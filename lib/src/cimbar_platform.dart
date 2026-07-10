@@ -13,7 +13,6 @@ import 'interfaces/screen_capture_interface.dart';
 import 'interfaces/camera_capture_interface.dart';
 import 'interfaces/image_compressor_interface.dart';
 import 'models/cimbar_config.dart';
-import 'models/cimbar_frame.dart';
 import 'models/decode_result.dart';
 
 import 'impl/avif_compressor.dart';
@@ -21,8 +20,13 @@ import 'impl/windows_screen_capture.dart'
     if (dart.library.js_interop) 'web/screen_capture_stub.dart';
 
 // Conditional imports — resolved at compile time:
-//   Native → FFI implementations
-//   Web    → JS interop implementations
+//   Native (Windows) → FFI implementations
+//   Web              → stubs / JS interop implementations
+//
+// Platform responsibilities:
+//   Windows  → Encoder (FFI), Screen Capture (Win32 GDI), Image Compressor
+//   Android  → Decoder (MethodChannel/JNI), Camera Capture
+//   Web      → Decoder (JS interop/WASM), Camera Capture
 import 'ffi/cimbar_encoder_ffi.dart'
     if (dart.library.js_interop) 'web/cimbar_encoder_web.dart';
 import 'ffi/cimbar_decoder_ffi.dart'
@@ -31,9 +35,22 @@ import 'ffi/cimbar_decoder_ffi.dart'
 /// Central registry that provides platform-appropriate implementations
 /// of all cimbar interfaces.
 ///
+/// ## Platform Responsibilities
+///
+/// | Feature           | Windows | Android | Web |
+/// |-------------------|---------|---------|-----|
+/// | Encoder           | FFI     | --      | --  |
+/// | Decoder           | --      | JNI     | WASM|
+/// | Screen Capture    | Win32   | --      | --  |
+/// | Camera Capture    | --      | plugin  | getUserMedia |
+/// | Image Compressor  | AVIF    | --      | --  |
+///
 /// Usage:
 /// ```dart
+/// // Windows only:
 /// final encoder = await CimbarPlatform.instance.createEncoder();
+///
+/// // Web / Android only:
 /// final decoder = await CimbarPlatform.instance.createDecoder();
 /// ```
 class CimbarPlatform {
@@ -44,27 +61,25 @@ class CimbarPlatform {
   /// Singleton access to the platform registry.
   static CimbarPlatform get instance => _instance;
 
-  /// Create a platform-appropriate cimbar encoder.
+  /// Create a cimbar encoder (Windows only).
   ///
-  /// | Platform            | Implementation                    |
-  /// |---------------------|-----------------------------------|
-  /// | Windows/macOS/Linux | FFI → libcimbar shared library    |
-  /// | Android             | MethodChannel → JNI native code   |
-  /// | Web (WASM)          | JS interop → WASM module          |
+  /// Throws [UnsupportedError] on Web and Android — encoding is
+  /// only supported on Windows via FFI to the native libcimbar library.
   Future<ICimbarEncoder> createEncoder() async {
     if (kIsWeb) {
-      // On web, the conditional import resolves CimbarEncoderFfi
-      // to CimbarEncoderWeb from web/cimbar_encoder_web.dart
-      return CimbarEncoderFfi();
+      throw UnsupportedError('Encoding is only supported on Windows.');
     }
     if (Platform.isAndroid) {
-      return _MethodChannelEncoder();
+      throw UnsupportedError('Encoding is only supported on Windows.');
     }
-    // Windows, macOS, Linux → FFI
+    // Windows → FFI
     return CimbarEncoderFfi();
   }
 
-  /// Create a platform-appropriate cimbar decoder.
+  /// Create a cimbar decoder (Web and Android only).
+  ///
+  /// Throws [UnsupportedError] on Windows — decoding is handled by
+  /// the receiving platforms (Web via WASM, Android via JNI).
   Future<ICimbarDecoder> createDecoder() async {
     if (kIsWeb) {
       return CimbarDecoderFfi();
@@ -72,10 +87,13 @@ class CimbarPlatform {
     if (Platform.isAndroid) {
       return _MethodChannelDecoder();
     }
-    return CimbarDecoderFfi();
+    throw UnsupportedError(
+      'Decoding is only supported on Web and Android. '
+      'Windows is the encoding platform.',
+    );
   }
 
-  /// Create a screen capture implementation (desktop platforms only).
+  /// Create a screen capture implementation (Windows only).
   Future<IScreenCapture> createScreenCapture() async {
     if (kIsWeb) {
       throw UnsupportedError('Screen capture is not available on web.');
@@ -84,11 +102,11 @@ class CimbarPlatform {
       return WindowsScreenCapture();
     }
     throw UnsupportedError(
-      'Screen capture not yet implemented for ${Platform.operatingSystem}.',
+      'Screen capture is only supported on Windows.',
     );
   }
 
-  /// Create a camera capture implementation.
+  /// Create a camera capture implementation (Web and Android only).
   Future<ICameraCapture> createCameraCapture() async {
     if (kIsWeb) {
       return _WebCameraCapture();
@@ -97,48 +115,24 @@ class CimbarPlatform {
       return _AndroidCameraCapture();
     }
     throw UnsupportedError(
-      'Camera capture not yet implemented for ${Platform.operatingSystem}.',
+      'Camera capture is only supported on Web and Android.',
     );
   }
 
-  /// Create an AVIF image compressor.
+  /// Create an AVIF image compressor (Windows only).
   Future<IImageCompressor> createImageCompressor() async {
+    if (kIsWeb) {
+      throw UnsupportedError(
+        'Image compression is only supported on Windows.',
+      );
+    }
     return AvifCompressor();
   }
 }
 
 // =================================================================
-// MethodChannel implementations for Android
+// MethodChannel decoder stub for Android
 // =================================================================
-
-class _MethodChannelEncoder implements ICimbarEncoder {
-  @override
-  bool get isReady => false;
-
-  @override
-  Future<void> configure(CimbarConfig config) async {
-    throw UnimplementedError(
-      'Android encoder requires the native JNI library. '
-      'Run native/build_android.sh to compile.',
-    );
-  }
-
-  @override
-  Future<List<CimbarFrame>> encodeData(
-    Uint8List data, {
-    String filename = 'data.bin',
-  }) async {
-    throw UnimplementedError('Android encoder not yet wired up.');
-  }
-
-  @override
-  Future<List<CimbarFrame>> encodeFile(String filePath) async {
-    throw UnimplementedError('Android encoder not yet wired up.');
-  }
-
-  @override
-  Future<void> dispose() async {}
-}
 
 class _MethodChannelDecoder implements ICimbarDecoder {
   @override
@@ -153,7 +147,8 @@ class _MethodChannelDecoder implements ICimbarDecoder {
   @override
   Future<void> configure(CimbarConfig config) async {
     throw UnimplementedError(
-      'Android decoder requires the native JNI library.',
+      'Android decoder requires the native JNI library. '
+      'Run native/build_android.sh to compile.',
     );
   }
 
@@ -182,7 +177,7 @@ class _MethodChannelDecoder implements ICimbarDecoder {
 }
 
 // =================================================================
-// Camera capture stubs
+// Camera capture stubs (Web + Android)
 // =================================================================
 
 class _AndroidCameraCapture implements ICameraCapture {

@@ -116,6 +116,222 @@ external int cimbardGetReport(int buffPtr, int maxlen);
 
 // ─── Helper utilities ────────────────────────────────────────────
 
+/// Check WASM module loading status and return diagnostic information.
+///
+/// Returns a map with:
+/// - `moduleDefined`: whether the global `Module` object exists
+/// - `calledRun`: whether WASM runtime has finished initializing
+/// - `scriptLoaded`: whether libcimbar.js script tag is present
+/// - `ready`: overall readiness status
+bool _checkWasmFileMissing() {
+  try {
+    return _wasmMissing == true;
+  } catch (_) {
+    return false;
+  }
+}
+
+WasmDiagnostics checkWasmDiagnostics() {
+  final moduleDefined = _checkModuleDefined();
+  final calledRun = moduleDefined ? _checkCalledRun() : false;
+  final wasmMissing = _checkWasmFileMissing();
+  return WasmDiagnostics(
+    moduleDefined: moduleDefined,
+    calledRun: calledRun,
+    ready: moduleDefined && calledRun,
+    wasmFileMissing: wasmMissing,
+  );
+}
+
+bool _checkModuleDefined() {
+  try {
+    return cimbarModule != null;
+  } catch (_) {
+    return false;
+  }
+}
+
+bool _checkCalledRun() {
+  try {
+    return cimbarModule?.calledRun ?? false;
+  } catch (_) {
+    return false;
+  }
+}
+
+@JS('window.__libcimbarWasmMissing')
+external bool? get _wasmMissing;
+
+/// WASM module diagnostic information.
+class WasmDiagnostics {
+  /// Whether the global `Module` JS object exists.
+  final bool moduleDefined;
+
+  /// Whether `Module.calledRun` is true (WASM runtime initialized).
+  final bool calledRun;
+
+  /// Whether the WASM JS glue file is missing (404).
+  final bool wasmFileMissing;
+
+  /// Overall readiness.
+  final bool ready;
+
+  /// How long the wait was (if applicable).
+  final Duration? waitDuration;
+
+  const WasmDiagnostics({
+    required this.moduleDefined,
+    required this.calledRun,
+    required this.ready,
+    this.wasmFileMissing = false,
+    this.waitDuration,
+  });
+
+  /// Human-readable diagnostic report.
+  String toReport() {
+    final lines = <String>[
+      'WASM Diagnostics:',
+      '  Module object exists: $moduleDefined',
+      '  Module.calledRun:     $calledRun',
+      '  WASM file loaded:     ${!wasmFileMissing}',
+      '  Ready:                $ready',
+    ];
+    if (waitDuration != null) {
+      lines.add('  Waited:               ${waitDuration!.inMilliseconds}ms');
+    }
+    if (wasmFileMissing) {
+      lines.add('');
+      lines.add('  Cause: libcimbar.js WASM file not found.');
+      lines.add('  The WASM module has not been compiled yet.');
+      lines.add('');
+      lines.add('  Steps to fix:');
+      lines.add('    1. Install Emscripten SDK:');
+      lines
+          .add('       git clone https://github.com/emscripten-core/emsdk.git');
+      lines.add('       cd emsdk && ./emsdk install latest && '
+          './emsdk activate latest');
+      lines.add('       source emsdk_env.sh');
+      lines.add('    2. Build WASM:');
+      lines.add('       cd native && ./build_wasm.sh');
+      lines.add('    3. Copy output:');
+      lines.add('       mkdir -p ../example/web/assets/wasm/');
+      lines
+          .add('       cp build_wasm/libcimbar.js ../example/web/assets/wasm/');
+      lines.add('       cp build_wasm/libcimbar.wasm '
+          '../example/web/assets/wasm/');
+      lines.add('    4. Rebuild web app:');
+      lines.add('       cd ../example && flutter build web');
+    } else if (!moduleDefined) {
+      lines.add('');
+      lines.add('  Cause: Module object not found.');
+      lines.add('  Fix: Ensure index.html configures the Module object.');
+    } else if (!calledRun) {
+      lines.add('');
+      lines.add('  Cause: Module exists but WASM runtime did not finish'
+          ' initializing.');
+      lines.add('  Fix: Check browser console for WASM loading errors.');
+      lines.add('       The .wasm binary may be missing or corrupted.');
+    }
+    return lines.join('\n');
+  }
+
+  @override
+  String toString() => toReport();
+}
+
+/// Wait for the WASM module to finish initializing.
+///
+/// Polls `Module.calledRun` at [pollInterval] until it becomes true
+/// or [timeout] is reached.
+///
+/// Returns a [WasmDiagnostics] with `ready: true` if successful,
+/// or `ready: false` if timed out.
+Future<WasmDiagnostics> waitForWasmReady({
+  Duration timeout = const Duration(seconds: 15),
+  Duration pollInterval = const Duration(milliseconds: 200),
+  void Function(String status)? onStatusUpdate,
+}) async {
+  final stopwatch = Stopwatch()..start();
+
+  // Quick check: already ready?
+  var diag = checkWasmDiagnostics();
+  if (diag.ready) {
+    return WasmDiagnostics(
+      moduleDefined: diag.moduleDefined,
+      calledRun: diag.calledRun,
+      ready: true,
+      wasmFileMissing: false,
+      waitDuration: stopwatch.elapsed,
+    );
+  }
+
+  // Quick check: WASM file is known to be missing?
+  if (diag.wasmFileMissing) {
+    return WasmDiagnostics(
+      moduleDefined: diag.moduleDefined,
+      calledRun: false,
+      ready: false,
+      wasmFileMissing: true,
+      waitDuration: stopwatch.elapsed,
+    );
+  }
+
+  onStatusUpdate?.call('Waiting for WASM module...');
+
+  // Poll until ready or timeout
+  while (stopwatch.elapsed < timeout) {
+    await Future<void>.delayed(pollInterval);
+    diag = checkWasmDiagnostics();
+
+    // WASM file confirmed missing during polling
+    if (diag.wasmFileMissing) {
+      return WasmDiagnostics(
+        moduleDefined: diag.moduleDefined,
+        calledRun: false,
+        ready: false,
+        wasmFileMissing: true,
+        waitDuration: stopwatch.elapsed,
+      );
+    }
+
+    if (!diag.moduleDefined) {
+      // Module not even defined yet — no point waiting
+      return WasmDiagnostics(
+        moduleDefined: false,
+        calledRun: false,
+        ready: false,
+        wasmFileMissing: false,
+        waitDuration: stopwatch.elapsed,
+      );
+    }
+
+    if (diag.calledRun) {
+      onStatusUpdate?.call('WASM module ready.');
+      return WasmDiagnostics(
+        moduleDefined: true,
+        calledRun: true,
+        ready: true,
+        wasmFileMissing: false,
+        waitDuration: stopwatch.elapsed,
+      );
+    }
+
+    final elapsed = stopwatch.elapsed.inMilliseconds;
+    onStatusUpdate?.call(
+      'Waiting for WASM runtime... (${elapsed}ms / ${timeout.inMilliseconds}ms)',
+    );
+  }
+
+  // Timed out
+  return WasmDiagnostics(
+    moduleDefined: diag.moduleDefined,
+    calledRun: diag.calledRun,
+    ready: false,
+    wasmFileMissing: diag.wasmFileMissing,
+    waitDuration: stopwatch.elapsed,
+  );
+}
+
 /// Load the libcimbar WASM module from the given script URL.
 ///
 /// Must be called before any `cimbare*` or `cimbard*` function.

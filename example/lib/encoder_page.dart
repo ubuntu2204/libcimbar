@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -8,7 +10,10 @@ import 'package:libcimbar/libcimbar.dart';
 
 import 'core/screenshot_capture.dart';
 
-/// Encoder page -- Windows screen capture -> AVIF compression -> cimbar encoding.
+/// Encoder page -- Windows only.
+///
+/// Screen capture -> AVIF compression -> cimbar encoding.
+/// This page should only be accessible on Windows.
 class EncoderPage extends StatefulWidget {
   const EncoderPage({super.key});
 
@@ -56,6 +61,14 @@ class _EncoderPageState extends State<EncoderPage>
   }
 
   Future<void> _initialize() async {
+    // Guard: encoder is Windows-only
+    if (kIsWeb || !Platform.isWindows) {
+      setState(() {
+        _statusMessage = 'Error: Encoding is only supported on Windows.';
+      });
+      return;
+    }
+
     try {
       _encoder = await _platform.createEncoder();
       _compressor = await _platform.createImageCompressor();
@@ -249,6 +262,24 @@ class _EncoderPageState extends State<EncoderPage>
                     ),
                     const SizedBox(width: 12),
                     Expanded(child: SelectableText(_statusMessage)),
+                    if (!_isReady ||
+                        _statusMessage.contains('error') ||
+                        _statusMessage.contains('Error'))
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 18),
+                        tooltip: 'Copy error message',
+                        onPressed: () {
+                          Clipboard.setData(
+                              ClipboardData(text: _statusMessage));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content:
+                                  Text('Error message copied to clipboard'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
               ),

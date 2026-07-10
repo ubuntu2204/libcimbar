@@ -14,21 +14,10 @@ import 'libcimbar_js_interop.dart';
 /// Calls the Emscripten-compiled libcimbar WASM module to decode
 /// cimbar barcode images received from a camera or file upload.
 ///
-/// ## Usage
-///
-/// ```dart
-/// final decoder = CimbarDecoderWeb();
-/// await decoder.configure(CimbarConfig(mode: CimbarMode.modeB));
-///
-/// // For each camera frame:
-/// final result = await decoder.decodeFrame(
-///   framePixels, width: 1024, height: 1024,
-/// );
-/// if (result.isComplete) {
-///   final fileBytes = result.data; // the recovered file
-/// }
-/// ```
-class CimbarDecoderWeb implements ICimbarDecoder {
+/// On web, the conditional import in `cimbar_platform.dart` resolves
+/// `CimbarDecoderFfi` to this class. On native platforms, it resolves
+/// to the FFI implementation in `ffi/cimbar_decoder_ffi.dart`.
+class CimbarDecoderFfi implements ICimbarDecoder {
   bool _ready = false;
   double _progress = 0.0;
   bool _isComplete = false;
@@ -41,8 +30,12 @@ class CimbarDecoderWeb implements ICimbarDecoder {
   int _decompressBufPtr = 0;
   int _decompressBufSize = 0;
 
-  CimbarDecoderWeb() {
-    _ready = cimbarModule != null && cimbarModule!.calledRun;
+  /// Last diagnostic snapshot (for debugging).
+  WasmDiagnostics? diagnostics;
+
+  CimbarDecoderFfi() {
+    diagnostics = checkWasmDiagnostics();
+    _ready = diagnostics!.ready;
     if (_ready) {
       _allocateBuffers();
     }
@@ -195,13 +188,10 @@ class CimbarDecoderWeb implements ICimbarDecoder {
 
   void _checkReady() {
     if (!_ready) {
+      final diag = diagnostics ?? checkWasmDiagnostics();
       throw StateError(
-        'Web decoder not ready. Ensure libcimbar.js is loaded in index.html.',
+        'Web decoder not ready.\n${diag.toReport()}',
       );
     }
   }
 }
-
-/// Alias for conditional import compatibility.
-/// On web, `CimbarDecoderFfi` resolves to this web implementation.
-typedef CimbarDecoderFfi = CimbarDecoderWeb;

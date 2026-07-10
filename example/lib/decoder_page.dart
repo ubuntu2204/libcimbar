@@ -3,15 +3,18 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:libcimbar/libcimbar.dart';
+// ignore: implementation_imports
+import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
+    if (dart.library.js_interop) 'package:libcimbar/src/web/libcimbar_js_interop.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Decoder page — receive cimbar barcodes via camera and decode them.
 ///
-/// Works on:
+/// Supported platforms:
 /// - **Android**: Uses the device camera via camera plugin
 /// - **Web (WASM)**: Uses getUserMedia for camera access
-/// - **Desktop**: Can also decode from image file upload
 ///
 /// The decoder processes each camera frame, feeding it into the
 /// fountain decoder until the complete file is recovered.
@@ -56,6 +59,33 @@ class _DecoderPageState extends State<DecoderPage> {
 
   Future<void> _initialize() async {
     try {
+      debugPrint('[Decoder] Waiting for WASM module...');
+      setState(() {
+        _statusMessage = 'Waiting for WASM module to initialize...';
+      });
+
+      final wasmDiag = await waitForWasmReady(
+        timeout: const Duration(seconds: 20),
+        onStatusUpdate: (status) {
+          debugPrint('[Decoder] $status');
+          if (mounted) {
+            setState(() => _statusMessage = status);
+          }
+        },
+      );
+
+      if (!wasmDiag.ready) {
+        debugPrint('[Decoder] WASM not ready. Diagnostics:');
+        debugPrint('[Decoder] ${wasmDiag.toReport()}');
+        setState(() {
+          _statusMessage =
+              'WASM module failed to initialize.\n\n${wasmDiag.toReport()}';
+        });
+        return;
+      }
+
+      debugPrint(
+          '[Decoder] WASM ready (${wasmDiag.waitDuration?.inMilliseconds}ms). Creating decoder...');
       _decoder = await _platform.createDecoder();
       await _decoder!.configure(_config);
 
@@ -63,20 +93,29 @@ class _DecoderPageState extends State<DecoderPage> {
         _isReady = _decoder!.isReady;
         _statusMessage = _isReady
             ? 'Decoder ready. Start camera to begin scanning.'
-            : 'Native library not loaded.';
+            : 'Decoder created but not ready.\n\n${_getDiagnostics()}';
       });
 
       // Try to initialize camera
       try {
         _camera = await _platform.createCameraCapture();
       } catch (e) {
-        // Camera not available — user can still decode from files
         debugPrint('Camera init failed: $e');
       }
     } catch (e) {
+      debugPrint('[Decoder] Initialization error: $e');
       setState(() {
         _statusMessage = 'Initialization error: $e';
       });
+    }
+  }
+
+  /// Get WASM diagnostic info.
+  String _getDiagnostics() {
+    try {
+      return checkWasmDiagnostics().toReport();
+    } catch (_) {
+      return 'WASM module not available.';
     }
   }
 
@@ -150,25 +189,6 @@ class _DecoderPageState extends State<DecoderPage> {
     } catch (e) {
       debugPrint('Frame decode error: $e');
     }
-  }
-
-  // ─── File decode (desktop / web fallback) ─────────────────────
-
-  Future<void> _decodeFromFile() async {
-    if (!_isReady) return;
-
-    // On desktop, open a file picker for a cimbar image
-    // On web, use <input type="file">
-    // For now, show a message
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'File-based decoding: select a cimbar barcode image.\n'
-          'This feature requires a file picker integration.',
-        ),
-        duration: Duration(seconds: 3),
-      ),
-    );
   }
 
   // ─── Save recovered file ──────────────────────────────────────
@@ -248,6 +268,24 @@ class _DecoderPageState extends State<DecoderPage> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(child: SelectableText(_statusMessage)),
+                        if (!_isReady ||
+                            _statusMessage.contains('error') ||
+                            _statusMessage.contains('Error'))
+                          IconButton(
+                            icon: const Icon(Icons.copy, size: 18),
+                            tooltip: 'Copy error message',
+                            onPressed: () {
+                              Clipboard.setData(
+                                  ClipboardData(text: _statusMessage));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Error message copied to clipboard'),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
                       ],
                     ),
                     if (_progress > 0 && _progress < 1.0) ...[
@@ -289,14 +327,6 @@ class _DecoderPageState extends State<DecoderPage> {
                     onPressed: _isCameraActive ? _stopCamera : null,
                     icon: const Icon(Icons.stop),
                     label: const Text('Stop Camera'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isReady ? _decodeFromFile : null,
-                    icon: const Icon(Icons.image),
-                    label: const Text('From Image'),
                   ),
                 ),
               ],
@@ -357,8 +387,7 @@ class _DecoderPageState extends State<DecoderPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Start the camera to scan cimbar codes\n'
-              'or decode from an image file',
+              'Start the camera to scan cimbar codes',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.outline,

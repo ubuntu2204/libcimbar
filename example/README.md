@@ -116,3 +116,19 @@ The example app only calls the abstract interfaces provided by the `libcimbar` p
 **WASM not loading** (Web)
 - Verify `libcimbar.js` and `libcimbar.wasm` exist in `web/assets/wasm/`
 - Check browser console for errors
+## 要让解码器真正工作，还需要编译 WASM 模块：
+# 1. 安装 Emscripten
+git clone https://github.com/emscripten-core/emsdk.git
+cd emsdk && ./emsdk install latest && ./emsdk activate latest
+source emsdk_env.sh
+
+# 2. 编译 WASM
+cd /home/ubuntu/project/libcimbar/native && ./build_wasm.sh
+
+# 3. 复制到 web assets
+mkdir -p ../example/web/assets/wasm/
+cp build_wasm/libcimbar.js ../example/web/assets/wasm/
+cp build_wasm/libcimbar.wasm ../example/web/assets/wasm/
+
+# 4. 重新构建
+cd ../example && flutter build web

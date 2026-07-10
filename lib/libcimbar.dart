@@ -9,35 +9,33 @@
 ///
 /// ## Features
 ///
-/// - **Encode**: Convert binary data into cimbar barcode frame images
-/// - **Decode**: Decode cimbar barcode images back into binary data
+/// - **Encode** (Windows): Convert binary data into cimbar barcode frame images
+/// - **Decode** (Web / Android): Decode cimbar barcode images back into binary data
 /// - **Screen Capture** (Windows): Hotkey-triggered region capture
 /// - **Camera Capture** (Android / Web): Real-time camera barcode scanning
-/// - **AVIF Compression**: Compress screenshots to AVIF before encoding
+/// - **AVIF Compression** (Windows): Compress screenshots to AVIF before encoding
 ///
-/// ## Architecture
+/// ## Platform Responsibilities
 ///
-/// All functionality is exposed through abstract interfaces in
-/// `lib/src/interfaces/`. Platform-specific implementations are selected
-/// automatically at runtime:
-///
-/// | Platform | Encoder (FFI/Native) | Decoder (FFI/Native) |
-/// |----------|---------------------|---------------------|
-/// | Windows  | dart:ffi → libcimbar.dll | dart:ffi → libcimbar.dll |
-/// | Android  | MethodChannel → JNI | MethodChannel → JNI + Camera |
-/// | Web      | JS interop → WASM | JS interop → WASM + Camera |
+/// | Feature          | Windows | Android | Web  |
+/// |------------------|---------|---------|------|
+/// | Encoder          | FFI     | --      | --   |
+/// | Decoder          | --      | JNI     | WASM |
+/// | Screen Capture   | Win32   | --      | --   |
+/// | Camera Capture   | --      | plugin  | getUserMedia |
+/// | Image Compressor | AVIF    | --      | --   |
 ///
 /// ## Quick Start
 ///
 /// ```dart
 /// import 'package:libcimbar/libcimbar.dart';
 ///
-/// // Encode data into cimbar frames
+/// // Windows only — encode data into cimbar frames
 /// final encoder = await CimbarPlatform.instance.createEncoder();
 /// await encoder.configure(CimbarConfig(mode: CimbarMode.modeB));
 /// final frames = await encoder.encodeData(avifBytes, filename: 'screen.avif');
 ///
-/// // Decode cimbar frames from camera
+/// // Web / Android only — decode cimbar frames from camera
 /// final decoder = await CimbarPlatform.instance.createDecoder();
 /// await decoder.configure(CimbarConfig(mode: CimbarMode.modeB));
 /// final result = await decoder.decodeFrame(imageBytes, width: 1024, height: 1024);

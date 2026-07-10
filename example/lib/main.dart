@@ -1,3 +1,8 @@
+// Platform responsibilities:
+//   Windows  → Encoder (screen capture + AVIF + cimbar encoding)
+//   Android  → Decoder (camera + JNI decoding)
+//   Web      → Decoder (camera + WASM decoding)
+
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -14,8 +19,8 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize window_manager (required for hide/show during screenshot)
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+  // Windows only: initialize window_manager for screenshot hide/show
+  if (!kIsWeb && Platform.isWindows) {
     await windowManager.ensureInitialized();
 
     const windowOptions = WindowOptions(
@@ -30,11 +35,13 @@ void main() async {
     });
   }
 
-  // Set navigator key for screenshot overlay (needs context without BuildContext)
-  ScreenshotCapture.navigatorKey = navigatorKey;
+  // Windows only: set navigator key for screenshot overlay
+  if (!kIsWeb && Platform.isWindows) {
+    ScreenshotCapture.navigatorKey = navigatorKey;
+  }
 
-  // Initialize hotkey manager
-  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+  // Windows only: initialize hotkey manager
+  if (!kIsWeb && Platform.isWindows) {
     await hotKeyManager.unregisterAll();
   }
 
@@ -70,15 +77,15 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
-  bool get _isEncoderPlatform =>
-      !kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS);
+  // Windows only: show Encode tab
+  bool get _isWindows => !kIsWeb && Platform.isWindows;
 
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[];
     final navItems = <BottomNavigationBarItem>[];
 
-    if (_isEncoderPlatform) {
+    if (_isWindows) {
       pages.add(const EncoderPage());
       navItems.add(const BottomNavigationBarItem(
         icon: Icon(Icons.cast),

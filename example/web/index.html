@@ -75,8 +75,25 @@
   </script>
 
   <!-- libcimbar WASM JS glue (must be built with build_wasm.sh first) -->
-  <!-- Uncomment after building: -->
-  <!-- <script src="assets/wasm/libcimbar.js"></script> -->
+  <script>
+    // Load libcimbar WASM module if the JS glue file exists.
+    // Build with: cd native && ./build_wasm.sh
+    // Then copy output to example/web/assets/wasm/
+    (function() {
+      var script = document.createElement('script');
+      script.src = 'assets/wasm/libcimbar.js';
+      script.onload = function() {
+        console.log('[libcimbar] WASM JS glue loaded');
+      };
+      script.onerror = function() {
+        console.warn('[libcimbar] WASM JS glue not found at assets/wasm/libcimbar.js');
+        console.warn('[libcimbar] Build with: cd native && ./build_wasm.sh');
+        console.warn('[libcimbar] Then copy output to example/web/assets/wasm/');
+        window.__libcimbarWasmMissing = true;
+      };
+      document.head.appendChild(script);
+    })();
+  </script>
 
   <!-- Flutter bootstrap -->
   <script src="flutter_bootstrap.js" async></script>
