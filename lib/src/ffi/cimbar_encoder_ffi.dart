@@ -4,7 +4,6 @@
 
 import 'dart:ffi';
 import 'dart:io' show File, Platform;
-import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
@@ -70,8 +69,7 @@ class CimbarEncoderFfi implements ICimbarEncoder {
 
         final result = _native.encode(nativeBuffer, copyLen);
         if (result < 0) {
-          throw StateError(
-              'cimbare_encode failed at offset $offset: $result');
+          throw StateError('cimbare_encode failed at offset $offset: $result');
         }
         offset += copyLen;
       }

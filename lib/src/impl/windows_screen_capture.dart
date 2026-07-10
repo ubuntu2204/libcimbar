@@ -58,8 +58,7 @@ class WindowsScreenCapture implements IScreenCapture {
         .asFunction<_DartGetSystemMetrics>();
 
     _createCompatibleDC = _gdi32
-        .lookup<NativeFunction<_NativeCreateCompatibleDC>>(
-            'CreateCompatibleDC')
+        .lookup<NativeFunction<_NativeCreateCompatibleDC>>('CreateCompatibleDC')
         .asFunction<_DartCreateCompatibleDC>();
     _deleteDC = _gdi32
         .lookup<NativeFunction<_NativeDeleteDC>>('DeleteDC')
@@ -90,8 +89,7 @@ class WindowsScreenCapture implements IScreenCapture {
   @override
   Future<ScreenCaptureResult> captureRegion(Rect region) async {
     if (!isSupported) {
-      throw UnsupportedError(
-          'Screen capture not supported on this platform.');
+      throw UnsupportedError('Screen capture not supported on this platform.');
     }
 
     final x = region.left.toInt();
@@ -105,8 +103,7 @@ class WindowsScreenCapture implements IScreenCapture {
   @override
   Future<ScreenCaptureResult> captureFullScreen() async {
     if (!isSupported) {
-      throw UnsupportedError(
-          'Screen capture not supported on this platform.');
+      throw UnsupportedError('Screen capture not supported on this platform.');
     }
 
     // SM_CXSCREEN = 0, SM_CYSCREEN = 1
@@ -132,7 +129,7 @@ class WindowsScreenCapture implements IScreenCapture {
     _bitBlt(hdcMem, 0, 0, width, height, hdcScreen, x, y, 0x00CC0020);
 
     // Set up BITMAPINFOHEADER for 32-bit BGRA
-    final biSize = 40;
+    const biSize = 40;
     final bi = calloc<Uint8>(biSize + 8); // extra for color masks
     final biView = bi.cast<Uint32>();
     biView[0] = biSize; // biSize

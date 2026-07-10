@@ -84,76 +84,69 @@ class CimbarNative {
   void _bindAll() {
     // ── Encoder ──
     _configure = _lib
-        .lookup<NativeFunction<_configure_t>>('cimbare_configure')
+        .lookup<NativeFunction<_ConfigureT>>('cimbare_configure')
         .asFunction();
     _initEncode = _lib
-        .lookup<NativeFunction<_init_encode_t>>('cimbare_init_encode')
+        .lookup<NativeFunction<_InitEncodeT>>('cimbare_init_encode')
         .asFunction();
     _encodeBufsize = _lib
-        .lookup<NativeFunction<_encode_bufsize_t>>('cimbare_encode_bufsize')
+        .lookup<NativeFunction<_EncodeBufsizeT>>('cimbare_encode_bufsize')
         .asFunction();
-    _encode = _lib
-        .lookup<NativeFunction<_encode_t>>('cimbare_encode')
-        .asFunction();
+    _encode =
+        _lib.lookup<NativeFunction<_EncodeT>>('cimbare_encode').asFunction();
     _nextFrame = _lib
-        .lookup<NativeFunction<_next_frame_t>>('cimbare_next_frame')
+        .lookup<NativeFunction<_NextFrameT>>('cimbare_next_frame')
         .asFunction();
     _getFrameBuff = _lib
-        .lookup<NativeFunction<_get_frame_buff_t>>('cimbare_get_frame_buff')
+        .lookup<NativeFunction<_GetFrameBuffT>>('cimbare_get_frame_buff')
         .asFunction();
-    _render = _lib
-        .lookup<NativeFunction<_render_t>>('cimbare_render')
-        .asFunction();
+    _render =
+        _lib.lookup<NativeFunction<_RenderT>>('cimbare_render').asFunction();
     _initWindow = _lib
-        .lookup<NativeFunction<_init_window_t>>('cimbare_init_window')
+        .lookup<NativeFunction<_InitWindowT>>('cimbare_init_window')
         .asFunction();
     _rotateWindow = _lib
-        .lookup<NativeFunction<_rotate_window_t>>('cimbare_rotate_window')
+        .lookup<NativeFunction<_RotateWindowT>>('cimbare_rotate_window')
         .asFunction();
     _autoScaleWindow = _lib
-        .lookup<NativeFunction<_auto_scale_window_t>>(
-            'cimbare_auto_scale_window')
+        .lookup<NativeFunction<_AutoScaleWindowT>>('cimbare_auto_scale_window')
         .asFunction();
     _getAspectRatio = _lib
-        .lookup<NativeFunction<_get_aspect_ratio_t>>(
-            'cimbare_get_aspect_ratio')
+        .lookup<NativeFunction<_GetAspectRatioT>>('cimbare_get_aspect_ratio')
         .asFunction();
 
     // ── Decoder ──
     _configureDecode = _lib
-        .lookup<NativeFunction<_configure_decode_t>>(
-            'cimbard_configure_decode')
+        .lookup<NativeFunction<_ConfigureDecodeT>>('cimbard_configure_decode')
         .asFunction();
     _getBufsize = _lib
-        .lookup<NativeFunction<_get_bufsize_t>>('cimbard_get_bufsize')
+        .lookup<NativeFunction<_GetBufsizeT>>('cimbard_get_bufsize')
         .asFunction();
     _getDecompressBufsize = _lib
-        .lookup<NativeFunction<_get_decompress_bufsize_t>>(
+        .lookup<NativeFunction<_GetDecompressBufsizeT>>(
             'cimbard_get_decompress_bufsize')
         .asFunction();
     _scanExtractDecode = _lib
-        .lookup<NativeFunction<_scan_extract_decode_t>>(
+        .lookup<NativeFunction<_ScanExtractDecodeT>>(
             'cimbard_scan_extract_decode')
         .asFunction();
     _fountainDecode = _lib
-        .lookup<NativeFunction<_fountain_decode_t>>(
-            'cimbard_fountain_decode')
+        .lookup<NativeFunction<_FountainDecodeT>>('cimbard_fountain_decode')
         .asFunction();
     _getFilesize = _lib
-        .lookup<NativeFunction<_get_filesize_t>>('cimbard_get_filesize')
+        .lookup<NativeFunction<_GetFilesizeT>>('cimbard_get_filesize')
         .asFunction();
     _getFilename = _lib
-        .lookup<NativeFunction<_get_filename_t>>('cimbard_get_filename')
+        .lookup<NativeFunction<_GetFilenameT>>('cimbard_get_filename')
         .asFunction();
     _decompressRead = _lib
-        .lookup<NativeFunction<_decompress_read_t>>(
-            'cimbard_decompress_read')
+        .lookup<NativeFunction<_DecompressReadT>>('cimbard_decompress_read')
         .asFunction();
     _getReport = _lib
-        .lookup<NativeFunction<_get_report_t>>('cimbard_get_report')
+        .lookup<NativeFunction<_GetReportT>>('cimbard_get_report')
         .asFunction();
     _getDebug = _lib
-        .lookup<NativeFunction<_get_debug_t>>('cimbard_get_debug')
+        .lookup<NativeFunction<_GetDebugT>>('cimbard_get_debug')
         .asFunction();
   }
 
@@ -290,38 +283,35 @@ class CimbarNative {
 // ─── Native function type definitions ─────────────────────────────
 
 // Encoder
-typedef _configure_t = Int32 Function(Int32 modeVal, Int32 compression);
-typedef _init_encode_t = Int32 Function(
+typedef _ConfigureT = Int32 Function(Int32 modeVal, Int32 compression);
+typedef _InitEncodeT = Int32 Function(
     Pointer<Utf8> filename, Uint32 fnsize, Int32 encodeId);
-typedef _encode_bufsize_t = Int32 Function();
-typedef _encode_t = Int32 Function(Pointer<Uint8> buffer, Uint32 size);
-typedef _next_frame_t = Int32 Function(Bool colorBalance);
-typedef _get_frame_buff_t = Int32 Function(Pointer<Pointer<Uint8>> buff);
-typedef _render_t = Int32 Function();
-typedef _init_window_t = Int32 Function(Int32 width, Int32 height);
-typedef _rotate_window_t = Int32 Function(Bool rotate);
-typedef _auto_scale_window_t = Int32 Function(Uint32 padding);
-typedef _get_aspect_ratio_t = Float Function();
+typedef _EncodeBufsizeT = Int32 Function();
+typedef _EncodeT = Int32 Function(Pointer<Uint8> buffer, Uint32 size);
+typedef _NextFrameT = Int32 Function(Bool colorBalance);
+typedef _GetFrameBuffT = Int32 Function(Pointer<Pointer<Uint8>> buff);
+typedef _RenderT = Int32 Function();
+typedef _InitWindowT = Int32 Function(Int32 width, Int32 height);
+typedef _RotateWindowT = Int32 Function(Bool rotate);
+typedef _AutoScaleWindowT = Int32 Function(Uint32 padding);
+typedef _GetAspectRatioT = Float Function();
 
 // Decoder
-typedef _configure_decode_t = Int32 Function(Int32 modeVal);
-typedef _get_bufsize_t = Int32 Function();
-typedef _get_decompress_bufsize_t = Int32 Function();
-typedef _scan_extract_decode_t = Int32 Function(
+typedef _ConfigureDecodeT = Int32 Function(Int32 modeVal);
+typedef _GetBufsizeT = Int32 Function();
+typedef _GetDecompressBufsizeT = Int32 Function();
+typedef _ScanExtractDecodeT = Int32 Function(
     Pointer<Uint8> imgdata,
     Uint32 imgw,
     Uint32 imgh,
     Int32 format,
     Pointer<Uint8> bufspace,
     Uint32 bufsize);
-typedef _fountain_decode_t = Int64 Function(
-    Pointer<Uint8> buffer, Uint32 size);
-typedef _get_filesize_t = Int32 Function(Uint32 id);
-typedef _get_filename_t = Int32 Function(
+typedef _FountainDecodeT = Int64 Function(Pointer<Uint8> buffer, Uint32 size);
+typedef _GetFilesizeT = Int32 Function(Uint32 id);
+typedef _GetFilenameT = Int32 Function(
     Uint32 id, Pointer<Utf8> filename, Uint32 fnsize);
-typedef _decompress_read_t = Int32 Function(
+typedef _DecompressReadT = Int32 Function(
     Uint32 id, Pointer<Uint8> buffer, Uint32 size);
-typedef _get_report_t = Uint32 Function(
-    Pointer<Uint8> buff, Uint32 maxlen);
-typedef _get_debug_t = Uint32 Function(
-    Pointer<Uint8> buff, Uint32 maxlen);
+typedef _GetReportT = Uint32 Function(Pointer<Uint8> buff, Uint32 maxlen);
+typedef _GetDebugT = Uint32 Function(Pointer<Uint8> buff, Uint32 maxlen);

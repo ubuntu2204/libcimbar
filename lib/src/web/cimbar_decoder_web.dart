@@ -42,14 +42,14 @@ class CimbarDecoderWeb implements ICimbarDecoder {
   int _decompressBufSize = 0;
 
   CimbarDecoderWeb() {
-    _ready = _module != null && _module!.calledRun;
+    _ready = cimbarModule != null && cimbarModule!.calledRun;
     if (_ready) {
       _allocateBuffers();
     }
   }
 
   void _allocateBuffers() {
-    final module = _module!;
+    final module = cimbarModule!;
     _decodeBufSize = cimbardGetBufsize();
     _decodeBufPtr = module.malloc(_decodeBufSize);
 
@@ -83,7 +83,7 @@ class CimbarDecoderWeb implements ICimbarDecoder {
     CimbarImageFormat format = CimbarImageFormat.rgb,
   }) async {
     _checkReady();
-    final module = _module!;
+    final module = cimbarModule!;
 
     // Copy image data to WASM heap
     final imgPtr = module.malloc(imageData.length);
@@ -144,7 +144,7 @@ class CimbarDecoderWeb implements ICimbarDecoder {
   @override
   Future<Uint8List?> recoverFile(int fileId) async {
     _checkReady();
-    final module = _module!;
+    final module = cimbarModule!;
 
     final result = BytesBuilder();
 
@@ -171,7 +171,7 @@ class CimbarDecoderWeb implements ICimbarDecoder {
 
   String _recoverFilename(int fileId) {
     _checkReady();
-    final module = _module!;
+    final module = cimbarModule!;
     final fnPtr = module.malloc(256);
     try {
       final len = cimbardGetFilename(fileId, fnPtr, 256);
@@ -185,8 +185,8 @@ class CimbarDecoderWeb implements ICimbarDecoder {
 
   @override
   Future<void> dispose() async {
-    if (_ready && _module != null) {
-      final module = _module!;
+    if (_ready && cimbarModule != null) {
+      final module = cimbarModule!;
       if (_decodeBufPtr != 0) module.free(_decodeBufPtr);
       if (_decompressBufPtr != 0) module.free(_decompressBufPtr);
     }

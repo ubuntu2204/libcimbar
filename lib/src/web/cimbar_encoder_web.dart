@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import 'dart:js_interop';
 import 'dart:typed_data';
 
 import '../interfaces/cimbar_encoder_interface.dart';
@@ -26,7 +27,7 @@ class CimbarEncoderWeb implements ICimbarEncoder {
   bool _ready = false;
 
   CimbarEncoderWeb() {
-    _ready = _module != null && _module!.calledRun;
+    _ready = cimbarModule != null && cimbarModule!.calledRun;
   }
 
   @override
@@ -47,7 +48,7 @@ class CimbarEncoderWeb implements ICimbarEncoder {
     String filename = 'data.bin',
   }) async {
     _checkReady();
-    final module = _module!;
+    final module = cimbarModule!;
 
     // Encode filename into WASM heap
     final fnBytes = Uint8List.fromList(filename.codeUnits);

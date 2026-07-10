@@ -290,7 +290,6 @@ bool _findChunkType(Uint8List png, String chunkType) {
 
 /// Find the byte position of a chunk type in PNG data.
 int? _findChunkPosition(Uint8List png, String chunkType) {
-  final typeBytes = chunkType.codeUnits;
   // Start after PNG signature (8 bytes)
   int offset = 8;
 

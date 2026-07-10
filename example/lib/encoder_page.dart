@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -41,7 +40,6 @@ class _EncoderPageState extends State<EncoderPage>
   AnimationController? _frameAnimationController;
 
   // Capture result
-  Uint8List? _capturedPixels;
   int _capturedWidth = 0;
   int _capturedHeight = 0;
 
@@ -101,7 +99,6 @@ class _EncoderPageState extends State<EncoderPage>
         return;
       }
 
-      _capturedPixels = result.pixels;
       _capturedWidth = result.width;
       _capturedHeight = result.height;
 
@@ -116,8 +113,7 @@ class _EncoderPageState extends State<EncoderPage>
         quality: CompressionQuality.balanced,
       );
 
-      _statusMessage =
-          'Captured ${result.width}x${result.height}, '
+      _statusMessage = 'Captured ${result.width}x${result.height}, '
           'compressed: ${_compressedData!.length} bytes. Ready to encode.';
     } catch (e) {
       _statusMessage = 'Capture error: $e';
@@ -163,7 +159,10 @@ class _EncoderPageState extends State<EncoderPage>
         }
         final completer = Completer<ui.Image>();
         ui.decodeImageFromPixels(
-          rgba, frame.width, frame.height, ui.PixelFormat.rgba8888,
+          rgba,
+          frame.width,
+          frame.height,
+          ui.PixelFormat.rgba8888,
           (image) => completer.complete(image),
         );
         _decodedFrames.add(await completer.future);
@@ -261,11 +260,11 @@ class _EncoderPageState extends State<EncoderPage>
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _isReady && !_isCapturing
-                        ? _startScreenCapture
-                        : null,
+                    onPressed:
+                        _isReady && !_isCapturing ? _startScreenCapture : null,
                     icon: const Icon(Icons.screenshot),
-                    label: Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
+                    label:
+                        Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -345,8 +344,8 @@ class _EncoderPageState extends State<EncoderPage>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.screenshot_monitor_outlined, size: 80,
-                color: Theme.of(context).colorScheme.outline),
+            Icon(Icons.screenshot_monitor_outlined,
+                size: 80, color: Theme.of(context).colorScheme.outline),
             const SizedBox(height: 16),
             Text(
               'Press Alt+A or click "Capture"\nto select a screen region',

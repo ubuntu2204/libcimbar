@@ -120,7 +120,6 @@ void main() {
       // 2. Read bytes: Module.HEAPU8.subarray(ptr, ptr + size)
       // 3. Copy to Dart Uint8List
 
-      const ptr = 0x1000;
       const size = 256;
       final output = List<int>.generate(size, (i) => i);
 

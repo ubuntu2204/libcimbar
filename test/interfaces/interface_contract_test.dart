@@ -393,7 +393,7 @@ void main() {
     });
 
     test('ScreenCaptureResult stride calculation', () {
-      const result = ScreenCaptureResult(
+      final result = ScreenCaptureResult(
         pixels: Uint8List(0),
         width: 256,
         height: 256,
@@ -537,7 +537,7 @@ void main() {
     });
 
     test('DecompressedImage has correct properties', () {
-      const img = DecompressedImage(
+      final img = DecompressedImage(
         pixels: Uint8List(0),
         width: 100,
         height: 200,

@@ -107,6 +107,7 @@ class AvifCompressor implements IImageCompressor {
   ) async {
     // Quality mapping: fast=20, balanced=50, best=80
     // (avif uses quantizer 0-63 where lower = better)
+    // ignore: unused_local_variable
     final quantizer = switch (quality) {
       CompressionQuality.fast => 45,
       CompressionQuality.balanced => 30,
@@ -178,11 +179,17 @@ class AvifCompressor implements IImageCompressor {
 
   /// Minimal PNG encoder for RGBA data (no external dependencies).
   /// Produces a valid PNG file with uncompressed IDAT chunks.
-  Uint8List _encodeMinimalPng(
-      Uint8List rgba, int width, int height) {
+  Uint8List _encodeMinimalPng(Uint8List rgba, int width, int height) {
     // PNG signature
     final signature = Uint8List.fromList([
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
     ]);
 
     // Build IHDR chunk

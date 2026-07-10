@@ -64,7 +64,9 @@ The app will show the **Decoder** tab:
 ```bash
 flutter run -d chrome
 
-adb reverse tcp:8080 tcp:8080 flutter run -d web-server --release --web-port 8080 --web-hostname 0.0.0.0 手机访问localhost:8080
+adb reverse tcp:8080 tcp:8080
+flutter run -d web-server --release --web-port 8080 --web-hostname 0.0.0.0
+手机访问localhost:8080
 ```
 
 Make sure the WASM files are in `web/assets/wasm/`:

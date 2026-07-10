@@ -1,4 +1,4 @@
-import 'dart:io' show File, Platform;
+import 'dart:io' show File;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -42,7 +42,6 @@ class _DecoderPageState extends State<DecoderPage> {
   );
 
   // Decode result
-  DecodeResult? _lastResult;
   Uint8List? _recoveredData;
   String _recoveredFilename = '';
 
@@ -130,7 +129,6 @@ class _DecoderPageState extends State<DecoderPage> {
       if (!mounted) return;
 
       _framesProcessed++;
-      _lastResult = result;
       _progress = result.progress;
 
       if (result.isComplete) {
@@ -145,7 +143,7 @@ class _DecoderPageState extends State<DecoderPage> {
       } else {
         _statusMessage =
             'Decoding... ${(result.progress * 100).toStringAsFixed(1)}% '
-            '(${_framesProcessed} frames)';
+            '($_framesProcessed frames)';
       }
 
       setState(() {});
@@ -183,8 +181,7 @@ class _DecoderPageState extends State<DecoderPage> {
       if (kIsWeb) {
         // On web, trigger a download
         // In production, use dart:js_interop to create a Blob and download link
-        _statusMessage =
-            'File decoded! In production, a download will start.';
+        _statusMessage = 'File decoded! In production, a download will start.';
         return;
       }
 
@@ -280,9 +277,8 @@ class _DecoderPageState extends State<DecoderPage> {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _isReady && !_isCameraActive
-                        ? _startCamera
-                        : null,
+                    onPressed:
+                        _isReady && !_isCameraActive ? _startCamera : null,
                     icon: const Icon(Icons.videocam),
                     label: const Text('Start Camera'),
                   ),

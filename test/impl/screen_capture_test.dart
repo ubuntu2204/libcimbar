@@ -6,7 +6,7 @@ import 'package:libcimbar/src/interfaces/screen_capture_interface.dart';
 void main() {
   group('ScreenCaptureResult', () {
     test('constructor sets all fields', () {
-      const result = ScreenCaptureResult(
+      final result = ScreenCaptureResult(
         pixels: Uint8List(0),
         width: 100,
         height: 200,
@@ -18,7 +18,7 @@ void main() {
     });
 
     test('stride is width * 4 (RGBA)', () {
-      const result = ScreenCaptureResult(
+      final result = ScreenCaptureResult(
         pixels: Uint8List(0),
         width: 256,
         height: 256,
@@ -62,7 +62,7 @@ void main() {
     });
 
     test('empty capture result', () {
-      const result = ScreenCaptureResult(
+      final result = ScreenCaptureResult(
         pixels: Uint8List(0),
         width: 0,
         height: 0,
@@ -138,16 +138,16 @@ void main() {
     test('region coordinates translate to pixel offsets', () {
       // Simulate extracting a sub-region from a full screen capture
       const fullWidth = 1920;
-      const fullHeight = 1080;
+      // fullHeight not needed for this test
       const regionX = 100;
       const regionY = 200;
       const regionW = 400;
       const regionH = 300;
 
       // Calculate byte offsets
-      final startOffset = (regionY * fullWidth + regionX) * 4;
-      final endRow = regionY + regionH;
-      final expectedRowBytes = regionW * 4;
+      const startOffset = (regionY * fullWidth + regionX) * 4;
+      const endRow = regionY + regionH;
+      const expectedRowBytes = regionW * 4;
 
       expect(startOffset, greaterThan(0));
       expect(expectedRowBytes, 1600);

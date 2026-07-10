@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -92,7 +91,8 @@ class ScreenshotCapture {
       }
     }
     if (_lastCaptureTime != null) {
-      final elapsed = DateTime.now().difference(_lastCaptureTime!).inMilliseconds;
+      final elapsed =
+          DateTime.now().difference(_lastCaptureTime!).inMilliseconds;
       if (elapsed < _cooldownMs) {
         return const ScreenshotResult(error: 'Cooldown active');
       }
@@ -115,7 +115,8 @@ class ScreenshotCapture {
 
   bool _isCaptureStuck() {
     if (_captureStartTime == null) return false;
-    return DateTime.now().difference(_captureStartTime!).inSeconds > _captureTimeoutSec;
+    return DateTime.now().difference(_captureStartTime!).inSeconds >
+        _captureTimeoutSec;
   }
 
   Future<void> _forceRecover() async {
@@ -139,7 +140,8 @@ class ScreenshotCapture {
       final appDir = await getApplicationDocumentsDirectory();
       final toolDir = '${appDir.path}/libcimbar_screenshots';
       await Directory(toolDir).create(recursive: true);
-      tmpPath = '$toolDir/tmp_capture_${DateTime.now().millisecondsSinceEpoch}.png';
+      tmpPath =
+          '$toolDir/tmp_capture_${DateTime.now().millisecondsSinceEpoch}.png';
 
       final captureOk = await _captureFullScreen(tmpPath);
       if (!captureOk) {
@@ -219,7 +221,10 @@ class ScreenshotCapture {
     ].join('; ');
 
     return Process.run('powershell', [
-      '-NonInteractive', '-NoProfile', '-Command', script,
+      '-NonInteractive',
+      '-NoProfile',
+      '-Command',
+      script,
     ]);
   }
 
@@ -289,10 +294,12 @@ class ScreenCapture {
       if (csc == null) return null;
 
       final result = await Process.run(csc, [
-        '/nologo', '/target:exe',
+        '/nologo',
+        '/target:exe',
         '/reference:System.Drawing.dll',
         '/reference:System.Windows.Forms.dll',
-        '/out:$exePath', csPath,
+        '/out:$exePath',
+        csPath,
       ]);
 
       if (result.exitCode != 0 || !await File(exePath).exists()) return null;
@@ -334,10 +341,13 @@ class ScreenCapture {
 
     final left = (selection.left * dpr).toInt().clamp(0, decoded.width);
     final top = (selection.top * dpr).toInt().clamp(0, decoded.height);
-    final width = (selection.width * dpr).toInt().clamp(1, decoded.width - left);
-    final height = (selection.height * dpr).toInt().clamp(1, decoded.height - top);
+    final width =
+        (selection.width * dpr).toInt().clamp(1, decoded.width - left);
+    final height =
+        (selection.height * dpr).toInt().clamp(1, decoded.height - top);
 
-    final cropped = img.copyCrop(decoded, x: left, y: top, width: width, height: height);
+    final cropped =
+        img.copyCrop(decoded, x: left, y: top, width: width, height: height);
 
     // Convert to raw RGBA bytes
     final rgba = cropped.getBytes(order: img.ChannelOrder.rgba);
@@ -356,7 +366,8 @@ class _CropResult {
   final Uint8List pixels;
   final int width;
   final int height;
-  const _CropResult({required this.pixels, required this.width, required this.height});
+  const _CropResult(
+      {required this.pixels, required this.width, required this.height});
 }
 
 /// Region selection overlay that shows the screenshot as background.
@@ -428,14 +439,18 @@ class _RegionSelectOverlayState extends State<_RegionSelectOverlay> {
                 left: _selectionRect!.left,
                 top: _selectionRect!.top - 28,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.blue,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     '${_selectionRect!.width.toInt()} x ${_selectionRect!.height.toInt()}',
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -443,10 +458,12 @@ class _RegionSelectOverlayState extends State<_RegionSelectOverlay> {
             // Instructions
             Positioned(
               top: 40,
-              left: 0, right: 0,
+              left: 0,
+              right: 0,
               child: Center(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.7),
                     borderRadius: BorderRadius.circular(8),
@@ -486,13 +503,21 @@ class _SelectionPainter extends CustomPainter {
     );
     // Corner handles
     const handleLen = 12.0;
-    final handlePaint = Paint()..color = Colors.white..strokeWidth = 3;
+    final handlePaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 3;
     for (final corner in [
-      selection.topLeft, selection.topRight,
-      selection.bottomLeft, selection.bottomRight,
+      selection.topLeft,
+      selection.topRight,
+      selection.bottomLeft,
+      selection.bottomRight,
     ]) {
-      final dx = corner == selection.topLeft || corner == selection.bottomLeft ? 1.0 : -1.0;
-      final dy = corner == selection.topLeft || corner == selection.topRight ? 1.0 : -1.0;
+      final dx = corner == selection.topLeft || corner == selection.bottomLeft
+          ? 1.0
+          : -1.0;
+      final dy = corner == selection.topLeft || corner == selection.topRight
+          ? 1.0
+          : -1.0;
       canvas.drawLine(corner, corner.translate(handleLen * dx, 0), handlePaint);
       canvas.drawLine(corner, corner.translate(0, handleLen * dy), handlePaint);
     }

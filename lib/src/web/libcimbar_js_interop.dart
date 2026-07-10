@@ -25,7 +25,7 @@ import 'dart:typed_data';
 // ─── Module loading ──────────────────────────────────────────────
 
 @JS('Module')
-external CimbarModule? get _module;
+external CimbarModule? get cimbarModule;
 
 /// The Emscripten Module object exposed by the WASM build.
 @JS()

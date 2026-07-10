@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:libcimbar/src/models/cimbar_config.dart';
 import 'package:libcimbar/src/models/cimbar_frame.dart';
@@ -43,13 +45,11 @@ class FakeDecoder implements ICimbarDecoder {
 
   @override
   Future<DecodeResult> decodeFrame(dynamic imageData,
-          {required int width,
-          required int height,
-          dynamic format}) async =>
+          {required int width, required int height, dynamic format}) async =>
       const DecodeResult();
 
   @override
-  Future<dynamic> recoverFile(int fileId) async => null;
+  Future<Uint8List?> recoverFile(int fileId) async => null;
 
   @override
   Future<String> recoverFilename(int fileId) async => '';
@@ -64,15 +64,14 @@ class FakeScreenCapture implements IScreenCapture {
 
   @override
   Future<ScreenCaptureResult> captureRegion(dynamic region) async =>
-      const ScreenCaptureResult(
+      ScreenCaptureResult(
         pixels: Uint8List(0),
         width: 0,
         height: 0,
       );
 
   @override
-  Future<ScreenCaptureResult> captureFullScreen() async =>
-      const ScreenCaptureResult(
+  Future<ScreenCaptureResult> captureFullScreen() async => ScreenCaptureResult(
         pixels: Uint8List(0),
         width: 0,
         height: 0,
@@ -90,7 +89,8 @@ class FakeCameraCapture implements ICameraCapture {
   bool get isStreaming => false;
 
   @override
-  Future<void> start({int preferredWidth = 1920, int preferredHeight = 1080}) async {}
+  Future<void> start(
+      {int preferredWidth = 1920, int preferredHeight = 1080}) async {}
 
   @override
   void onFrame(CameraFrameCallback callback) {}
