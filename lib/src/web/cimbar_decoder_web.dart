@@ -1,0 +1,203 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+import 'dart:typed_data';
+
+import '../interfaces/cimbar_decoder_interface.dart';
+import '../models/cimbar_config.dart';
+import '../models/decode_result.dart';
+import 'libcimbar_js_interop.dart';
+
+/// Web (Flutter WASM) cimbar decoder using JS interop.
+///
+/// Calls the Emscripten-compiled libcimbar WASM module to decode
+/// cimbar barcode images received from a camera or file upload.
+///
+/// ## Usage
+///
+/// ```dart
+/// final decoder = CimbarDecoderWeb();
+/// await decoder.configure(CimbarConfig(mode: CimbarMode.modeB));
+///
+/// // For each camera frame:
+/// final result = await decoder.decodeFrame(
+///   framePixels, width: 1024, height: 1024,
+/// );
+/// if (result.isComplete) {
+///   final fileBytes = result.data; // the recovered file
+/// }
+/// ```
+class CimbarDecoderWeb implements ICimbarDecoder {
+  bool _ready = false;
+  double _progress = 0.0;
+  bool _isComplete = false;
+
+  /// WASM heap pointer for the decode buffer.
+  int _decodeBufPtr = 0;
+  int _decodeBufSize = 0;
+
+  /// WASM heap pointer for the decompress buffer.
+  int _decompressBufPtr = 0;
+  int _decompressBufSize = 0;
+
+  CimbarDecoderWeb() {
+    _ready = _module != null && _module!.calledRun;
+    if (_ready) {
+      _allocateBuffers();
+    }
+  }
+
+  void _allocateBuffers() {
+    final module = _module!;
+    _decodeBufSize = cimbardGetBufsize();
+    _decodeBufPtr = module.malloc(_decodeBufSize);
+
+    _decompressBufSize = cimbardGetDecompressBufsize();
+    _decompressBufPtr = module.malloc(_decompressBufSize);
+  }
+
+  @override
+  bool get isReady => _ready;
+
+  @override
+  double get progress => _progress;
+
+  @override
+  bool get isComplete => _isComplete;
+
+  @override
+  Future<void> configure(CimbarConfig config) async {
+    _checkReady();
+    final result = cimbardConfigureDecode(config.modeValue);
+    if (result < 0) {
+      throw StateError('cimbard_configure_decode failed: $result');
+    }
+  }
+
+  @override
+  Future<DecodeResult> decodeFrame(
+    Uint8List imageData, {
+    required int width,
+    required int height,
+    CimbarImageFormat format = CimbarImageFormat.rgb,
+  }) async {
+    _checkReady();
+    final module = _module!;
+
+    // Copy image data to WASM heap
+    final imgPtr = module.malloc(imageData.length);
+    try {
+      copyToWasmHeap(module, imageData, imgPtr);
+
+      // Scan, extract, decode
+      final bytesDecoded = cimbardScanExtractDecode(
+        imgPtr,
+        width,
+        height,
+        format.value,
+        _decodeBufPtr,
+        _decodeBufSize,
+      );
+
+      if (bytesDecoded < 0) {
+        return DecodeResult.error('scan_extract_decode failed: $bytesDecoded');
+      }
+      if (bytesDecoded == 0) {
+        return DecodeResult.inProgress(progress: _progress);
+      }
+
+      // Feed into fountain decoder
+      // Align to chunk size
+      const chunkSize = 930; // approximate fountain_chunk_size
+      final alignedSize = (bytesDecoded ~/ chunkSize) * chunkSize;
+      if (alignedSize <= 0) {
+        return DecodeResult.inProgress(progress: _progress);
+      }
+
+      final fileId = cimbardFountainDecode(_decodeBufPtr, alignedSize);
+
+      if (fileId < 0) {
+        return DecodeResult.error('fountain_decode error: $fileId');
+      }
+      if (fileId == 0) {
+        return DecodeResult.inProgress(progress: _progress);
+      }
+
+      // Complete!
+      _isComplete = true;
+      _progress = 1.0;
+
+      final filename = _recoverFilename(fileId);
+      final data = await recoverFile(fileId);
+
+      return DecodeResult.complete(
+        fileId: fileId,
+        filename: filename,
+        data: data ?? Uint8List(0),
+      );
+    } finally {
+      module.free(imgPtr);
+    }
+  }
+
+  @override
+  Future<Uint8List?> recoverFile(int fileId) async {
+    _checkReady();
+    final module = _module!;
+
+    final result = BytesBuilder();
+
+    while (true) {
+      final bytesRead = cimbardDecompressRead(
+        fileId,
+        _decompressBufPtr,
+        _decompressBufSize,
+      );
+      if (bytesRead <= 0) break;
+
+      final chunk = copyFromWasmHeap(module, _decompressBufPtr, bytesRead);
+      result.add(chunk);
+    }
+
+    final data = result.toBytes();
+    return data.isNotEmpty ? data : null;
+  }
+
+  @override
+  Future<String> recoverFilename(int fileId) async {
+    return _recoverFilename(fileId);
+  }
+
+  String _recoverFilename(int fileId) {
+    _checkReady();
+    final module = _module!;
+    final fnPtr = module.malloc(256);
+    try {
+      final len = cimbardGetFilename(fileId, fnPtr, 256);
+      if (len <= 0) return '';
+      final bytes = copyFromWasmHeap(module, fnPtr, len);
+      return String.fromCharCodes(bytes);
+    } finally {
+      module.free(fnPtr);
+    }
+  }
+
+  @override
+  Future<void> dispose() async {
+    if (_ready && _module != null) {
+      final module = _module!;
+      if (_decodeBufPtr != 0) module.free(_decodeBufPtr);
+      if (_decompressBufPtr != 0) module.free(_decompressBufPtr);
+    }
+    _ready = false;
+  }
+
+  void _checkReady() {
+    if (!_ready) {
+      throw StateError(
+        'Web decoder not ready. Ensure libcimbar.js is loaded in index.html.',
+      );
+    }
+  }
+}
