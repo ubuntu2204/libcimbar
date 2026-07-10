@@ -201,3 +201,7 @@ class CimbarDecoderWeb implements ICimbarDecoder {
     }
   }
 }
+
+/// Alias for conditional import compatibility.
+/// On web, `CimbarDecoderFfi` resolves to this web implementation.
+typedef CimbarDecoderFfi = CimbarDecoderWeb;

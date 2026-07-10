@@ -17,7 +17,8 @@ import 'models/cimbar_frame.dart';
 import 'models/decode_result.dart';
 
 import 'impl/avif_compressor.dart';
-import 'impl/windows_screen_capture.dart';
+import 'impl/windows_screen_capture.dart'
+    if (dart.library.js_interop) 'web/screen_capture_stub.dart';
 
 // Conditional imports — resolved at compile time:
 //   Native → FFI implementations

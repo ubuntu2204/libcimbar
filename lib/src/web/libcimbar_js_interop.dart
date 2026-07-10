@@ -32,25 +32,23 @@ external CimbarModule? get cimbarModule;
 @staticInterop
 class CimbarModule {
   external factory CimbarModule();
+}
 
+/// Instance members for [CimbarModule] via extension (required by @staticInterop).
+extension CimbarModuleMembers on CimbarModule {
   /// Whether the WASM runtime has finished initializing.
-  @JS('calledRun')
   external bool get calledRun;
 
   /// The HTML canvas element used for WebGL rendering (encoder only).
-  @JS('canvas')
   external JSAny? get canvas;
 
   /// Allocate bytes in the WASM heap and return the pointer.
-  @JS('_malloc')
   external int malloc(int size);
 
   /// Free previously allocated WASM heap memory.
-  @JS('_free')
   external void free(int ptr);
 
   /// Access the WASM HEAPU8 (Uint8Array) for reading/writing memory.
-  @JS('HEAPU8')
   external JSUint8Array get heapU8;
 }
 

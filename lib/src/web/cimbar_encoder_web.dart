@@ -164,3 +164,7 @@ class CimbarEncoderWeb implements ICimbarEncoder {
     return x;
   }
 }
+
+/// Alias for conditional import compatibility.
+/// On web, `CimbarEncoderFfi` resolves to this web implementation.
+typedef CimbarEncoderFfi = CimbarEncoderWeb;
