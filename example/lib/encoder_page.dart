@@ -180,6 +180,10 @@ class _EncoderPageState extends State<EncoderPage>
         );
         _decodedFrames.add(await completer.future);
       }
+      debugPrint('[Frames] ${_frames.length} frames, '
+          'first: ${_frames[0].width}x${_frames[0].height}');
+      debugPrint(
+          '[UI Images] first: ${_decodedFrames[0].width}x${_decodedFrames[0].height}');
 
       _statusMessage =
           'Generated ${_frames.length} cimbar frames. Displaying animation...';
@@ -345,15 +349,12 @@ class _EncoderPageState extends State<EncoderPage>
     if (_decodedFrames.isEmpty || _currentFrameIndex >= _decodedFrames.length) {
       return const SizedBox.shrink();
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return CustomPaint(
-          size: Size(constraints.maxWidth, constraints.maxHeight),
-          painter: _CimbarPainter(
-            image: _decodedFrames[_currentFrameIndex],
-          ),
-        );
-      },
+    return SizedBox.expand(
+      child: CustomPaint(
+        painter: _CimbarPainter(
+          image: _decodedFrames[_currentFrameIndex],
+        ),
+      ),
     );
   }
 
@@ -426,10 +427,15 @@ class _CimbarPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final src =
-        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
-    final dst = Rect.fromLTWH(0, 0, size.width, size.height);
-    canvas.drawImageRect(image, src, dst, Paint());
+    debugPrint('[Painter] canvas size: ${size.width}x${size.height}, '
+        'image: ${image.width}x${image.height}');
+    final paint = Paint()..filterQuality = FilterQuality.high;
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      paint,
+    );
   }
 
   @override

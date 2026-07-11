@@ -257,23 +257,36 @@ bash build_wasm.sh /path/to/libcimbar
 # example/web/assets/wasm/libcimbar.wasm
 ```
 
-## Example App
+## Example Apps
 
-The example application demonstrates the complete workflow:
+The project provides two separate example applications:
 
-- **Encoder Page** (Windows): Press Alt+A to select a screen region → compresses to AVIF → encodes into cimbar barcodes → displays as animation
-- **Decoder Page** (Android / Web): Opens camera → scans cimbar barcodes → recovers the original file
+### `example` — Windows Encoder (发送端)
+
+Windows 专用编码发送端。左侧 200px 控制面板 + 右侧最大化显示 cimbar 编码图像。
+
+- Press **Alt+A** to select a screen region → compresses to AVIF → encodes into cimbar barcodes → displays as animation
+- 不包含解码功能
 
 ```bash
-# Run on Windows
 cd example
 flutter run -d windows
+```
 
-# Run on Android
-flutter run -d <android-device-id>
+### `example_decode` — Web/Android Decoder (接收端)
+
+Web 和 Android 平台的解码接收端。通过摄像头扫描 cimbar 条码并恢复原始文件。
+
+- Opens camera → scans cimbar barcodes → recovers the original file
+
+```bash
+cd example_decode
 
 # Run on Web
 flutter run -d chrome
+
+# Run on Android
+flutter run -d <android-device-id>
 ```
 
 ## Technical Details
@@ -372,15 +385,20 @@ Android 原生库通过 Flutter 构建系统自动编译。
 
 ### 示例应用
 
+项目提供两个独立的示例应用：
+
+- **`example`** — Windows 编码发送端（Alt+A 截图 → AVIF 压缩 → cimbar 编码 → 动画显示）
+- **`example_decode`** — Web/Android 解码接收端（摄像头扫描 → cimbar 解码 → 文件恢复）
+
 ```bash
-# Windows 运行编码器
+# Windows 发送端
 cd example && flutter run -d windows
 
-# Android 运行解码器
-flutter run -d <android-device-id>
+# Web 接收端
+cd example_decode && flutter run -d chrome
 
-# Web 运行解码器
-flutter run -d chrome
+# Android 接收端
+cd example_decode && flutter run -d <android-device-id>
 ```
 
 详细 API 文档和架构说明请参考上方的英文部分。
