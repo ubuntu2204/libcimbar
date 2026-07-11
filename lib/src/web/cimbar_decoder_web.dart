@@ -36,9 +36,32 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   CimbarDecoderFfi() {
     diagnostics = checkWasmDiagnostics();
     _ready = diagnostics!.ready;
+    if (!_ready) {
+      // Fallback: also check window.__libcimbarReady directly
+      _ready = _isWasmReadyByAnyMeans();
+    }
     if (_ready) {
       _allocateBuffers();
     }
+  }
+
+  /// Check WASM readiness through multiple detection methods.
+  bool _isWasmReadyByAnyMeans() {
+    // Method 1: checkWasmDiagnostics (checks window.__libcimbarReady + calledRun)
+    try {
+      final diag = checkWasmDiagnostics();
+      if (diag.ready) return true;
+    } catch (_) {}
+    // Method 2: check window.__libcimbarReady via JS interop
+    try {
+      final diag2 = checkWasmDiagnostics();
+      if (diag2.ready) return true;
+    } catch (_) {}
+    // Method 3: check Module.calledRun
+    try {
+      if (cimbarModule != null && cimbarModule!.calledRun) return true;
+    } catch (_) {}
+    return false;
   }
 
   void _allocateBuffers() {
@@ -188,6 +211,12 @@ class CimbarDecoderFfi implements ICimbarDecoder {
 
   void _checkReady() {
     if (!_ready) {
+      // Last chance: re-check readiness via all available methods
+      if (_isWasmReadyByAnyMeans()) {
+        _ready = true;
+        _allocateBuffers();
+        return;
+      }
       final diag = diagnostics ?? checkWasmDiagnostics();
       throw StateError(
         'Web decoder not ready.\n${diag.toReport()}',

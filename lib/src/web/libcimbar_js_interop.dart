@@ -43,12 +43,15 @@ extension CimbarModuleMembers on CimbarModule {
   external JSAny? get canvas;
 
   /// Allocate bytes in the WASM heap and return the pointer.
+  @JS('_malloc')
   external int malloc(int size);
 
   /// Free previously allocated WASM heap memory.
+  @JS('_free')
   external void free(int ptr);
 
   /// Access the WASM HEAPU8 (Uint8Array) for reading/writing memory.
+  @JS('HEAPU8')
   external JSUint8Array get heapU8;
 }
 
@@ -152,6 +155,11 @@ bool _checkModuleDefined() {
 }
 
 bool _checkCalledRun() {
+  // Emscripten may not expose `calledRun` directly on Module.
+  // Prefer `window.__libcimbarReady` set by onRuntimeInitialized callback.
+  try {
+    if (_wasmRuntimeReady == true) return true;
+  } catch (_) {}
   try {
     return cimbarModule?.calledRun ?? false;
   } catch (_) {
@@ -161,6 +169,9 @@ bool _checkCalledRun() {
 
 @JS('window.__libcimbarWasmMissing')
 external bool? get _wasmMissing;
+
+@JS('window.__libcimbarReady')
+external bool? get _wasmRuntimeReady;
 
 /// WASM module diagnostic information.
 class WasmDiagnostics {

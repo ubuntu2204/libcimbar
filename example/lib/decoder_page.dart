@@ -65,7 +65,7 @@ class _DecoderPageState extends State<DecoderPage> {
       });
 
       final wasmDiag = await waitForWasmReady(
-        timeout: const Duration(seconds: 20),
+        timeout: const Duration(seconds: 60),
         onStatusUpdate: (status) {
           debugPrint('[Decoder] $status');
           if (mounted) {
