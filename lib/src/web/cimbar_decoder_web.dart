@@ -4,6 +4,8 @@
 
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../interfaces/cimbar_decoder_interface.dart';
 import '../models/cimbar_config.dart';
 import '../models/decode_result.dart';
@@ -117,6 +119,9 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       );
 
       if (bytesDecoded < 0) {
+        debugPrint('[Decoder] scan_extract_decode($width'
+            'x$height, fmt=${format.value}, '
+            'buf=${imageData.length}B) => $bytesDecoded');
         return DecodeResult.error('scan_extract_decode failed: $bytesDecoded');
       }
       if (bytesDecoded == 0) {

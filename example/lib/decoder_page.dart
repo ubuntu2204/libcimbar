@@ -147,6 +147,8 @@ class _DecoderPageState extends State<DecoderPage> {
     });
   }
 
+  int _debugFrameCount = 0;
+
   Future<void> _processCameraFrame(CameraFrame frame) async {
     if (!_isDecoding || _decoder == null) return;
 
@@ -157,6 +159,16 @@ class _DecoderPageState extends State<DecoderPage> {
         'yuv420' => CimbarImageFormat.yuv420,
         _ => CimbarImageFormat.rgb,
       };
+
+      // Debug: log first 3 frames for troubleshooting
+      _debugFrameCount++;
+      if (_debugFrameCount <= 3) {
+        debugPrint('[Frame #$_debugFrameCount] '
+            '${frame.width}x${frame.height}, '
+            'format=${frame.format}(code=${imageFormat.value}), '
+            'data=${frame.data.length} bytes '
+            '(expected=${frame.width * frame.height * (imageFormat.value > 4 ? 4 : 3)})');
+      }
 
       final result = await _decoder!.decodeFrame(
         frame.data,
@@ -349,8 +361,38 @@ class _DecoderPageState extends State<DecoderPage> {
     );
   }
 
+  /// Get the camera view type for HtmlElementView (web only).
+  String? get _cameraViewType {
+    try {
+      // WebCameraCapture has a viewType getter
+      final cam = _camera;
+      if (cam != null) {
+        return (cam as dynamic).viewType as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Widget _buildCameraPreview() {
+    final vType = _cameraViewType;
+    if (_isCameraActive && vType != null) {
+      // Show camera preview with scanning frame overlay
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Camera video stream
+            HtmlElementView(viewType: vType),
+            // Scanning frame overlay
+            _buildScanningOverlay(),
+          ],
+        ),
+      );
+    }
+
     if (_isCameraActive) {
+      // Camera active but no preview available
       return Card(
         child: Center(
           child: Column(
@@ -399,6 +441,58 @@ class _DecoderPageState extends State<DecoderPage> {
     );
   }
 
+  /// Scanning frame overlay: dark surroundings with a clear center frame
+  /// and animated corner brackets.
+  Widget _buildScanningOverlay() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = constraints.biggest;
+        // Square frame size: 70% of the shorter dimension
+        final frameSize = (size.shortestSide * 0.7).clamp(200.0, 500.0);
+        final frameLeft = (size.width - frameSize) / 2;
+        final frameTop = (size.height - frameSize) / 2;
+        final frameRect =
+            Rect.fromLTWH(frameLeft, frameTop, frameSize, frameSize);
+
+        return Stack(
+          children: [
+            // Dark overlay with a hole cut out for the frame
+            CustomPaint(
+              size: size,
+              painter: _DarkOverlayPainter(
+                frameRect: frameRect,
+                color: Colors.black.withValues(alpha: 0.6),
+              ),
+            ),
+            // Corner brackets
+            CustomPaint(
+              size: size,
+              painter: _CornerBracketsPainter(
+                frameRect: frameRect,
+                color: Colors.white,
+                bracketLength: frameSize * 0.15,
+                strokeWidth: 3.0,
+              ),
+            ),
+            // Scanning hint text below frame
+            Positioned(
+              left: 0,
+              right: 0,
+              top: frameRect.bottom + 16,
+              child: Text(
+                'Point camera at cimbar barcode',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildResultPanel() {
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
@@ -440,4 +534,109 @@ class _DecoderPageState extends State<DecoderPage> {
     _decoder?.dispose();
     super.dispose();
   }
+}
+
+// ─── Scanning frame painters ────────────────────────────────────
+
+/// Draws a dark overlay with a rectangular hole for the scanning frame.
+class _DarkOverlayPainter extends CustomPainter {
+  final Rect frameRect;
+  final Color color;
+
+  _DarkOverlayPainter({required this.frameRect, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    // Draw the dark overlay
+    final path = Path()
+      ..addRect(fullRect)
+      ..addRRect(RRect.fromRectAndRadius(frameRect, const Radius.circular(8)))
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_DarkOverlayPainter old) =>
+      old.frameRect != frameRect || old.color != color;
+}
+
+/// Draws corner brackets at the four corners of the scanning frame.
+class _CornerBracketsPainter extends CustomPainter {
+  final Rect frameRect;
+  final Color color;
+  final double bracketLength;
+  final double strokeWidth;
+
+  _CornerBracketsPainter({
+    required this.frameRect,
+    required this.color,
+    required this.bracketLength,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final l = bracketLength;
+    const r = 8.0; // corner radius offset
+
+    // Top-left
+    canvas.drawLine(
+      Offset(frameRect.left - r, frameRect.top + l),
+      Offset(frameRect.left - r, frameRect.top - r),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(frameRect.left - r, frameRect.top - r),
+      Offset(frameRect.left + l, frameRect.top - r),
+      paint,
+    );
+
+    // Top-right
+    canvas.drawLine(
+      Offset(frameRect.right + r, frameRect.top + l),
+      Offset(frameRect.right + r, frameRect.top - r),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(frameRect.right + r, frameRect.top - r),
+      Offset(frameRect.right - l, frameRect.top - r),
+      paint,
+    );
+
+    // Bottom-left
+    canvas.drawLine(
+      Offset(frameRect.left - r, frameRect.bottom - l),
+      Offset(frameRect.left - r, frameRect.bottom + r),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(frameRect.left - r, frameRect.bottom + r),
+      Offset(frameRect.left + l, frameRect.bottom + r),
+      paint,
+    );
+
+    // Bottom-right
+    canvas.drawLine(
+      Offset(frameRect.right + r, frameRect.bottom - l),
+      Offset(frameRect.right + r, frameRect.bottom + r),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(frameRect.right + r, frameRect.bottom + r),
+      Offset(frameRect.right - l, frameRect.bottom + r),
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_CornerBracketsPainter old) => old.frameRect != frameRect;
 }

@@ -115,3 +115,8 @@ example/web/assets/wasm/
 *.swp
 .history
 .svn/
+
+# Qoder / AI agent screenshots
+*.png
+!assets/**/*.png
+!example/**/assets/**/*.png

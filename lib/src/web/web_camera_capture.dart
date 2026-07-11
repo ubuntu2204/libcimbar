@@ -5,6 +5,7 @@
 import 'dart:async';
 import 'dart:js_interop';
 import 'dart:typed_data';
+import 'dart:ui_web' as ui_web;
 
 import '../interfaces/camera_capture_interface.dart';
 
@@ -59,6 +60,7 @@ class WebCameraCapture implements ICameraCapture {
   Timer? _frameTimer;
   CameraFrameCallback? _callback;
   bool _streaming = false;
+  String? _viewType;
 
   int _videoWidth = 0;
   int _videoHeight = 0;
@@ -70,6 +72,9 @@ class WebCameraCapture implements ICameraCapture {
 
   @override
   bool get isStreaming => _streaming;
+
+  /// Platform view type for embedding the video element.
+  String? get viewType => _viewType;
 
   @override
   Future<void> start({
@@ -91,6 +96,8 @@ class WebCameraCapture implements ICameraCapture {
     _setProp(video, 'muted', true.toJS);
     _setProp(video, 'playsInline', true.toJS);
     _setProp(video, 'srcObject', stream);
+    // Style the video element to fill its container
+    _setProp(video, 'style', 'width:100%;height:100%;object-fit:cover;'.toJS);
     _video = video;
 
     // Listen for loadedmetadata
@@ -124,6 +131,13 @@ class WebCameraCapture implements ICameraCapture {
     _setProp(canvas, 'height', _videoHeight.toJS);
     final getCtx = _reflectGet(canvas, 'getContext'.toJS) as JSFunction?;
     _ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
+
+    // Register video element as a Flutter platform view
+    _viewType = 'libcimbar-camera-${DateTime.now().millisecondsSinceEpoch}';
+    ui_web.platformViewRegistry.registerViewFactory(
+      _viewType!,
+      (int viewId) => video,
+    );
 
     _streaming = true;
     _frameTimer = Timer.periodic(
@@ -177,27 +191,58 @@ class WebCameraCapture implements ICameraCapture {
     final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
     if (vw <= 0 || vh <= 0) return;
 
-    // Draw video frame to canvas: ctx.drawImage(video, 0, 0)
-    final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
-    drawImage?.callAsFunction(ctx, video, 0.toJS, 0.toJS);
+    // Calculate square crop region from center (matching scanning overlay)
+    final cropSize = vw < vh ? vw : vh;
+    final sx = (vw - cropSize) ~/ 2;
+    final sy = (vh - cropSize) ~/ 2;
 
-    // Get pixel data: ctx.getImageData(0, 0, vw, vh)
+    // Target size: 1024x1024 (optimal for cimbar decoder)
+    const targetSize = 1024;
+
+    // Resize canvas via the canvas element
+    final canvas = _reflectGet(ctx, 'canvas'.toJS) as JSObject?;
+    if (canvas != null) {
+      _setProp(canvas, 'width', targetSize.toJS);
+      _setProp(canvas, 'height', targetSize.toJS);
+    }
+
+    // Draw cropped region scaled to target using Reflect.apply for variadic args
+    final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
+    if (drawImage != null) {
+      final args = [
+        video,
+        sx.toJS, sy.toJS, cropSize.toJS, cropSize.toJS, // source rect
+        0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS, // dest rect
+      ].toJS;
+      _reflectApply(drawImage, ctx, args);
+    }
+
+    // Get cropped pixel data
     final getImageData = _reflectGet(ctx, 'getImageData'.toJS) as JSFunction?;
     final imageData = getImageData?.callAsFunction(
-        ctx, 0.toJS, 0.toJS, vw.toJS, vh.toJS) as JSObject?;
+        ctx, 0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS) as JSObject?;
     if (imageData == null) return;
 
     final jsData = _reflectGet(imageData, 'data'.toJS);
     if (jsData == null) return;
 
     final clampedArray = jsData as JSUint8ClampedArray;
-    final pixels = Uint8List.fromList(clampedArray.toDart);
+    final rgbaPixels = Uint8List.fromList(clampedArray.toDart);
+
+    // Convert RGBA to RGB (strip alpha channel) for cimbar decoder
+    const pixelCount = targetSize * targetSize;
+    final rgbPixels = Uint8List(pixelCount * 3);
+    for (int i = 0; i < pixelCount; i++) {
+      rgbPixels[i * 3] = rgbaPixels[i * 4]; // R
+      rgbPixels[i * 3 + 1] = rgbaPixels[i * 4 + 1]; // G
+      rgbPixels[i * 3 + 2] = rgbaPixels[i * 4 + 2]; // B
+    }
 
     _callback!(CameraFrame(
-      data: pixels,
-      width: vw,
-      height: vh,
-      format: 'rgba',
+      data: rgbPixels,
+      width: targetSize,
+      height: targetSize,
+      format: 'rgb',
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
   }
@@ -239,6 +284,7 @@ class WebCameraCapture implements ICameraCapture {
 
     _video = null;
     _ctx = null;
+    _viewType = null;
     _streaming = false;
   }
 
