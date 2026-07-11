@@ -1,4 +1,4 @@
-name: example_decode
+name: decode_example
 description: libcimbar Web/Android decoder app.
 publish_to: 'none'
 

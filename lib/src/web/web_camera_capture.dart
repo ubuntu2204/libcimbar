@@ -66,6 +66,7 @@ class WebCameraCapture implements ICameraCapture {
   int _videoHeight = 0;
 
   static const _frameIntervalMs = 200; // ~5 fps
+  static const _targetSize = 1024;
 
   @override
   bool get isSupported => true;
@@ -125,10 +126,10 @@ class WebCameraCapture implements ICameraCapture {
     _videoWidth = _getIntProp(video, 'videoWidth') ?? preferredWidth;
     _videoHeight = _getIntProp(video, 'videoHeight') ?? preferredHeight;
 
-    // Create offscreen canvas
+    // Create offscreen canvas at target size (1024x1024) from the start
     final canvas = _createElement('canvas');
-    _setProp(canvas, 'width', _videoWidth.toJS);
-    _setProp(canvas, 'height', _videoHeight.toJS);
+    _setProp(canvas, 'width', _targetSize.toJS);
+    _setProp(canvas, 'height', _targetSize.toJS);
     final getCtx = _reflectGet(canvas, 'getContext'.toJS) as JSFunction?;
     _ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
 
@@ -197,16 +198,9 @@ class WebCameraCapture implements ICameraCapture {
     final sy = (vh - cropSize) ~/ 2;
 
     // Target size: 1024x1024 (optimal for cimbar decoder)
-    const targetSize = 1024;
+    const targetSize = _targetSize;
 
-    // Resize canvas via the canvas element
-    final canvas = _reflectGet(ctx, 'canvas'.toJS) as JSObject?;
-    if (canvas != null) {
-      _setProp(canvas, 'width', targetSize.toJS);
-      _setProp(canvas, 'height', targetSize.toJS);
-    }
-
-    // Draw cropped region scaled to target using Reflect.apply for variadic args
+    // Draw cropped region scaled to target — do NOT resize canvas here
     final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
     if (drawImage != null) {
       final args = [

@@ -1,6 +1,6 @@
 {
-    "name": "example_decode",
-    "short_name": "example_decode",
+    "name": "decode_example",
+    "short_name": "decode_example",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

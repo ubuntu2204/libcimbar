@@ -273,14 +273,14 @@ cd example
 flutter run -d windows
 ```
 
-### `example_decode` — Web/Android Decoder (接收端)
+### `decode_example` — Web/Android Decoder (接收端)
 
 Web 和 Android 平台的解码接收端。通过摄像头扫描 cimbar 条码并恢复原始文件。
 
 - Opens camera → scans cimbar barcodes → recovers the original file
 
 ```bash
-cd example_decode
+cd decode_example
 
 # Run on Web
 flutter run -d chrome
@@ -388,17 +388,17 @@ Android 原生库通过 Flutter 构建系统自动编译。
 项目提供两个独立的示例应用：
 
 - **`example`** — Windows 编码发送端（Alt+A 截图 → AVIF 压缩 → cimbar 编码 → 动画显示）
-- **`example_decode`** — Web/Android 解码接收端（摄像头扫描 → cimbar 解码 → 文件恢复）
+- **`decode_example`** — Web/Android 解码接收端（摄像头扫描 → cimbar 解码 → 文件恢复）
 
 ```bash
 # Windows 发送端
 cd example && flutter run -d windows
 
 # Web 接收端
-cd example_decode && flutter run -d chrome
+cd decode_example && flutter run -d chrome
 
 # Android 接收端
-cd example_decode && flutter run -d <android-device-id>
+cd decode_example && flutter run -d <android-device-id>
 ```
 
 详细 API 文档和架构说明请参考上方的英文部分。

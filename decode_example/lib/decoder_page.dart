@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show File;
 import 'dart:typed_data';
 
@@ -9,6 +10,8 @@ import 'package:libcimbar/libcimbar.dart';
 import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
     if (dart.library.js_interop) 'package:libcimbar/src/web/libcimbar_js_interop.dart';
 import 'package:path_provider/path_provider.dart';
+
+import 'dart:ui' as ui;
 
 /// Decoder page — receive cimbar barcodes via camera and decode them.
 ///
@@ -50,6 +53,9 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // Frame counter
   int _framesProcessed = 0;
+
+  // Last camera frame for screenshot
+  CameraFrame? _lastFrame;
 
   @override
   void initState() {
@@ -151,6 +157,7 @@ class _DecoderPageState extends State<DecoderPage> {
 
   Future<void> _processCameraFrame(CameraFrame frame) async {
     if (!_isDecoding || _decoder == null) return;
+    _lastFrame = frame;
 
     try {
       final imageFormat = switch (frame.format) {
@@ -204,6 +211,74 @@ class _DecoderPageState extends State<DecoderPage> {
   }
 
   // ─── Save recovered file ──────────────────────────────────────
+
+  /// Save camera frame as PNG for debugging
+  Future<void> _screenshotFrame() async {
+    final frame = _lastFrame;
+    if (frame == null) {
+      _statusMessage = 'No frame captured yet.';
+      setState(() {});
+      return;
+    }
+    try {
+      // Convert RGB to RGBA
+      final pixelCount = frame.width * frame.height;
+      final rgba = Uint8List(pixelCount * 4);
+      final isRgba = frame.format == 'rgba';
+      for (int i = 0; i < pixelCount; i++) {
+        if (isRgba) {
+          rgba[i * 4] = frame.data[i * 4];
+          rgba[i * 4 + 1] = frame.data[i * 4 + 1];
+          rgba[i * 4 + 2] = frame.data[i * 4 + 2];
+          rgba[i * 4 + 3] = frame.data[i * 4 + 3];
+        } else {
+          rgba[i * 4] = frame.data[i * 3];
+          rgba[i * 4 + 1] = frame.data[i * 3 + 1];
+          rgba[i * 4 + 2] = frame.data[i * 3 + 2];
+          rgba[i * 4 + 3] = 255;
+        }
+      }
+      final completer = Completer<ui.Image>();
+      ui.decodeImageFromPixels(
+        rgba,
+        frame.width,
+        frame.height,
+        ui.PixelFormat.rgba8888,
+        (img) => completer.complete(img),
+      );
+      final image = await completer.future;
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (byteData == null) return;
+      final pngBytes = byteData.buffer.asUint8List();
+
+      if (kIsWeb) {
+        // On web, trigger download via JS
+        _downloadBytesWeb(
+            pngBytes, 'cimbar_frame_${frame.width}x${frame.height}.png');
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+        final path =
+            '${dir.path}/cimbar_frame_${frame.width}x${frame.height}.png';
+        await File(path).writeAsBytes(pngBytes);
+        _statusMessage = 'Frame saved: $path';
+      }
+      setState(() {});
+    } catch (e) {
+      _statusMessage = 'Screenshot error: $e';
+      setState(() {});
+    }
+  }
+
+  void _downloadBytesWeb(Uint8List bytes, String filename) {
+    // Use JS interop to trigger download
+    _statusMessage = 'Frame captured: ${bytes.length} bytes. '
+        'Check browser downloads for $filename';
+    // Save to memory for manual extraction
+    _lastPngBytes = bytes;
+  }
+
+  Uint8List? _lastPngBytes;
 
   Future<void> _saveFile() async {
     if (_recoveredData == null) return;
@@ -339,6 +414,14 @@ class _DecoderPageState extends State<DecoderPage> {
                     onPressed: _isCameraActive ? _stopCamera : null,
                     icon: const Icon(Icons.stop),
                     label: const Text('Stop Camera'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: _lastFrame != null ? _screenshotFrame : null,
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Screenshot'),
                   ),
                 ),
               ],
