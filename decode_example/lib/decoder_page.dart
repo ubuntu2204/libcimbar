@@ -205,8 +205,11 @@ class _DecoderPageState extends State<DecoderPage> {
       }
 
       setState(() {});
-    } catch (e) {
+    } catch (e, stack) {
       debugPrint('Frame decode error: $e');
+      debugPrint('Frame decode stack:\n$stack');
+      debugPrint('Frame info: ${frame.width}x${frame.height}, '
+          'format=${frame.format}, data=${frame.data.length} bytes');
     }
   }
 

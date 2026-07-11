@@ -43,79 +43,111 @@ extension CimbarModuleMembers on CimbarModule {
   external JSAny? get canvas;
 
   /// Allocate bytes in the WASM heap and return the pointer.
+  ///
+  /// The result is declared as [JSNumber] to avoid dart2js widening the
+  /// return type to [BigInt] when the heap address exceeds 2^53. Callers
+  /// should convert via `.toDart.toInt()`.
   @JS('_malloc')
-  external int malloc(int size);
+  external JSNumber malloc(JSNumber size);
 
   /// Free previously allocated WASM heap memory.
   @JS('_free')
-  external void free(int ptr);
+  external void free(JSNumber ptr);
 
   /// Access the WASM HEAPU8 (Uint8Array) for reading/writing memory.
   @JS('HEAPU8')
   external JSUint8Array get heapU8;
+
+  /// Allocate bytes in the WASM heap and return an int pointer.
+  ///
+  /// Wraps [malloc] (which returns [JSNumber]) to give callers a normal
+  /// Dart [int] suitable for use as a `Uint8List` index. The value is
+  /// routed through `dartify()` to handle both regular JS numbers and
+  /// the rare case where the heap address is large enough to be
+  /// surfaced as a [BigInt].
+  int allocate(int size) => jsNumberToInt(malloc(size.toJS));
+
+  /// Free a pointer previously obtained from [allocate].
+  void deallocate(int ptr) => free(ptr.toJS);
+}
+
+/// Convert a [JSNumber] to a Dart [int], handling the case where the
+/// JS value is actually a [BigInt] (which the WASM heap can surface
+/// when the pointer exceeds 2^53).
+int jsNumberToInt(JSNumber n) {
+  final v = n.dartify();
+  if (v is BigInt) return v.toInt();
+  if (v is num) return v.toInt();
+  return 0;
 }
 
 // ─── Encoder functions ───────────────────────────────────────────
 
 @JS('Module._cimbare_configure')
-external int cimbareConfigure(int modeVal, int compression);
+external JSNumber cimbareConfigure(JSNumber modeVal, JSNumber compression);
 
 @JS('Module._cimbare_init_encode')
-external int cimbareInitEncode(int filenamePtr, int fnsize, int encodeId);
+external JSNumber cimbareInitEncode(
+    JSNumber filenamePtr, JSNumber fnsize, JSNumber encodeId);
 
 @JS('Module._cimbare_encode_bufsize')
-external int cimbareEncodeBufsize();
+external JSNumber cimbareEncodeBufsize();
 
 @JS('Module._cimbare_encode')
-external int cimbareEncode(int bufferPtr, int size);
+external JSNumber cimbareEncode(JSNumber bufferPtr, JSNumber size);
 
 @JS('Module._cimbare_next_frame')
-external int cimbareNextFrame(bool colorBalance);
+external JSNumber cimbareNextFrame(JSNumber colorBalance);
 
 @JS('Module._cimbare_get_frame_buff')
-external int cimbareGetFrameBuff(int buffPtrPtr);
+external JSNumber cimbareGetFrameBuff(JSNumber buffPtrPtr);
 
 @JS('Module._cimbare_init_window')
-external int cimbareInitWindow(int width, int height);
+external JSNumber cimbareInitWindow(JSNumber width, JSNumber height);
 
 @JS('Module._cimbare_render')
-external int cimbareRender();
+external JSNumber cimbareRender();
 
 // ─── Decoder functions ───────────────────────────────────────────
 
 @JS('Module._cimbard_configure_decode')
-external int cimbardConfigureDecode(int modeVal);
+external JSNumber cimbardConfigureDecode(JSNumber modeVal);
 
 @JS('Module._cimbard_get_bufsize')
-external int cimbardGetBufsize();
+external JSNumber cimbardGetBufsize();
 
 @JS('Module._cimbard_get_decompress_bufsize')
-external int cimbardGetDecompressBufsize();
+external JSNumber cimbardGetDecompressBufsize();
 
 @JS('Module._cimbard_scan_extract_decode')
-external int cimbardScanExtractDecode(
-  int imgdataPtr,
-  int imgw,
-  int imgh,
-  int format,
-  int bufspacePtr,
-  int bufsize,
+external JSNumber cimbardScanExtractDecode(
+  JSNumber imgdataPtr,
+  JSNumber imgw,
+  JSNumber imgh,
+  JSNumber format,
+  JSNumber bufspacePtr,
+  JSNumber bufsize,
 );
 
 @JS('Module._cimbard_fountain_decode')
-external int cimbardFountainDecode(int bufferPtr, int size);
+external JSNumber cimbardFountainDecode(JSNumber bufferPtr, JSNumber size);
 
 @JS('Module._cimbard_get_filesize')
-external int cimbardGetFilesize(int id);
+external JSNumber cimbardGetFilesize(JSNumber id);
 
 @JS('Module._cimbard_get_filename')
-external int cimbardGetFilename(int id, int filenamePtr, int fnsize);
+external JSNumber cimbardGetFilename(
+    JSNumber id, JSNumber filenamePtr, JSNumber fnsize);
 
 @JS('Module._cimbard_decompress_read')
-external int cimbardDecompressRead(int id, int bufferPtr, int size);
+external JSNumber cimbardDecompressRead(
+    JSNumber id, JSNumber bufferPtr, JSNumber size);
 
 @JS('Module._cimbard_get_report')
-external int cimbardGetReport(int buffPtr, int maxlen);
+external JSNumber cimbardGetReport(JSNumber buffPtr, JSNumber maxlen);
+
+@JS('Module._cimbard_get_debug')
+external JSNumber cimbardGetDebug(JSNumber buffPtr, JSNumber maxlen);
 
 // ─── Helper utilities ────────────────────────────────────────────
 

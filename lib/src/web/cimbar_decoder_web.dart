@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import 'dart:js_interop';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint;
@@ -68,11 +69,17 @@ class CimbarDecoderFfi implements ICimbarDecoder {
 
   void _allocateBuffers() {
     final module = cimbarModule!;
-    _decodeBufSize = cimbardGetBufsize();
-    _decodeBufPtr = module.malloc(_decodeBufSize);
+    _decodeBufSize = jsNumberToInt(cimbardGetBufsize());
+    _decodeBufPtr = module.allocate(_decodeBufSize);
+    debugPrint('[Decoder] _allocateBuffers: '
+        'decodeBufPtr=$_decodeBufPtr (size=$_decodeBufSize), '
+        'runtimeType=${_decodeBufPtr.runtimeType}');
 
-    _decompressBufSize = cimbardGetDecompressBufsize();
-    _decompressBufPtr = module.malloc(_decompressBufSize);
+    _decompressBufSize = jsNumberToInt(cimbardGetDecompressBufsize());
+    _decompressBufPtr = module.allocate(_decompressBufSize);
+    debugPrint('[Decoder] _allocateBuffers: '
+        'decompressBufPtr=$_decompressBufPtr (size=$_decompressBufSize), '
+        'runtimeType=${_decompressBufPtr.runtimeType}');
   }
 
   @override
@@ -87,7 +94,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   @override
   Future<void> configure(CimbarConfig config) async {
     _checkReady();
-    final result = cimbardConfigureDecode(config.modeValue);
+    final result = jsNumberToInt(cimbardConfigureDecode(config.modeValue.toJS));
     if (result < 0) {
       throw StateError('cimbard_configure_decode failed: $result');
     }
@@ -104,19 +111,25 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     final module = cimbarModule!;
 
     // Copy image data to WASM heap
-    final imgPtr = module.malloc(imageData.length);
+    final imgPtr = module.allocate(imageData.length);
+    debugPrint('[Decoder] decodeFrame($width'
+        'x$height, fmt=${format.value}, '
+        'data=${imageData.length}B): '
+        'imgPtr=$imgPtr, _decodeBufPtr=$_decodeBufPtr');
     try {
       copyToWasmHeap(module, imageData, imgPtr);
 
       // Scan, extract, decode
-      final bytesDecoded = cimbardScanExtractDecode(
-        imgPtr,
-        width,
-        height,
-        format.value,
-        _decodeBufPtr,
-        _decodeBufSize,
-      );
+      final bytesDecoded = jsNumberToInt(cimbardScanExtractDecode(
+        imgPtr.toJS,
+        width.toJS,
+        height.toJS,
+        format.value.toJS,
+        _decodeBufPtr.toJS,
+        _decodeBufSize.toJS,
+      ));
+      debugPrint('[Decoder] scan_extract_decode => $bytesDecoded '
+          '(runtimeType=${bytesDecoded.runtimeType})');
 
       if (bytesDecoded < 0) {
         debugPrint('[Decoder] scan_extract_decode($width'
@@ -136,7 +149,10 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         return DecodeResult.inProgress(progress: _progress);
       }
 
-      final fileId = cimbardFountainDecode(_decodeBufPtr, alignedSize);
+      final fileId = jsNumberToInt(
+          cimbardFountainDecode(_decodeBufPtr.toJS, alignedSize.toJS));
+      debugPrint('[Decoder] fountain_decode => $fileId '
+          '(runtimeType=${fileId.runtimeType})');
 
       if (fileId < 0) {
         return DecodeResult.error('fountain_decode error: $fileId');
@@ -157,8 +173,12 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         filename: filename,
         data: data ?? Uint8List(0),
       );
+    } catch (e, stack) {
+      debugPrint('[Decoder] decodeFrame FAILED: $e');
+      debugPrint('[Decoder] stack:\n$stack');
+      rethrow;
     } finally {
-      module.free(imgPtr);
+      module.deallocate(imgPtr);
     }
   }
 
@@ -170,11 +190,13 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     final result = BytesBuilder();
 
     while (true) {
-      final bytesRead = cimbardDecompressRead(
-        fileId,
-        _decompressBufPtr,
-        _decompressBufSize,
-      );
+      final bytesRead = jsNumberToInt(cimbardDecompressRead(
+        fileId.toJS,
+        _decompressBufPtr.toJS,
+        _decompressBufSize.toJS,
+      ));
+      debugPrint('[Decoder] decompress_read(id=$fileId) => $bytesRead '
+          '(runtimeType=${bytesRead.runtimeType})');
       if (bytesRead <= 0) break;
 
       final chunk = copyFromWasmHeap(module, _decompressBufPtr, bytesRead);
@@ -193,14 +215,17 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   String _recoverFilename(int fileId) {
     _checkReady();
     final module = cimbarModule!;
-    final fnPtr = module.malloc(256);
+    final fnPtr = module.allocate(256);
     try {
-      final len = cimbardGetFilename(fileId, fnPtr, 256);
+      final len =
+          jsNumberToInt(cimbardGetFilename(fileId.toJS, fnPtr.toJS, 256.toJS));
+      debugPrint('[Decoder] get_filename(id=$fileId) => $len '
+          '(runtimeType=${len.runtimeType})');
       if (len <= 0) return '';
       final bytes = copyFromWasmHeap(module, fnPtr, len);
       return String.fromCharCodes(bytes);
     } finally {
-      module.free(fnPtr);
+      module.deallocate(fnPtr);
     }
   }
 
@@ -208,8 +233,8 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   Future<void> dispose() async {
     if (_ready && cimbarModule != null) {
       final module = cimbarModule!;
-      if (_decodeBufPtr != 0) module.free(_decodeBufPtr);
-      if (_decompressBufPtr != 0) module.free(_decompressBufPtr);
+      if (_decodeBufPtr != 0) module.deallocate(_decodeBufPtr);
+      if (_decompressBufPtr != 0) module.deallocate(_decompressBufPtr);
     }
     _ready = false;
   }
