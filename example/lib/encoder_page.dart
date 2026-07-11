@@ -238,17 +238,23 @@ class _EncoderPageState extends State<EncoderPage>
       color: Colors.black,
       child: Stack(
         children: [
-          // Right side: fixed 1024x1024 cimbar panel
+          // Right side: cimbar panel centered in the right area (1024x1024, no stretch)
           Positioned(
             left: 200,
             top: 0,
-            width: 1024,
-            height: 1024,
+            right: 0,
+            bottom: 0,
             child: Container(
               color: Colors.black,
-              child: _frames.isNotEmpty
-                  ? _buildFrameDisplay()
-                  : _buildPlaceholder(),
+              child: Center(
+                child: SizedBox(
+                  width: 1024,
+                  height: 1024,
+                  child: _frames.isNotEmpty
+                      ? _buildFrameDisplay()
+                      : _buildPlaceholder(),
+                ),
+              ),
             ),
           ),
           // Left panel: fixed 200px width
