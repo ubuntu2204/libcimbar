@@ -192,7 +192,7 @@ class WindowCtrl {
 
   Future<void> _trySetTitleBar() async {
     try {
-      await windowManager.setTitleBarStyle(TitleBarStyle.normal);
+      await windowManager.setAsFrameless();
     } catch (_) {}
   }
 
