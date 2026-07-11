@@ -25,7 +25,7 @@ void main() async {
       size: Size(1400, 1100),
       center: true,
       title: 'libcimbar',
-      titleBarStyle: TitleBarStyle.normal,
+      titleBarStyle: TitleBarStyle.hidden,
     );
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();

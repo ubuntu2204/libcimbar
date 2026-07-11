@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:libcimbar/libcimbar.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'core/screenshot_capture.dart';
 
@@ -259,6 +260,24 @@ class _EncoderPageState extends State<EncoderPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Window controls (minimize, close)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _WindowButton(
+                      icon: Icons.remove,
+                      tooltip: 'Minimize',
+                      onPressed: () => windowManager.minimize(),
+                    ),
+                    _WindowButton(
+                      icon: Icons.close,
+                      tooltip: 'Close',
+                      onPressed: () => windowManager.close(),
+                      isClose: true,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
                 PopupMenuButton<CimbarMode>(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -424,4 +443,36 @@ class _CimbarPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CimbarPainter old) => old.image != image;
+}
+
+/// Small window control button (minimize/close).
+class _WindowButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+  final bool isClose;
+
+  const _WindowButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.isClose = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 36,
+      height: 28,
+      child: Tooltip(
+        message: tooltip,
+        child: InkWell(
+          onTap: onPressed,
+          hoverColor:
+              isClose ? Colors.red : Colors.white.withValues(alpha: 0.1),
+          child: Icon(icon, size: 16, color: Colors.white70),
+        ),
+      ),
+    );
+  }
 }
