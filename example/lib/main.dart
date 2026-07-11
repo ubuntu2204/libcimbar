@@ -12,7 +12,6 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 
 import 'core/screenshot_capture.dart';
 import 'encoder_page.dart';
-import 'decoder_page.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -24,7 +23,7 @@ void main() async {
     await windowManager.ensureInitialized();
 
     const windowOptions = WindowOptions(
-      size: Size(1100, 750),
+      size: Size(1400, 1100),
       center: true,
       title: 'libcimbar',
       titleBarStyle: TitleBarStyle.normal,
@@ -75,41 +74,15 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 0;
-
-  // Windows only: show Encode tab
   bool get _isWindows => !kIsWeb && Platform.isWindows;
 
   @override
   Widget build(BuildContext context) {
-    final pages = <Widget>[];
-    final navItems = <BottomNavigationBarItem>[];
-
     if (_isWindows) {
-      pages.add(const EncoderPage());
-      navItems.add(const BottomNavigationBarItem(
-        icon: Icon(Icons.cast),
-        label: 'Encode',
-      ));
+      return const Scaffold(body: EncoderPage());
     }
-
-    pages.add(const DecoderPage());
-    navItems.add(const BottomNavigationBarItem(
-      icon: Icon(Icons.qr_code_scanner),
-      label: 'Decode',
-    ));
-
-    final index = _currentIndex.clamp(0, pages.length - 1);
-
-    return Scaffold(
-      body: IndexedStack(index: index, children: pages),
-      bottomNavigationBar: navItems.length > 1
-          ? BottomNavigationBar(
-              currentIndex: index,
-              onTap: (i) => setState(() => _currentIndex = i),
-              items: navItems,
-            )
-          : null,
+    return const Scaffold(
+      body: Center(child: Text('Encoder is only available on Windows.')),
     );
   }
 }

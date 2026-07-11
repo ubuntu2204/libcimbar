@@ -229,114 +229,115 @@ class _EncoderPageState extends State<EncoderPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('libcimbar Encoder'),
-        actions: [
-          PopupMenuButton<CimbarMode>(
-            icon: const Icon(Icons.settings),
-            onSelected: (mode) async {
-              _config = _config.copyWith(mode: mode);
-              await _encoder?.configure(_config);
-            },
-            itemBuilder: (_) => CimbarMode.values
-                .map((m) => PopupMenuItem(value: m, child: Text(m.name)))
-                .toList(),
+    return Stack(
+      children: [
+        // Right side: cimbar image fills from left panel to right edge
+        Positioned(
+          left: 200,
+          top: 0,
+          right: 0,
+          bottom: 0,
+          child: Container(
+            color: Colors.black,
+            child:
+                _frames.isNotEmpty ? _buildFrameDisplay() : _buildPlaceholder(),
           ),
-        ],
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Status bar
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
+        ),
+        // Left panel: fixed 200px width
+        Positioned(
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 200,
+          child: Container(
+            color: Theme.of(context).colorScheme.surface,
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PopupMenuButton<CimbarMode>(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.settings, size: 18),
+                      const SizedBox(width: 6),
+                      Text(_config.mode.name),
+                    ],
+                  ),
+                  onSelected: (mode) async {
+                    _config = _config.copyWith(mode: mode);
+                    await _encoder?.configure(_config);
+                  },
+                  itemBuilder: (_) => CimbarMode.values
+                      .map((m) => PopupMenuItem(value: m, child: Text(m.name)))
+                      .toList(),
+                ),
+                const SizedBox(height: 12),
+                Row(
                   children: [
                     Icon(
                       _isReady ? Icons.check_circle : Icons.error,
+                      size: 16,
                       color: _isReady ? Colors.green : Colors.red,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(child: SelectableText(_statusMessage)),
-                    if (!_isReady ||
-                        _statusMessage.contains('error') ||
-                        _statusMessage.contains('Error'))
-                      IconButton(
-                        icon: const Icon(Icons.copy, size: 18),
-                        tooltip: 'Copy error message',
-                        onPressed: () {
-                          Clipboard.setData(
-                              ClipboardData(text: _statusMessage));
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content:
-                                  Text('Error message copied to clipboard'),
-                              duration: Duration(seconds: 2),
-                            ),
-                          );
-                        },
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _statusMessage,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ),
                   ],
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed:
-                        _isReady && !_isCapturing ? _startScreenCapture : null,
-                    icon: const Icon(Icons.screenshot),
-                    label:
-                        Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
-                  ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed:
+                      _isReady && !_isCapturing ? _startScreenCapture : null,
+                  icon: const Icon(Icons.screenshot, size: 18),
+                  label:
+                      Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _compressedData != null && !_isEncoding
-                        ? _startEncoding
-                        : null,
-                    icon: const Icon(Icons.qr_code),
-                    label: const Text('Encode & Display'),
-                  ),
+                const SizedBox(height: 8),
+                FilledButton.icon(
+                  onPressed: _compressedData != null && !_isEncoding
+                      ? _startEncoding
+                      : null,
+                  icon: const Icon(Icons.qr_code, size: 18),
+                  label: const Text('Encode & Display'),
                 ),
                 if (_frames.isNotEmpty) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _stopEncoding,
-                      icon: const Icon(Icons.stop),
-                      label: const Text('Stop'),
-                    ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _stopEncoding,
+                    icon: const Icon(Icons.stop, size: 18),
+                    label: const Text('Stop'),
                   ),
                 ],
+                const SizedBox(height: 20),
+                if (_compressedData != null) ...[
+                  _infoRow('Capture', '${_capturedWidth}x$_capturedHeight'),
+                  const SizedBox(height: 6),
+                  _infoRow('Compressed',
+                      '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
+                  const SizedBox(height: 6),
+                  _infoRow('Mode', _config.mode.name),
+                  const SizedBox(height: 6),
+                  _infoRow('Frames', '${_frames.length}'),
+                ],
+                const Spacer(),
+                if (_frames.isNotEmpty)
+                  Text(
+                    'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
               ],
             ),
-            const SizedBox(height: 24),
-
-            // Frame display
-            Expanded(
-              child: _frames.isNotEmpty
-                  ? _buildFrameDisplay()
-                  : _buildPlaceholder(),
-            ),
-
-            // Info panel
-            if (_compressedData != null) ...[
-              const SizedBox(height: 12),
-              _buildInfoPanel(),
-            ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -344,78 +345,48 @@ class _EncoderPageState extends State<EncoderPage>
     if (_decodedFrames.isEmpty || _currentFrameIndex >= _decodedFrames.length) {
       return const SizedBox.shrink();
     }
-    return Card(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: Text(
-              'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return CustomPaint(
+          size: Size(constraints.maxWidth, constraints.maxHeight),
+          painter: _CimbarPainter(
+            image: _decodedFrames[_currentFrameIndex],
           ),
-          Expanded(
-            child: Center(
-              child: RawImage(
-                image: _decodedFrames[_currentFrameIndex],
-                width: 512,
-                height: 512,
-                fit: BoxFit.contain,
-              ),
-            ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.screenshot_monitor_outlined,
+              size: 80, color: Theme.of(context).colorScheme.outline),
+          const SizedBox(height: 16),
+          Text(
+            'Press Alt+A or click "Capture"\nto select a screen region',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPlaceholder() {
-    return Card(
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.screenshot_monitor_outlined,
-                size: 80, color: Theme.of(context).colorScheme.outline),
-            const SizedBox(height: 16),
-            Text(
-              'Press Alt+A or click "Capture"\nto select a screen region',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-            ),
-          ],
-        ),
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelSmall),
+          Text(value, style: Theme.of(context).textTheme.bodyMedium),
+        ],
       ),
-    );
-  }
-
-  Widget _buildInfoPanel() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _infoChip('Capture', '${_capturedWidth}x$_capturedHeight'),
-            _infoChip('Compressed',
-                '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
-            _infoChip('Mode', _config.mode.name),
-            _infoChip('Frames', '${_frames.length}'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoChip(String label, String value) {
-    return Column(
-      children: [
-        Text(label, style: Theme.of(context).textTheme.labelSmall),
-        const SizedBox(height: 4),
-        Text(value, style: Theme.of(context).textTheme.titleMedium),
-      ],
     );
   }
 
@@ -430,4 +401,37 @@ class _EncoderPageState extends State<EncoderPage>
     hotKeyManager.unregisterAll();
     super.dispose();
   }
+}
+
+/// Clips a fraction from each edge of the child.
+class _CimbarCropClipper extends CustomClipper<Rect> {
+  final double cropFraction;
+  _CimbarCropClipper({required this.cropFraction});
+
+  @override
+  Rect getClip(Size size) {
+    final dx = size.width * cropFraction;
+    final dy = size.height * cropFraction;
+    return Rect.fromLTRB(dx, dy, size.width - dx, size.height - dy);
+  }
+
+  @override
+  bool shouldReclip(_CimbarCropClipper old) => old.cropFraction != cropFraction;
+}
+
+/// Paints a ui.Image stretched to fill the entire canvas.
+class _CimbarPainter extends CustomPainter {
+  final ui.Image image;
+  _CimbarPainter({required this.image});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final src =
+        Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+    final dst = Rect.fromLTWH(0, 0, size.width, size.height);
+    canvas.drawImageRect(image, src, dst, Paint());
+  }
+
+  @override
+  bool shouldRepaint(_CimbarPainter old) => old.image != image;
 }
