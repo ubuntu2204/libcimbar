@@ -23,9 +23,15 @@ abstract class ICameraCapture {
   ///
   /// [preferredResolution] hints at the desired capture resolution.
   /// The actual resolution may differ based on device capabilities.
+  ///
+  /// [frameIntervalMs] controls how often frames are captured/delivered
+  /// (in milliseconds). Lower values mean a higher frame rate. Defaults to
+  /// 200 ms (~5 fps). This only affects the cadence of [onFrame] callbacks —
+  /// it does not change the camera's native sensor rate.
   Future<void> start({
     int preferredWidth = 1920,
     int preferredHeight = 1080,
+    int frameIntervalMs = 200,
   });
 
   /// Register a callback to receive raw camera frames.

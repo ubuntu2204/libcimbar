@@ -65,8 +65,12 @@ class WebCameraCapture implements ICameraCapture {
   int _videoWidth = 0;
   int _videoHeight = 0;
 
-  static const _frameIntervalMs = 200; // ~5 fps
+  /// Default capture cadence (~5 fps). Can be overridden via [start].
+  static const int _defaultFrameIntervalMs = 200; // ~5 fps
   static const _targetSize = 1024;
+
+  /// Current capture cadence in milliseconds (driven by [start]).
+  int _frameIntervalMs = _defaultFrameIntervalMs;
 
   @override
   bool get isSupported => true;
@@ -81,8 +85,11 @@ class WebCameraCapture implements ICameraCapture {
   Future<void> start({
     int preferredWidth = 1024,
     int preferredHeight = 1024,
+    int frameIntervalMs = _defaultFrameIntervalMs,
   }) async {
     if (_streaming) return;
+
+    _frameIntervalMs = frameIntervalMs <= 0 ? _defaultFrameIntervalMs : frameIntervalMs;
 
     // Build getUserMedia constraints
     final constraints = _buildConstraints(preferredWidth, preferredHeight);
@@ -142,7 +149,7 @@ class WebCameraCapture implements ICameraCapture {
 
     _streaming = true;
     _frameTimer = Timer.periodic(
-      const Duration(milliseconds: _frameIntervalMs),
+      Duration(milliseconds: _frameIntervalMs),
       (_) => _captureFrame(),
     );
   }

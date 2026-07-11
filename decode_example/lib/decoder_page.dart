@@ -8,7 +8,6 @@ import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:libcimbar/libcimbar.dart';
 // ignore: implementation_imports
 import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
-    if (dart.library.js_interop) 'package:libcimbar/src/web/cimbar_decoder_web.dart'
     if (dart.library.js_interop) 'package:libcimbar/src/web/libcimbar_js_interop.dart';
 // ignore: implementation_imports
 import 'native/web_file_download_stub.dart'
@@ -57,6 +56,9 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // Frame counter
   int _framesProcessed = 0;
+
+  // Capture frame rate (frames per second) for the web camera.
+  int _captureFps = 5;
 
   // Last camera frame for screenshot
   CameraFrame? _lastFrame;
@@ -141,7 +143,11 @@ class _DecoderPageState extends State<DecoderPage> {
       _framesProcessed = 0;
     });
 
-    await _camera!.start(preferredWidth: 1920, preferredHeight: 1080);
+    await _camera!.start(
+      preferredWidth: 1920,
+      preferredHeight: 1080,
+      frameIntervalMs: (1000 / _captureFps).round(),
+    );
 
     _camera!.onFrame((frame) {
       _processCameraFrame(frame);
@@ -433,6 +439,41 @@ class _DecoderPageState extends State<DecoderPage> {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+
+            // Capture FPS control (affects how often frames are delivered
+            // from the web camera; only used when starting the camera).
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Capture FPS',
+                          style: Theme.of(context).textTheme.labelSmall),
+                      Text(
+                        '$_captureFps /s',
+                        style:
+                            Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                      ),
+                    ],
+                  ),
+                  Slider(
+                    value: _captureFps.toDouble(),
+                    min: 1,
+                    max: 30,
+                    divisions: 29,
+                    label: '$_captureFps fps',
+                    onChanged: (v) => setState(() => _captureFps = v.round()),
+                  ),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 16),
 
             // Camera controls
