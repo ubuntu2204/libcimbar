@@ -569,7 +569,8 @@ class _DecoderPageState extends State<DecoderPage> {
               const CircularProgressIndicator(),
               const SizedBox(height: 16),
               Text(
-                'Scanning for cimbar codes...\nPoint camera at the displayed barcode',
+                'Scanning for cimbar codes...\n'
+                'Keep the entire barcode (all four corners) in view',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -642,7 +643,8 @@ class _DecoderPageState extends State<DecoderPage> {
               right: 0,
               top: frameRect.bottom + 16,
               child: Text(
-                'Point camera at cimbar barcode',
+                'Fit the whole barcode inside the frame '
+                '(all four corners visible)',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.8),

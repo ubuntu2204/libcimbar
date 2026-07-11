@@ -7,7 +7,22 @@ import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
+import 'dart:math' as math;
+
 import '../interfaces/camera_capture_interface.dart';
+
+/// How the camera frame is mapped into the square decoder input.
+enum WebCaptureMode {
+  /// Fit the *entire* video frame into the target square, preserving aspect
+  /// ratio (letterboxed). Nothing is cropped, so all four cimbar anchors stay
+  /// in view even when the barcode is off-center. Recommended default.
+  fit,
+
+  /// Crop the largest centered square from the video frame. Yields a larger
+  /// barcode when it is well-centered, but drops content (and anchors) that
+  /// fall outside the center square.
+  centerCrop,
+}
 
 // ─── JS interop declarations (top-level only) ───────────────────
 
@@ -71,6 +86,13 @@ class WebCameraCapture implements ICameraCapture {
 
   /// Current capture cadence in milliseconds (driven by [start]).
   int _frameIntervalMs = _defaultFrameIntervalMs;
+
+  /// How the video frame is mapped into the square decoder input.
+  ///
+  /// Defaults to [WebCaptureMode.fit] so that off-center barcodes keep all
+  /// four anchors visible (a center crop would otherwise drop them and cause
+  /// decode failures).
+  WebCaptureMode captureMode = WebCaptureMode.fit;
 
   @override
   bool get isSupported => true;
@@ -199,21 +221,50 @@ class WebCameraCapture implements ICameraCapture {
     final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
     if (vw <= 0 || vh <= 0) return;
 
-    // Calculate square crop region from center (matching scanning overlay)
-    final cropSize = vw < vh ? vw : vh;
-    final sx = (vw - cropSize) ~/ 2;
-    final sy = (vh - cropSize) ~/ 2;
-
     // Target size: 1024x1024 (optimal for cimbar decoder)
     const targetSize = _targetSize;
 
-    // Draw cropped region scaled to target — do NOT resize canvas here
+    // Source rect (region of the video) and dest rect (region of the canvas).
+    int sx, sy, sw, sh; // source
+    int dx, dy, dw, dh; // destination
+    if (captureMode == WebCaptureMode.centerCrop) {
+      // Largest centered square, scaled to fill the whole canvas.
+      final cropSize = vw < vh ? vw : vh;
+      sx = (vw - cropSize) ~/ 2;
+      sy = (vh - cropSize) ~/ 2;
+      sw = sh = cropSize;
+      dx = dy = 0;
+      dw = dh = targetSize;
+    } else {
+      // Fit the ENTIRE frame into the square, preserving aspect ratio.
+      // The whole barcode (and all four anchors) stays visible even when it
+      // is not perfectly centered in the camera view.
+      sx = sy = 0;
+      sw = vw;
+      sh = vh;
+      final scale = targetSize / math.max(vw, vh);
+      dw = (vw * scale).round().clamp(1, targetSize);
+      dh = (vh * scale).round().clamp(1, targetSize);
+      dx = (targetSize - dw) ~/ 2;
+      dy = (targetSize - dh) ~/ 2;
+    }
+
+    // Clear the canvas to solid black so letterbox borders are well-defined
+    // (a uniform fill won't be mistaken for cimbar anchor patterns).
+    final fillRect = _reflectGet(ctx, 'fillRect'.toJS) as JSFunction?;
+    if (fillRect != null) {
+      _setProp(ctx, 'fillStyle', '#000000'.toJS);
+      _reflectApply(fillRect, ctx,
+          [0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS].toJS);
+    }
+
+    // Draw the (cropped or fitted) region — do NOT resize canvas here.
     final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
     if (drawImage != null) {
       final args = [
         video,
-        sx.toJS, sy.toJS, cropSize.toJS, cropSize.toJS, // source rect
-        0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS, // dest rect
+        sx.toJS, sy.toJS, sw.toJS, sh.toJS, // source rect
+        dx.toJS, dy.toJS, dw.toJS, dh.toJS, // dest rect
       ].toJS;
       _reflectApply(drawImage, ctx, args);
     }
