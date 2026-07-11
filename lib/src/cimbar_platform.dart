@@ -18,6 +18,8 @@ import 'models/decode_result.dart';
 import 'impl/avif_compressor.dart';
 import 'impl/windows_screen_capture.dart'
     if (dart.library.js_interop) 'web/screen_capture_stub.dart';
+import 'native/camera_capture_stub.dart'
+    if (dart.library.js_interop) 'web/web_camera_capture.dart';
 
 // Conditional imports — resolved at compile time:
 //   Native (Windows) → FFI implementations
@@ -109,7 +111,7 @@ class CimbarPlatform {
   /// Create a camera capture implementation (Web and Android only).
   Future<ICameraCapture> createCameraCapture() async {
     if (kIsWeb) {
-      return _WebCameraCapture();
+      return WebCameraCapture();
     }
     if (Platform.isAndroid) {
       return _AndroidCameraCapture();
@@ -201,36 +203,6 @@ class _AndroidCameraCapture implements ICameraCapture {
   @override
   void onFrame(CameraFrameCallback callback) {
     throw UnimplementedError('Android camera not yet wired up.');
-  }
-
-  @override
-  Future<void> stop() async {}
-
-  @override
-  Future<void> dispose() async {}
-}
-
-class _WebCameraCapture implements ICameraCapture {
-  @override
-  bool get isSupported => true;
-
-  @override
-  bool get isStreaming => false;
-
-  @override
-  Future<void> start({
-    int preferredWidth = 1920,
-    int preferredHeight = 1080,
-  }) async {
-    throw UnimplementedError(
-      'Web camera uses getUserMedia. '
-      'See example/lib/decoder_page.dart.',
-    );
-  }
-
-  @override
-  void onFrame(CameraFrameCallback callback) {
-    throw UnimplementedError('Web camera not yet wired up.');
   }
 
   @override
