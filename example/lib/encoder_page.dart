@@ -404,22 +404,6 @@ class _EncoderPageState extends State<EncoderPage>
   }
 }
 
-/// Clips a fraction from each edge of the child.
-class _CimbarCropClipper extends CustomClipper<Rect> {
-  final double cropFraction;
-  _CimbarCropClipper({required this.cropFraction});
-
-  @override
-  Rect getClip(Size size) {
-    final dx = size.width * cropFraction;
-    final dy = size.height * cropFraction;
-    return Rect.fromLTRB(dx, dy, size.width - dx, size.height - dy);
-  }
-
-  @override
-  bool shouldReclip(_CimbarCropClipper old) => old.cropFraction != cropFraction;
-}
-
 /// Paints a ui.Image stretched to fill the entire canvas.
 class _CimbarPainter extends CustomPainter {
   final ui.Image image;

@@ -271,14 +271,9 @@ class _DecoderPageState extends State<DecoderPage> {
   }
 
   void _downloadBytesWeb(Uint8List bytes, String filename) {
-    // Use JS interop to trigger download
     _statusMessage = 'Frame captured: ${bytes.length} bytes. '
         'Check browser downloads for $filename';
-    // Save to memory for manual extraction
-    _lastPngBytes = bytes;
   }
-
-  Uint8List? _lastPngBytes;
 
   Future<void> _saveFile() async {
     if (_recoveredData == null) return;
