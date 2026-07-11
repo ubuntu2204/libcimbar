@@ -196,7 +196,7 @@ const config = CimbarConfig(
   compressionLevel: 16,       // zstd level (0–22)
   eccBytes: 30,               // Reed-Solomon ECC bytes
   fps: 15,                    // Animation frame rate
-  imageSize: 1024,            // Output image size
+  // imageSize is fixed at 1024x1024
   encodeId: -1,               // Auto-increment
 );
 ```

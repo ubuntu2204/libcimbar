@@ -20,7 +20,6 @@ void main() {
         compressionLevel: 10,
         eccBytes: 20,
         fps: 30,
-        imageSize: 2048,
         encodeId: 42,
       );
 
@@ -28,7 +27,7 @@ void main() {
       expect(config.compressionLevel, 10);
       expect(config.eccBytes, 20);
       expect(config.fps, 30);
-      expect(config.imageSize, 2048);
+      expect(config.imageSize, 1024);
       expect(config.encodeId, 42);
     });
 
@@ -61,7 +60,6 @@ void main() {
         compressionLevel: 8,
         eccBytes: 25,
         fps: 20,
-        imageSize: 512,
         encodeId: 10,
       );
       final copy = original.copyWith();

@@ -16,7 +16,8 @@ class CimbarConfig {
   /// Frame rate for animated encoding display.
   final int fps;
 
-  /// Target image size in pixels (width == height for square frames).
+  /// Fixed output image size in pixels (width == height for square frames).
+  /// Always 1024 — not configurable.
   final int imageSize;
 
   /// Optional encode ID (0–127). -1 for auto-increment.
@@ -27,9 +28,8 @@ class CimbarConfig {
     this.compressionLevel = 16,
     this.eccBytes = 30,
     this.fps = 15,
-    this.imageSize = 1024,
     this.encodeId = -1,
-  });
+  }) : imageSize = 1024;
 
   /// Numeric mode value passed to the native library.
   int get modeValue => mode.value;
@@ -39,7 +39,6 @@ class CimbarConfig {
     int? compressionLevel,
     int? eccBytes,
     int? fps,
-    int? imageSize,
     int? encodeId,
   }) {
     return CimbarConfig(
@@ -47,7 +46,6 @@ class CimbarConfig {
       compressionLevel: compressionLevel ?? this.compressionLevel,
       eccBytes: eccBytes ?? this.eccBytes,
       fps: fps ?? this.fps,
-      imageSize: imageSize ?? this.imageSize,
       encodeId: encodeId ?? this.encodeId,
     );
   }
