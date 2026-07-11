@@ -234,133 +234,138 @@ class _EncoderPageState extends State<EncoderPage>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Right side: cimbar image fills from left panel to right edge
-        Positioned(
-          left: 200,
-          top: 0,
-          right: 0,
-          bottom: 0,
-          child: Container(
-            color: Colors.black,
-            child:
-                _frames.isNotEmpty ? _buildFrameDisplay() : _buildPlaceholder(),
-          ),
-        ),
-        // Left panel: fixed 200px width
-        Positioned(
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 200,
-          child: Container(
-            color: Theme.of(context).colorScheme.surface,
-            padding: const EdgeInsets.all(10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Window controls (minimize, close)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    _WindowButton(
-                      icon: Icons.remove,
-                      tooltip: 'Minimize',
-                      onPressed: () => windowManager.minimize(),
-                    ),
-                    _WindowButton(
-                      icon: Icons.close,
-                      tooltip: 'Close',
-                      onPressed: () => windowManager.close(),
-                      isClose: true,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                PopupMenuButton<CimbarMode>(
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.settings, size: 18),
-                      const SizedBox(width: 6),
-                      Text(_config.mode.name),
-                    ],
-                  ),
-                  onSelected: (mode) async {
-                    _config = _config.copyWith(mode: mode);
-                    await _encoder?.configure(_config);
-                  },
-                  itemBuilder: (_) => CimbarMode.values
-                      .map((m) => PopupMenuItem(value: m, child: Text(m.name)))
-                      .toList(),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      _isReady ? Icons.check_circle : Icons.error,
-                      size: 16,
-                      color: _isReady ? Colors.green : Colors.red,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _statusMessage,
-                        style: Theme.of(context).textTheme.bodySmall,
-                        maxLines: 4,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed:
-                      _isReady && !_isCapturing ? _startScreenCapture : null,
-                  icon: const Icon(Icons.screenshot, size: 18),
-                  label:
-                      Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
-                ),
-                const SizedBox(height: 8),
-                FilledButton.icon(
-                  onPressed: _compressedData != null && !_isEncoding
-                      ? _startEncoding
-                      : null,
-                  icon: const Icon(Icons.qr_code, size: 18),
-                  label: const Text('Encode & Display'),
-                ),
-                if (_frames.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: _stopEncoding,
-                    icon: const Icon(Icons.stop, size: 18),
-                    label: const Text('Stop'),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                if (_compressedData != null) ...[
-                  _infoRow('Capture', '${_capturedWidth}x$_capturedHeight'),
-                  const SizedBox(height: 6),
-                  _infoRow('Compressed',
-                      '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
-                  const SizedBox(height: 6),
-                  _infoRow('Mode', _config.mode.name),
-                  const SizedBox(height: 6),
-                  _infoRow('Frames', '${_frames.length}'),
-                ],
-                const Spacer(),
-                if (_frames.isNotEmpty)
-                  Text(
-                    'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-              ],
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        children: [
+          // Right side: fixed 1024x1024 cimbar panel
+          Positioned(
+            left: 200,
+            top: 0,
+            width: 1024,
+            height: 1024,
+            child: Container(
+              color: Colors.black,
+              child: _frames.isNotEmpty
+                  ? _buildFrameDisplay()
+                  : _buildPlaceholder(),
             ),
           ),
-        ),
-      ],
+          // Left panel: fixed 200px width
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 200,
+            child: Container(
+              color: Theme.of(context).colorScheme.surface,
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Window controls (minimize, close)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      _WindowButton(
+                        icon: Icons.remove,
+                        tooltip: 'Minimize',
+                        onPressed: () => windowManager.minimize(),
+                      ),
+                      _WindowButton(
+                        icon: Icons.close,
+                        tooltip: 'Close',
+                        onPressed: () => windowManager.close(),
+                        isClose: true,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  PopupMenuButton<CimbarMode>(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.settings, size: 18),
+                        const SizedBox(width: 6),
+                        Text(_config.mode.name),
+                      ],
+                    ),
+                    onSelected: (mode) async {
+                      _config = _config.copyWith(mode: mode);
+                      await _encoder?.configure(_config);
+                    },
+                    itemBuilder: (_) => CimbarMode.values
+                        .map(
+                            (m) => PopupMenuItem(value: m, child: Text(m.name)))
+                        .toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(
+                        _isReady ? Icons.check_circle : Icons.error,
+                        size: 16,
+                        color: _isReady ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _statusMessage,
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed:
+                        _isReady && !_isCapturing ? _startScreenCapture : null,
+                    icon: const Icon(Icons.screenshot, size: 18),
+                    label:
+                        Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    onPressed: _compressedData != null && !_isEncoding
+                        ? _startEncoding
+                        : null,
+                    icon: const Icon(Icons.qr_code, size: 18),
+                    label: const Text('Encode & Display'),
+                  ),
+                  if (_frames.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: _stopEncoding,
+                      icon: const Icon(Icons.stop, size: 18),
+                      label: const Text('Stop'),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
+                  if (_compressedData != null) ...[
+                    _infoRow('Capture', '${_capturedWidth}x$_capturedHeight'),
+                    const SizedBox(height: 6),
+                    _infoRow('Compressed',
+                        '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
+                    const SizedBox(height: 6),
+                    _infoRow('Mode', _config.mode.name),
+                    const SizedBox(height: 6),
+                    _infoRow('Frames', '${_frames.length}'),
+                  ],
+                  const Spacer(),
+                  if (_frames.isNotEmpty)
+                    Text(
+                      'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
+                      style: Theme.of(context).textTheme.bodySmall,
+                      textAlign: TextAlign.center,
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -368,11 +373,9 @@ class _EncoderPageState extends State<EncoderPage>
     if (_decodedFrames.isEmpty || _currentFrameIndex >= _decodedFrames.length) {
       return const SizedBox.shrink();
     }
-    return SizedBox.expand(
-      child: CustomPaint(
-        painter: _CimbarPainter(
-          image: _decodedFrames[_currentFrameIndex],
-        ),
+    return CustomPaint(
+      painter: _CimbarPainter(
+        image: _decodedFrames[_currentFrameIndex],
       ),
     );
   }
