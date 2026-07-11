@@ -42,7 +42,8 @@ class WindowCtrl {
     if (_opStartTime != null) {
       final elapsed = DateTime.now().difference(_opStartTime!).inSeconds;
       if (elapsed > _timeoutSec) {
-        debugPrint('[WindowCtrl] Timeout auto-unlock: phase=$_phase, ${elapsed}s');
+        debugPrint(
+            '[WindowCtrl] Timeout auto-unlock: phase=$_phase, ${elapsed}s');
         _phase = WindowPhase.normal;
         _opStartTime = null;
         Future.microtask(_emergencyRestore);
@@ -96,10 +97,26 @@ class WindowCtrl {
   }
 
   /// Restore window to original state.
+  ///
+  /// Bounded by a timeout because [windowManager] operations on a frameless
+  /// fullscreen window occasionally hang on Windows. If [restoreToNormal]
+  /// stalls, an emergency restore is fired in the background and the phase is
+  /// reset so the next capture can proceed.
   Future<void> restoreToNormal() async {
     if (_phase == WindowPhase.normal && !_isInIntermediateState()) return;
     _setPhase(WindowPhase.restoring);
-    await _doRestore();
+    try {
+      await _doRestore().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () =>
+            debugPrint('[WindowCtrl] restoreToNormal timed out (3s)'),
+      );
+    } on TimeoutException {
+      debugPrint('[WindowCtrl] Restore exceeded timeout, scheduling emergency');
+      unawaited(_emergencyRestore().catchError((e) {
+        debugPrint('[WindowCtrl] emergency restore error: $e');
+      }));
+    }
   }
 
   /// Force reset: immediately restore window regardless of state.
@@ -108,8 +125,7 @@ class WindowCtrl {
     await _emergencyRestore();
   }
 
-  bool get isInCaptureFlow =>
-      _phase != WindowPhase.normal;
+  bool get isInCaptureFlow => _phase != WindowPhase.normal;
 
   // --- Internal ---
 
@@ -157,6 +173,11 @@ class WindowCtrl {
         windowManager.setAlwaysOnTop(false),
       ]);
 
+      // Brief delay so Windows can finish the fullscreen->windowed transition
+      // before we attempt to resize/reposition. Without this, setSize and
+      // setPosition can deadlock on a frameless window.
+      await Future.delayed(const Duration(milliseconds: 100));
+
       await Future.wait([
         if (_savedSkipTaskbar != null)
           windowManager.setSkipTaskbar(_savedSkipTaskbar!),
@@ -191,9 +212,10 @@ class WindowCtrl {
   }
 
   Future<void> _trySetTitleBar() async {
-    try {
-      await windowManager.setAsFrameless();
-    } catch (_) {}
+    // Window is kept frameless throughout the app lifecycle
+    // (set in main.dart on startup and selection mode).
+    // Re-applying setAsFrameless() here is a no-op and is skipped to
+    // avoid a redundant window operation during restore.
   }
 
   Future<void> _emergencyRestore() async {

@@ -163,18 +163,19 @@ class ScreenshotCapture {
         return const ScreenshotResult(error: 'Selection cancelled');
       }
 
-      // 4+5. Restore window + crop (parallel)
-      debugPrint('[Screenshot] [4/5] Restoring window + cropping...');
-      final results = await Future.wait<Object?>([
-        _winCtrl.restoreToNormal(),
-        _cropToPixels(tmpPath, selectedRect),
-      ]);
+      // 4. Crop selected region from temp file (independent of window state)
+      debugPrint('[Screenshot] [4/5] Cropping selected region...');
+      final cropResult = await _cropToPixels(tmpPath, selectedRect);
       _cleanupTmpFile(tmpPath);
 
-      final cropResult = results[1] as _CropResult?;
       if (cropResult == null) {
+        await _winCtrl.restoreToNormal();
         return const ScreenshotResult(error: 'Crop failed');
       }
+
+      // 5. Restore window (after crop; window ops are slow and may stall)
+      debugPrint('[Screenshot] [5/5] Restoring window...');
+      await _winCtrl.restoreToNormal();
 
       return ScreenshotResult(
         pixels: cropResult.pixels,
