@@ -71,10 +71,10 @@ extension CimbarModuleMembers on CimbarModule {
   void deallocate(int ptr) => free(ptr.toJS);
 }
 
-/// Convert a [JSNumber] to a Dart [int], handling the case where the
-/// JS value is actually a [BigInt] (which the WASM heap can surface
-/// when the pointer exceeds 2^53).
-int jsNumberToInt(JSNumber n) {
+/// Convert a JS value ([JSNumber] or [JSAny]) to a Dart [int], handling
+/// the case where the JS value is actually a [BigInt] (which the WASM
+/// heap can surface when the pointer exceeds 2^53).
+int jsNumberToInt(JSAny n) {
   final v = n.dartify();
   if (v is BigInt) return v.toInt();
   if (v is num) return v.toInt();
@@ -130,7 +130,7 @@ external JSNumber cimbardScanExtractDecode(
 );
 
 @JS('Module._cimbard_fountain_decode')
-external JSNumber cimbardFountainDecode(JSNumber bufferPtr, JSNumber size);
+external JSAny cimbardFountainDecode(JSNumber bufferPtr, JSNumber size);
 
 @JS('Module._cimbard_get_filesize')
 external JSNumber cimbardGetFilesize(JSNumber id);

@@ -2,13 +2,17 @@ import 'dart:async';
 import 'dart:io' show File;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:libcimbar/libcimbar.dart';
 // ignore: implementation_imports
 import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
+    if (dart.library.js_interop) 'package:libcimbar/src/web/cimbar_decoder_web.dart'
     if (dart.library.js_interop) 'package:libcimbar/src/web/libcimbar_js_interop.dart';
+// ignore: implementation_imports
+import 'native/web_file_download_stub.dart'
+    if (dart.library.js_interop) 'web/web_file_download_web.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'dart:ui' as ui;
@@ -273,9 +277,17 @@ class _DecoderPageState extends State<DecoderPage> {
     }
   }
 
+  /// Web implementation: trigger a real browser download via the
+  /// [downloadBytesWeb] helper (defined in conditional import).
   void _downloadBytesWeb(Uint8List bytes, String filename) {
-    _statusMessage = 'Frame captured: ${bytes.length} bytes. '
-        'Check browser downloads for $filename';
+    try {
+      downloadBytesWeb(bytes, filename);
+      _statusMessage = 'Frame captured: ${bytes.length} bytes. '
+          'Check browser downloads for "$filename".';
+    } catch (e) {
+      _statusMessage = 'Web download error: $e';
+    }
+    setState(() {});
   }
 
   Future<void> _saveFile() async {
@@ -370,6 +382,34 @@ class _DecoderPageState extends State<DecoderPage> {
                                 ),
                               );
                             },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Chip(
+                          avatar: const Icon(
+                            Icons.settings_input_antenna,
+                            size: 16,
+                          ),
+                          label: Text('Mode: ${_config.mode.name}'),
+                        ),
+                        if (_framesProcessed > 0)
+                          Chip(
+                            avatar: const Icon(Icons.photo_camera, size: 16),
+                            label: Text('$_framesProcessed frames'),
+                          ),
+                        if (_recoveredData != null)
+                          Chip(
+                            avatar: const Icon(Icons.check_circle, size: 16),
+                            label: Text(
+                              _recoveredFilename.isNotEmpty
+                                  ? _recoveredFilename
+                                  : 'recovered',
+                            ),
                           ),
                       ],
                     ),

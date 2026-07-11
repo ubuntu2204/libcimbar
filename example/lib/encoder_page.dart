@@ -40,6 +40,10 @@ class _EncoderPageState extends State<EncoderPage>
     fps: 15,
   );
 
+  /// Range of supported display rates.
+  static const int _minFps = 1;
+  static const int _maxFps = 60;
+
   // Frame animation
   List<CimbarFrame> _frames = [];
   int _currentFrameIndex = 0;
@@ -230,6 +234,24 @@ class _EncoderPageState extends State<EncoderPage>
     });
   }
 
+  /// Update display FPS and restart the animation controller so the new
+  /// period takes effect immediately.
+  void _setFps(int newFps) {
+    final clamped = newFps.clamp(_minFps, _maxFps);
+    if (clamped == _config.fps) return;
+    setState(() {
+      _config = _config.copyWith(fps: clamped);
+    });
+    // Restart the controller with the new period.
+    final controller = _frameAnimationController;
+    if (controller != null && _frames.isNotEmpty) {
+      controller
+        ..stop()
+        ..duration = Duration(milliseconds: 1000 ~/ clamped)
+        ..forward();
+    }
+  }
+
   // --- UI ---
 
   @override
@@ -357,6 +379,8 @@ class _EncoderPageState extends State<EncoderPage>
                     const SizedBox(height: 6),
                     _infoRow('Mode', _config.mode.name),
                     const SizedBox(height: 6),
+                    _fpsControl(),
+                    const SizedBox(height: 6),
                     _infoRow('Frames', '${_frames.length}'),
                   ],
                   const Spacer(),
@@ -414,6 +438,40 @@ class _EncoderPageState extends State<EncoderPage>
         children: [
           Text(label, style: Theme.of(context).textTheme.labelSmall),
           Text(value, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+
+  /// FPS control: shows current display rate, lets the user adjust it
+  /// via a slider. The new rate is applied live via [_setFps].
+  Widget _fpsControl() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('Display FPS',
+                  style: Theme.of(context).textTheme.labelSmall),
+              Text(
+                '${_config.fps} /s',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+          Slider(
+            value: _config.fps.toDouble(),
+            min: _minFps.toDouble(),
+            max: _maxFps.toDouble(),
+            divisions: _maxFps - _minFps,
+            label: '${_config.fps} fps',
+            onChanged: (v) => _setFps(v.round()),
+          ),
         ],
       ),
     );
