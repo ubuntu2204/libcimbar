@@ -1,7 +1,6 @@
 // Platform responsibilities:
 //   Windows  → Encoder (screen capture + AVIF + cimbar encoding)
-//   Android  → Decoder (camera + JNI decoding)
-//   Web      → Decoder (camera + WASM decoding)
+//   Android / Web → see decode_example project
 
 import 'dart:io' show Platform;
 
