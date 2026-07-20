@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 
 import 'core/screenshot_capture.dart';
+import 'core/window_display.dart';
 import 'encoder_page.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -31,9 +32,10 @@ void main() async {
       await windowManager.setAsFrameless();
       await windowManager.show();
       await windowManager.focus();
-      // Enter fullscreen so the encoder fills the whole monitor and covers
-      // the Windows taskbar while displaying cimbar frames for capture.
-      await windowManager.setFullScreen(true);
+      // Cover the whole monitor — including the taskbar — as a borderless,
+      // topmost window. This is NOT fullscreen mode, so the screenshot
+      // capture flow keeps working (it hides the window before grabbing).
+      await coverTaskbar();
     });
   }
 

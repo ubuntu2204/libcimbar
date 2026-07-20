@@ -10,6 +10,7 @@ import 'package:libcimbar/libcimbar.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'core/screenshot_capture.dart';
+import 'core/window_display.dart';
 
 /// Encoder page -- Windows only.
 ///
@@ -32,7 +33,7 @@ class _EncoderPageState extends State<EncoderPage>
   bool _isReady = false;
   bool _isEncoding = false;
   bool _isCapturing = false;
-  bool _isFullScreen = true; // app starts fullscreen (covers the taskbar)
+  bool _coveringTaskbar = true; // app starts covering the taskbar
   String _statusMessage = 'Initializing...';
 
   CimbarConfig _config = const CimbarConfig(
@@ -64,30 +65,18 @@ class _EncoderPageState extends State<EncoderPage>
   void initState() {
     super.initState();
     _initialize();
-    _syncFullScreenState();
   }
 
-  /// Read the current fullscreen state from the window manager so the
-  /// toggle button reflects reality (e.g. after the capture flow restores it).
-  Future<void> _syncFullScreenState() async {
+  /// Toggle between covering the taskbar (topmost, full screen) and a
+  /// normal centered windowed size. Neither uses fullscreen mode.
+  Future<void> _toggleCoverTaskbar() async {
     try {
-      final fs = await windowManager.isFullScreen();
-      if (mounted) setState(() => _isFullScreen = fs);
-    } catch (_) {}
-  }
-
-  /// Toggle between fullscreen (covers the taskbar) and a windowed size.
-  Future<void> _toggleFullScreen() async {
-    try {
-      final fs = await windowManager.isFullScreen();
-      if (fs) {
-        await windowManager.setFullScreen(false);
-        await windowManager.setSize(const Size(1400, 1100));
-        await windowManager.center();
+      if (_coveringTaskbar) {
+        await restoreWindowed();
       } else {
-        await windowManager.setFullScreen(true);
+        await coverTaskbar();
       }
-      if (mounted) setState(() => _isFullScreen = !fs);
+      if (mounted) setState(() => _coveringTaskbar = !_coveringTaskbar);
     } catch (_) {}
   }
 
@@ -322,13 +311,13 @@ class _EncoderPageState extends State<EncoderPage>
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       _WindowButton(
-                        icon: _isFullScreen
+                        icon: _coveringTaskbar
                             ? Icons.fullscreen_exit
                             : Icons.fullscreen,
-                        tooltip: _isFullScreen
-                            ? 'Exit fullscreen'
-                            : 'Fullscreen (cover taskbar)',
-                        onPressed: _toggleFullScreen,
+                        tooltip: _coveringTaskbar
+                            ? 'Windowed mode'
+                            : 'Cover taskbar',
+                        onPressed: _toggleCoverTaskbar,
                       ),
                       _WindowButton(
                         icon: Icons.remove,

@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'window_display.dart';
+
 /// Window state phases for the capture flow.
 ///
 /// Transitions:
@@ -34,6 +36,7 @@ class WindowCtrl {
 
   Rect? _savedBounds;
   bool? _savedSkipTaskbar;
+  bool? _savedAlwaysOnTop;
   bool _wasFullScreen = false;
 
   bool get _busy {
@@ -153,10 +156,12 @@ class WindowCtrl {
       windowManager.getBounds(),
       windowManager.isSkipTaskbar(),
       _isFullScreen(),
+      windowManager.isAlwaysOnTop(),
     ]);
     _savedBounds = results[0] as Rect;
     _savedSkipTaskbar = results[1] as bool;
     _wasFullScreen = results[2] as bool;
+    _savedAlwaysOnTop = results[3] as bool;
   }
 
   Future<void> _doHide() async {
@@ -170,7 +175,9 @@ class WindowCtrl {
     try {
       await Future.wait([
         windowManager.setFullScreen(false),
-        windowManager.setAlwaysOnTop(false),
+        // Restore the app's normal topmost state (true while covering the
+        // taskbar) rather than always clearing it.
+        windowManager.setAlwaysOnTop(_savedAlwaysOnTop ?? false),
       ]);
 
       // Brief delay so Windows can finish the fullscreen->windowed transition
@@ -185,28 +192,24 @@ class WindowCtrl {
         windowManager.setBackgroundColor(Colors.transparent),
       ]);
 
-      if (_wasFullScreen) {
-        // The app runs fullscreen (covering the taskbar). Restore that state
-        // rather than dropping back to a windowed size/position.
-        await windowManager.show();
-        await windowManager.focus();
-        await windowManager.setFullScreen(true);
+      // Restore the saved bounds. When covering the taskbar these are the
+      // full-screen rect; when windowed they are the last windowed rect.
+      if (_savedBounds != null) {
+        await windowManager.setSize(_savedBounds!.size);
+        await windowManager.setPosition(_savedBounds!.topLeft);
       } else {
-        if (_savedBounds != null) {
-          await windowManager.setSize(_savedBounds!.size);
-          await windowManager.setPosition(_savedBounds!.topLeft);
-        } else {
-          await windowManager.setSize(const Size(1100, 750));
-        }
-        await windowManager.show();
-        await windowManager.focus();
+        await windowManager.setSize(kDefaultWindowedSize);
       }
+
+      await windowManager.show();
+      await windowManager.focus();
     } catch (e) {
       debugPrint('[WindowCtrl] _doRestore failed: $e');
       await _emergencyRestore();
     } finally {
       _savedBounds = null;
       _savedSkipTaskbar = null;
+      _savedAlwaysOnTop = null;
       _wasFullScreen = false;
       _setPhase(WindowPhase.normal);
     }
@@ -228,17 +231,18 @@ class WindowCtrl {
   Future<void> _emergencyRestore() async {
     await Future.wait([
       _safeCall(() => windowManager.setFullScreen(false)),
-      _safeCall(() => windowManager.setAlwaysOnTop(false)),
       _safeCall(() => windowManager.setSkipTaskbar(false)),
-      _safeCall(() => windowManager.setSize(const Size(1100, 750))),
       _safeCall(() => windowManager.setBackgroundColor(Colors.transparent)),
     ]);
+    // Return to the app's normal state (covering the taskbar).
+    await _safeCall(() => coverTaskbar());
     try {
       await windowManager.show();
       await windowManager.focus();
     } catch (_) {}
     _savedBounds = null;
     _savedSkipTaskbar = null;
+    _savedAlwaysOnTop = null;
     _wasFullScreen = false;
     _setPhase(WindowPhase.normal);
   }
