@@ -356,6 +356,7 @@ class _EncoderPageState extends State<EncoderPage>
                   ),
                   const SizedBox(height: 12),
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         _isReady ? Icons.check_circle : Icons.error,
@@ -364,11 +365,15 @@ class _EncoderPageState extends State<EncoderPage>
                       ),
                       const SizedBox(width: 6),
                       Expanded(
-                        child: Text(
-                          _statusMessage,
-                          style: Theme.of(context).textTheme.bodySmall,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 120),
+                          child: SingleChildScrollView(
+                            // Selectable so users can copy error / status text.
+                            child: SelectableText(
+                              _statusMessage,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
                         ),
                       ),
                     ],
