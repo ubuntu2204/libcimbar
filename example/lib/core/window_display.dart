@@ -27,13 +27,34 @@ Future<void> coverTaskbar() async {
   await windowManager.setAlwaysOnTop(true);
 }
 
-/// Return the window to a normal, centered windowed size.
+/// Return the window to a normal windowed layout that always fits fully on
+/// screen.
 ///
-/// The window stays topmost (always-on-top) so it remains above the Windows
-/// taskbar in windowed mode too — only its size changes from the full-screen
-/// [coverTaskbar] layout back to [kDefaultWindowedSize].
+/// The desired [size] is clamped to the monitor's visible work area (the
+/// region excluding the taskbar) so the window — including its top control
+/// buttons (fullscreen / minimize / close) — is never pushed off the screen
+/// edges on smaller displays. The window is horizontally centered and anchored
+/// to the bottom of the work area, and stays topmost (always-on-top) so it
+/// always sits above other windows.
 Future<void> restoreWindowed({Size size = kDefaultWindowedSize}) async {
+  final display = await screenRetriever.getPrimaryDisplay();
+  // Work area = monitor minus the taskbar, in logical pixels (DPI already
+  // accounted for). Fall back to the full size if the platform omits it.
+  final Size work = display.visibleSize ?? display.size;
+  final Offset workOrigin = display.visiblePosition ?? Offset.zero;
+
+  // Leave a small margin so the frameless window never sits flush against the
+  // screen edges, and never exceeds the usable area.
+  const double margin = 32.0;
+  final double w =
+      size.width < work.width - margin ? size.width : work.width - margin;
+  final double h =
+      size.height < work.height - margin ? size.height : work.height - margin;
+
+  // Horizontally centered, anchored to the bottom of the work area.
+  final double left = workOrigin.dx + (work.width - w) / 2;
+  final double top = workOrigin.dy + (work.height - h);
+
   await windowManager.setAlwaysOnTop(true);
-  await windowManager.setSize(size);
-  await windowManager.center();
+  await windowManager.setBounds(Rect.fromLTWH(left, top, w, h));
 }

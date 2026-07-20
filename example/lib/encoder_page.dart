@@ -303,7 +303,9 @@ class _EncoderPageState extends State<EncoderPage>
             width: 200,
             child: Container(
               color: Theme.of(context).colorScheme.surface,
-              padding: const EdgeInsets.all(10),
+              // Extra top inset so the window control buttons (fullscreen /
+              // minimize / close) sit a little lower and are easy to reach.
+              padding: const EdgeInsets.fromLTRB(10, 32, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
