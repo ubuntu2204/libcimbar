@@ -27,9 +27,13 @@ Future<void> coverTaskbar() async {
   await windowManager.setAlwaysOnTop(true);
 }
 
-/// Return the window to a normal, centered, non-topmost windowed state.
+/// Return the window to a normal, centered windowed size.
+///
+/// The window stays topmost (always-on-top) so it remains above the Windows
+/// taskbar in windowed mode too — only its size changes from the full-screen
+/// [coverTaskbar] layout back to [kDefaultWindowedSize].
 Future<void> restoreWindowed({Size size = kDefaultWindowedSize}) async {
-  await windowManager.setAlwaysOnTop(false);
+  await windowManager.setAlwaysOnTop(true);
   await windowManager.setSize(size);
   await windowManager.center();
 }

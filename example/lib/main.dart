@@ -32,10 +32,10 @@ void main() async {
       await windowManager.setAsFrameless();
       await windowManager.show();
       await windowManager.focus();
-      // Cover the whole monitor — including the taskbar — as a borderless,
-      // topmost window. This is NOT fullscreen mode, so the screenshot
+      // Start in a normal centered windowed size, kept topmost so it stays
+      // above the taskbar. This is NOT fullscreen mode, so the screenshot
       // capture flow keeps working (it hides the window before grabbing).
-      await coverTaskbar();
+      await restoreWindowed();
     });
   }
 

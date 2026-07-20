@@ -33,7 +33,7 @@ class _EncoderPageState extends State<EncoderPage>
   bool _isReady = false;
   bool _isEncoding = false;
   bool _isCapturing = false;
-  bool _coveringTaskbar = true; // app starts covering the taskbar
+  bool _coveringTaskbar = false; // app starts windowed (still topmost)
   String _statusMessage = 'Initializing...';
 
   CimbarConfig _config = const CimbarConfig(
@@ -67,8 +67,9 @@ class _EncoderPageState extends State<EncoderPage>
     _initialize();
   }
 
-  /// Toggle between covering the taskbar (topmost, full screen) and a
-  /// normal centered windowed size. Neither uses fullscreen mode.
+  /// Toggle between covering the taskbar (topmost, full-screen size) and a
+  /// normal centered windowed size. Both stay topmost (above the taskbar);
+  /// neither uses fullscreen mode.
   Future<void> _toggleCoverTaskbar() async {
     try {
       if (_coveringTaskbar) {

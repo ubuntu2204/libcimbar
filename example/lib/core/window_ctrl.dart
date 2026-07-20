@@ -234,8 +234,8 @@ class WindowCtrl {
       _safeCall(() => windowManager.setSkipTaskbar(false)),
       _safeCall(() => windowManager.setBackgroundColor(Colors.transparent)),
     ]);
-    // Return to the app's normal state (covering the taskbar).
-    await _safeCall(() => coverTaskbar());
+    // Return to the app's normal state (windowed, still topmost).
+    await _safeCall(() => restoreWindowed());
     try {
       await windowManager.show();
       await windowManager.focus();
