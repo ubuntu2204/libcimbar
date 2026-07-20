@@ -24,7 +24,7 @@ class EncoderPage extends StatefulWidget {
 }
 
 class _EncoderPageState extends State<EncoderPage>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WindowListener {
   final CimbarPlatform _platform = CimbarPlatform.instance;
 
   ICimbarEncoder? _encoder;
@@ -61,10 +61,29 @@ class _EncoderPageState extends State<EncoderPage>
   // Pre-decoded frame images for display
   List<ui.Image> _decodedFrames = [];
 
+  // Measures the on-screen size of the cimbar display (for the quality check).
+  final GlobalKey _displayKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
+    // Project rule: the encoder window must stay frontmost (always-on-top).
+    // Listen for focus changes so we can re-assert it (see [onWindowBlur]).
+    if (!kIsWeb && Platform.isWindows) {
+      windowManager.addListener(this);
+    }
     _initialize();
+  }
+
+  /// Project rule (.qoder/rules): the encoder window must always stay on top /
+  /// frontmost, so the displayed cimbar is never occluded. Whenever the window
+  /// loses focus, re-assert topmost so it can never fall behind other windows.
+  /// Skipped during the region-capture flow, which intentionally toggles the
+  /// window state and restores it afterwards.
+  @override
+  void onWindowBlur() {
+    if (_isCapturing) return;
+    windowManager.setAlwaysOnTop(true);
   }
 
   /// Toggle between covering the taskbar (topmost, full-screen size) and a
@@ -112,6 +131,15 @@ class _EncoderPageState extends State<EncoderPage>
           modifiers: [HotKeyModifier.alt],
         ),
         keyDownHandler: (_) => _saveDebugScreenshot(),
+      );
+
+      // Register Alt+Q hotkey for the barcode quality check.
+      await hotKeyManager.register(
+        HotKey(
+          key: LogicalKeyboardKey.keyQ,
+          modifiers: [HotKeyModifier.alt],
+        ),
+        keyDownHandler: (_) => _checkBarcodeQuality(),
       );
 
       setState(() {
@@ -179,6 +207,90 @@ class _EncoderPageState extends State<EncoderPage>
       _statusMessage = path != null
           ? 'Saved full-screen screenshot:\n$path'
           : 'Full-screen screenshot failed.';
+    });
+  }
+
+  /// Analyze whether the generated cimbar is presented with enough pixels to be
+  /// decodable, and save a plain-text report for later analysis.
+  ///
+  /// "Enough pixels" means the on-screen cimbar is rendered at >= its native
+  /// resolution in *physical* pixels. If the window is small or DPI scaling
+  /// shrinks it, the barcode is downscaled and the decoder fails.
+  Future<void> _checkBarcodeQuality() async {
+    if (_frames.isEmpty) {
+      setState(
+          () => _statusMessage = 'No barcode yet - encode & display first.');
+      return;
+    }
+
+    final int nativeW = _frames.first.width;
+    final int nativeH = _frames.first.height;
+
+    // Actual on-screen render size of the cimbar (logical px).
+    final RenderBox? box =
+        _displayKey.currentContext?.findRenderObject() as RenderBox?;
+    final Size logical = (box != null && box.hasSize) ? box.size : Size.zero;
+
+    // Windows display scaling (device pixel ratio).
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    final double dpr = views.isNotEmpty ? views.first.devicePixelRatio : 1.0;
+
+    final int physW = (logical.width * dpr).round();
+    final int physH = (logical.height * dpr).round();
+    final double scaleW = nativeW == 0 ? 0.0 : physW / nativeW;
+    final double scaleH = nativeH == 0 ? 0.0 : physH / nativeH;
+
+    final bool passW = physW >= nativeW;
+    final bool passH = physH >= nativeH;
+    final bool pass = passW && passH;
+
+    final report = StringBuffer()
+      ..writeln('libcimbar encoder - barcode quality report')
+      ..writeln('Generated  : ${DateTime.now().toIso8601String()}')
+      ..writeln('Mode       : ${_config.mode.name}')
+      ..writeln('Display FPS: ${_config.fps}')
+      ..writeln('Frames     : ${_frames.length}')
+      ..writeln('')
+      ..writeln('[Generated barcode]')
+      ..writeln('  Native resolution : $nativeW x $nativeH px')
+      ..writeln('')
+      ..writeln('[On-screen display]')
+      ..writeln('  DPI scale (DPR)   : ${dpr.toStringAsFixed(3)}')
+      ..writeln('  Logical size      : '
+          '${logical.width.toStringAsFixed(1)} x ${logical.height.toStringAsFixed(1)}')
+      ..writeln('  Physical size     : $physW x $physH px')
+      ..writeln('  Scale vs native   : '
+          '${scaleW.toStringAsFixed(2)}x by ${scaleH.toStringAsFixed(2)}x')
+      ..writeln('')
+      ..writeln('[Verdict - enough pixels?]')
+      ..writeln('  Horizontal : ${passW ? 'PASS' : 'FAIL'} '
+          '($physW ${passW ? '>=' : '<'} $nativeW)')
+      ..writeln('  Vertical   : ${passH ? 'PASS' : 'FAIL'} '
+          '($physH ${passH ? '>=' : '<'} $nativeH)')
+      ..writeln('  OVERALL    : ${pass ? 'PASS' : 'FAIL'}')
+      ..writeln('');
+    if (pass) {
+      report.writeln('Displayed at >= 1:1 of native resolution - enough pixels '
+          'for decoding.');
+      if (dpr != 1.0 || (scaleW - scaleW.roundToDouble()).abs() > 0.001) {
+        report.writeln('Note: non-integer scale with FilterQuality.high means '
+            'the cimbar is interpolated (slightly blurred). If decoding still '
+            'fails, render at an integer scale with FilterQuality.none.');
+      }
+    } else {
+      report.writeln('Displayed BELOW native resolution - the cimbar is '
+          'downscaled and likely undecodable. Enlarge the window / cimbar area '
+          'so the display is at least $nativeW x $nativeH physical pixels '
+          '(currently $physW x $physH).');
+    }
+
+    final path =
+        await ScreenshotCapture.instance.saveDebugReport(report.toString());
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = path != null
+          ? '${pass ? 'PASS' : 'FAIL'} - quality report saved:\n$path'
+          : 'Quality report failed to save.';
     });
   }
 
@@ -312,6 +424,7 @@ class _EncoderPageState extends State<EncoderPage>
               color: Colors.black,
               child: Center(
                 child: SizedBox(
+                  key: _displayKey,
                   width: 1024,
                   height: 1024,
                   child: _frames.isNotEmpty
@@ -443,6 +556,13 @@ class _EncoderPageState extends State<EncoderPage>
                           icon: const Icon(Icons.bug_report, size: 18),
                           label: const Text('Debug shot (Alt+S)'),
                         ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed:
+                              _frames.isNotEmpty ? _checkBarcodeQuality : null,
+                          icon: const Icon(Icons.high_quality, size: 18),
+                          label: const Text('Check quality (Alt+Q)'),
+                        ),
                         if (_frames.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           OutlinedButton.icon(
@@ -564,6 +684,9 @@ class _EncoderPageState extends State<EncoderPage>
 
   @override
   void dispose() {
+    if (!kIsWeb && Platform.isWindows) {
+      windowManager.removeListener(this);
+    }
     _frameAnimationController?.dispose();
     for (final img in _decodedFrames) {
       img.dispose();

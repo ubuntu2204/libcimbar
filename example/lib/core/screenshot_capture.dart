@@ -101,6 +101,23 @@ class ScreenshotCapture {
     }
   }
 
+  /// Save a plain-text debug/report file and return its path (or null on
+  /// failure). Used by the barcode quality check to persist a report.
+  Future<String?> saveDebugReport(String content) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final dir = '${appDir.path}/libcimbar_screenshots';
+      await Directory(dir).create(recursive: true);
+      final path =
+          '$dir/quality_report_${DateTime.now().millisecondsSinceEpoch}.txt';
+      await File(path).writeAsString(content);
+      return path;
+    } catch (e) {
+      debugPrint('[ScreenshotCapture] saveDebugReport failed: $e');
+      return null;
+    }
+  }
+
   /// Take a screenshot with region selection.
   ///
   /// Returns a [ScreenshotResult] with the cropped RGBA pixel data.
