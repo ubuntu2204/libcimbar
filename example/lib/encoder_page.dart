@@ -32,6 +32,7 @@ class _EncoderPageState extends State<EncoderPage>
   bool _isReady = false;
   bool _isEncoding = false;
   bool _isCapturing = false;
+  bool _isFullScreen = true; // app starts fullscreen (covers the taskbar)
   String _statusMessage = 'Initializing...';
 
   CimbarConfig _config = const CimbarConfig(
@@ -63,6 +64,31 @@ class _EncoderPageState extends State<EncoderPage>
   void initState() {
     super.initState();
     _initialize();
+    _syncFullScreenState();
+  }
+
+  /// Read the current fullscreen state from the window manager so the
+  /// toggle button reflects reality (e.g. after the capture flow restores it).
+  Future<void> _syncFullScreenState() async {
+    try {
+      final fs = await windowManager.isFullScreen();
+      if (mounted) setState(() => _isFullScreen = fs);
+    } catch (_) {}
+  }
+
+  /// Toggle between fullscreen (covers the taskbar) and a windowed size.
+  Future<void> _toggleFullScreen() async {
+    try {
+      final fs = await windowManager.isFullScreen();
+      if (fs) {
+        await windowManager.setFullScreen(false);
+        await windowManager.setSize(const Size(1400, 1100));
+        await windowManager.center();
+      } else {
+        await windowManager.setFullScreen(true);
+      }
+      if (mounted) setState(() => _isFullScreen = !fs);
+    } catch (_) {}
   }
 
   Future<void> _initialize() async {
@@ -291,10 +317,19 @@ class _EncoderPageState extends State<EncoderPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Window controls (minimize, close)
+                  // Window controls (fullscreen toggle, minimize, close)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
+                      _WindowButton(
+                        icon: _isFullScreen
+                            ? Icons.fullscreen_exit
+                            : Icons.fullscreen,
+                        tooltip: _isFullScreen
+                            ? 'Exit fullscreen'
+                            : 'Fullscreen (cover taskbar)',
+                        onPressed: _toggleFullScreen,
+                      ),
                       _WindowButton(
                         icon: Icons.remove,
                         tooltip: 'Minimize',

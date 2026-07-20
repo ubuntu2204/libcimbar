@@ -31,6 +31,9 @@ void main() async {
       await windowManager.setAsFrameless();
       await windowManager.show();
       await windowManager.focus();
+      // Enter fullscreen so the encoder fills the whole monitor and covers
+      // the Windows taskbar while displaying cimbar frames for capture.
+      await windowManager.setFullScreen(true);
     });
   }
 

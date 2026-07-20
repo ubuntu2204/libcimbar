@@ -185,15 +185,22 @@ class WindowCtrl {
         windowManager.setBackgroundColor(Colors.transparent),
       ]);
 
-      if (_savedBounds != null) {
-        await windowManager.setSize(_savedBounds!.size);
-        await windowManager.setPosition(_savedBounds!.topLeft);
+      if (_wasFullScreen) {
+        // The app runs fullscreen (covering the taskbar). Restore that state
+        // rather than dropping back to a windowed size/position.
+        await windowManager.show();
+        await windowManager.focus();
+        await windowManager.setFullScreen(true);
       } else {
-        await windowManager.setSize(const Size(1100, 750));
+        if (_savedBounds != null) {
+          await windowManager.setSize(_savedBounds!.size);
+          await windowManager.setPosition(_savedBounds!.topLeft);
+        } else {
+          await windowManager.setSize(const Size(1100, 750));
+        }
+        await windowManager.show();
+        await windowManager.focus();
       }
-
-      await windowManager.show();
-      await windowManager.focus();
     } catch (e) {
       debugPrint('[WindowCtrl] _doRestore failed: $e');
       await _emergencyRestore();
