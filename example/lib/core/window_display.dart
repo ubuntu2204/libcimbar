@@ -27,37 +27,39 @@ Future<void> coverTaskbar() async {
   await windowManager.setAlwaysOnTop(true);
 }
 
-/// Return the window to a normal, bottom-anchored windowed layout that stays
-/// on top of (above) the taskbar.
+/// Return the window to a normal windowed layout: horizontally centered and
+/// vertically centered but nudged up a little.
 ///
-/// The desired [size] is clamped so the window never exceeds the monitor and
-/// always leaves a top margin — this keeps the top control buttons (fullscreen
-/// / minimize / close) on-screen even on small displays. The window is
-/// horizontally centered and its bottom edge is flush with the screen bottom,
-/// so it sits over the taskbar area. Because it is made topmost *after*
-/// positioning (same order as [coverTaskbar]), Windows draws it above the
-/// always-on-top taskbar instead of hiding it behind the taskbar.
+/// The desired [size] is clamped so the window keeps a margin on every side —
+/// this keeps the top control buttons (fullscreen / minimize / close) on-screen
+/// even on small displays. It is made topmost *after* positioning (same order
+/// as [coverTaskbar]) so Windows always draws it above the taskbar instead of
+/// hiding it behind the taskbar.
 Future<void> restoreWindowed({Size size = kDefaultWindowedSize}) async {
   final display = await screenRetriever.getPrimaryDisplay();
   // Full monitor size in logical pixels (DPI already accounted for).
   final Size screen = display.size;
 
-  // Keep the top of the window (and its control buttons) on-screen, and leave
-  // a small gap on the sides so it reads as a window rather than full screen.
+  // Keep a margin on every side so the window never touches the screen edges
+  // and the top control buttons stay on-screen even on small displays.
   const double topMargin = 40.0;
+  const double bottomMargin = 40.0;
   const double sideMargin = 24.0;
+  // How far above the exact vertical center to sit ("稍微上点").
+  const double upwardNudge = 48.0;
   final double maxW = screen.width - sideMargin * 2;
-  final double maxH = screen.height - topMargin;
+  final double maxH = screen.height - topMargin - bottomMargin;
   final double w = size.width < maxW ? size.width : maxW;
   final double h = size.height < maxH ? size.height : maxH;
 
-  // Horizontally centered, bottom edge flush with the screen bottom so the
-  // window covers the taskbar area rather than stopping above it.
+  // Horizontally centered; vertically centered then nudged up, clamped so the
+  // top control buttons never leave the screen.
   final double left = (screen.width - w) / 2;
-  final double top = screen.height - h;
+  double top = (screen.height - h) / 2 - upwardNudge;
+  if (top < topMargin) top = topMargin;
 
   // Apply bounds first, then mark topmost LAST so Windows draws the window
-  // above the taskbar (this ordering is what makes it cover the taskbar).
+  // above the taskbar (same ordering as coverTaskbar).
   await windowManager.setBounds(Rect.fromLTWH(left, top, w, h));
   await windowManager.setAlwaysOnTop(true);
 }

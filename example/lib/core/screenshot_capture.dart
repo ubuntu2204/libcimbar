@@ -78,6 +78,29 @@ class ScreenshotCapture {
     }
   }
 
+  /// Capture the full screen to a PNG file WITHOUT hiding this window.
+  ///
+  /// Unlike [takeScreenshot] (which hides the app first so it can grab the
+  /// desktop *behind* the window), this keeps the window visible, so the shot
+  /// shows exactly what the encoder is displaying. Useful for diagnosing why
+  /// the rendered cimbar frames fail to decode. Returns the saved file path,
+  /// or null on failure.
+  Future<String?> captureFullScreenToFile() async {
+    if (!Platform.isWindows) return null;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final dir = '${appDir.path}/libcimbar_screenshots';
+      await Directory(dir).create(recursive: true);
+      final path =
+          '$dir/encoder_fullscreen_${DateTime.now().millisecondsSinceEpoch}.png';
+      final ok = await _captureFullScreen(path);
+      return ok ? path : null;
+    } catch (e) {
+      debugPrint('[ScreenshotCapture] debug full-screen capture failed: $e');
+      return null;
+    }
+  }
+
   /// Take a screenshot with region selection.
   ///
   /// Returns a [ScreenshotResult] with the cropped RGBA pixel data.

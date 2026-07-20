@@ -105,6 +105,15 @@ class _EncoderPageState extends State<EncoderPage>
         keyDownHandler: (_) => _startScreenCapture(),
       );
 
+      // Register Alt+S hotkey for the debug full-screen screenshot.
+      await hotKeyManager.register(
+        HotKey(
+          key: LogicalKeyboardKey.keyS,
+          modifiers: [HotKeyModifier.alt],
+        ),
+        keyDownHandler: (_) => _saveDebugScreenshot(),
+      );
+
       setState(() {
         _isReady = _encoder!.isReady;
         _statusMessage = _isReady
@@ -154,6 +163,23 @@ class _EncoderPageState extends State<EncoderPage>
     }
 
     if (mounted) setState(() => _isCapturing = false);
+  }
+
+  /// Debug helper: save a full-screen screenshot (window kept visible) so the
+  /// displayed cimbar frames can be inspected outside the app. Useful for
+  /// diagnosing decode failures. The saved path is shown in the status text
+  /// (which is selectable, so it can be copied).
+  Future<void> _saveDebugScreenshot() async {
+    if (mounted) {
+      setState(() => _statusMessage = 'Saving full-screen screenshot...');
+    }
+    final path = await ScreenshotCapture.instance.captureFullScreenToFile();
+    if (!mounted) return;
+    setState(() {
+      _statusMessage = path != null
+          ? 'Saved full-screen screenshot:\n$path'
+          : 'Full-screen screenshot failed.';
+    });
   }
 
   // --- Encoding flow ---
@@ -303,125 +329,152 @@ class _EncoderPageState extends State<EncoderPage>
             width: 200,
             child: Container(
               color: Theme.of(context).colorScheme.surface,
-              // Extra top inset so the window control buttons (fullscreen /
-              // minimize / close) sit a little lower and are easy to reach.
-              padding: const EdgeInsets.fromLTRB(10, 32, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              child: Stack(
                 children: [
-                  // Window controls (fullscreen toggle, minimize, close)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      _WindowButton(
-                        icon: _coveringTaskbar
-                            ? Icons.fullscreen_exit
-                            : Icons.fullscreen,
-                        tooltip: _coveringTaskbar
-                            ? 'Windowed mode'
-                            : 'Cover taskbar',
-                        onPressed: _toggleCoverTaskbar,
-                      ),
-                      _WindowButton(
-                        icon: Icons.remove,
-                        tooltip: 'Minimize',
-                        onPressed: () => windowManager.minimize(),
-                      ),
-                      _WindowButton(
-                        icon: Icons.close,
-                        tooltip: 'Close',
-                        onPressed: () => windowManager.close(),
-                        isClose: true,
-                      ),
-                    ],
+                  // Press-and-drag on any empty part of the left panel to move
+                  // the frameless window. Interactive controls sit above this
+                  // layer, so they still receive their own taps and drags.
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanStart: (_) => windowManager.startDragging(),
+                      child: const SizedBox.expand(),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  PopupMenuButton<CimbarMode>(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                  Padding(
+                    // Extra top inset so the window control buttons (fullscreen
+                    // / minimize / close) sit a little lower and easy to reach.
+                    padding: const EdgeInsets.fromLTRB(10, 32, 10, 10),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        const Icon(Icons.settings, size: 18),
-                        const SizedBox(width: 6),
-                        Text(_config.mode.name),
+                        // Window controls (fullscreen toggle, minimize, close)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            _WindowButton(
+                              icon: _coveringTaskbar
+                                  ? Icons.fullscreen_exit
+                                  : Icons.fullscreen,
+                              tooltip: _coveringTaskbar
+                                  ? 'Windowed mode'
+                                  : 'Cover taskbar',
+                              onPressed: _toggleCoverTaskbar,
+                            ),
+                            _WindowButton(
+                              icon: Icons.remove,
+                              tooltip: 'Minimize',
+                              onPressed: () => windowManager.minimize(),
+                            ),
+                            _WindowButton(
+                              icon: Icons.close,
+                              tooltip: 'Close',
+                              onPressed: () => windowManager.close(),
+                              isClose: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        PopupMenuButton<CimbarMode>(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.settings, size: 18),
+                              const SizedBox(width: 6),
+                              Text(_config.mode.name),
+                            ],
+                          ),
+                          onSelected: (mode) async {
+                            _config = _config.copyWith(mode: mode);
+                            await _encoder?.configure(_config);
+                          },
+                          itemBuilder: (_) => CimbarMode.values
+                              .map((m) =>
+                                  PopupMenuItem(value: m, child: Text(m.name)))
+                              .toList(),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              _isReady ? Icons.check_circle : Icons.error,
+                              size: 16,
+                              color: _isReady ? Colors.green : Colors.red,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxHeight: 120),
+                                child: SingleChildScrollView(
+                                  // Selectable so users can copy error / status text.
+                                  child: SelectableText(
+                                    _statusMessage,
+                                    style:
+                                        Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _isReady && !_isCapturing
+                              ? _startScreenCapture
+                              : null,
+                          icon: const Icon(Icons.screenshot, size: 18),
+                          label: Text(_isCapturing
+                              ? 'Capturing...'
+                              : 'Capture (Alt+A)'),
+                        ),
+                        const SizedBox(height: 8),
+                        FilledButton.icon(
+                          onPressed: _compressedData != null && !_isEncoding
+                              ? _startEncoding
+                              : null,
+                          icon: const Icon(Icons.qr_code, size: 18),
+                          label: const Text('Encode & Display'),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _saveDebugScreenshot,
+                          icon: const Icon(Icons.bug_report, size: 18),
+                          label: const Text('Debug shot (Alt+S)'),
+                        ),
+                        if (_frames.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _stopEncoding,
+                            icon: const Icon(Icons.stop, size: 18),
+                            label: const Text('Stop'),
+                          ),
+                        ],
+                        const SizedBox(height: 20),
+                        if (_compressedData != null) ...[
+                          _infoRow(
+                              'Capture', '${_capturedWidth}x$_capturedHeight'),
+                          const SizedBox(height: 6),
+                          _infoRow('Compressed',
+                              '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
+                          const SizedBox(height: 6),
+                          _infoRow('Mode', _config.mode.name),
+                          const SizedBox(height: 6),
+                          _fpsControl(),
+                          const SizedBox(height: 6),
+                          _infoRow('Frames', '${_frames.length}'),
+                        ],
+                        const Spacer(),
+                        if (_frames.isNotEmpty)
+                          Text(
+                            'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
                       ],
                     ),
-                    onSelected: (mode) async {
-                      _config = _config.copyWith(mode: mode);
-                      await _encoder?.configure(_config);
-                    },
-                    itemBuilder: (_) => CimbarMode.values
-                        .map(
-                            (m) => PopupMenuItem(value: m, child: Text(m.name)))
-                        .toList(),
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        _isReady ? Icons.check_circle : Icons.error,
-                        size: 16,
-                        color: _isReady ? Colors.green : Colors.red,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 120),
-                          child: SingleChildScrollView(
-                            // Selectable so users can copy error / status text.
-                            child: SelectableText(
-                              _statusMessage,
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed:
-                        _isReady && !_isCapturing ? _startScreenCapture : null,
-                    icon: const Icon(Icons.screenshot, size: 18),
-                    label:
-                        Text(_isCapturing ? 'Capturing...' : 'Capture (Alt+A)'),
-                  ),
-                  const SizedBox(height: 8),
-                  FilledButton.icon(
-                    onPressed: _compressedData != null && !_isEncoding
-                        ? _startEncoding
-                        : null,
-                    icon: const Icon(Icons.qr_code, size: 18),
-                    label: const Text('Encode & Display'),
-                  ),
-                  if (_frames.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      onPressed: _stopEncoding,
-                      icon: const Icon(Icons.stop, size: 18),
-                      label: const Text('Stop'),
-                    ),
-                  ],
-                  const SizedBox(height: 20),
-                  if (_compressedData != null) ...[
-                    _infoRow('Capture', '${_capturedWidth}x$_capturedHeight'),
-                    const SizedBox(height: 6),
-                    _infoRow('Compressed',
-                        '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
-                    const SizedBox(height: 6),
-                    _infoRow('Mode', _config.mode.name),
-                    const SizedBox(height: 6),
-                    _fpsControl(),
-                    const SizedBox(height: 6),
-                    _infoRow('Frames', '${_frames.length}'),
-                  ],
-                  const Spacer(),
-                  if (_frames.isNotEmpty)
-                    Text(
-                      'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      textAlign: TextAlign.center,
-                    ),
                 ],
               ),
             ),
