@@ -30,33 +30,37 @@ Future<void> coverTaskbar() async {
 /// Return the window to a normal windowed layout: horizontally centered and
 /// vertically centered but nudged up a little.
 ///
-/// The desired [size] is clamped so the window keeps a margin on every side —
-/// this keeps the top control buttons (fullscreen / minimize / close) on-screen
-/// even on small displays. It is made topmost *after* positioning (same order
-/// as [coverTaskbar]) so Windows always draws it above the taskbar instead of
-/// hiding it behind the taskbar.
+/// The window is sized from [size] but kept tall enough (when the screen
+/// allows) that the right-hand cimbar area stays at least 1024 px — its native
+/// resolution — so the barcode is shown at >= 1:1 and stays decodable. It is
+/// made topmost *after* positioning (same order as [coverTaskbar]) so Windows
+/// draws it above the taskbar instead of hiding it behind the taskbar.
 Future<void> restoreWindowed({Size size = kDefaultWindowedSize}) async {
   final display = await screenRetriever.getPrimaryDisplay();
   // Full monitor size in logical pixels (DPI already accounted for).
   final Size screen = display.size;
 
-  // Keep a margin on every side so the window never touches the screen edges
-  // and the top control buttons stay on-screen even on small displays.
-  const double topMargin = 40.0;
-  const double bottomMargin = 40.0;
   const double sideMargin = 24.0;
+  const double vMargin = 16.0;
   // How far above the exact vertical center to sit ("稍微上点").
   const double upwardNudge = 48.0;
+  // The cimbar (1024x1024) is shown in the right-hand area, which spans the
+  // full window height. It MUST be displayed at >= its native size or it gets
+  // downscaled/distorted and fails to decode, so keep the window at least this
+  // tall whenever the screen allows — pixels take priority over margins.
+  const double minCimbarPx = 1024.0;
+
   final double maxW = screen.width - sideMargin * 2;
-  final double maxH = screen.height - topMargin - bottomMargin;
+  final double maxH = screen.height - vMargin * 2;
   final double w = size.width < maxW ? size.width : maxW;
-  final double h = size.height < maxH ? size.height : maxH;
+  double h = size.height < maxH ? size.height : maxH;
+  if (h < minCimbarPx && screen.height >= minCimbarPx) h = minCimbarPx;
 
   // Horizontally centered; vertically centered then nudged up, clamped so the
-  // top control buttons never leave the screen.
+  // window never runs past the top edge (keeps the control buttons on-screen).
   final double left = (screen.width - w) / 2;
   double top = (screen.height - h) / 2 - upwardNudge;
-  if (top < topMargin) top = topMargin;
+  if (top < 0) top = 0;
 
   // Apply bounds first, then mark topmost LAST so Windows draws the window
   // above the taskbar (same ordering as coverTaskbar).

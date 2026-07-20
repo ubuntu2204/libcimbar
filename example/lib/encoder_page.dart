@@ -698,20 +698,27 @@ class _EncoderPageState extends State<EncoderPage>
   }
 }
 
-/// Paints a ui.Image stretched to fill the entire canvas.
+/// Paints a cimbar [ui.Image] as a centered square, uniformly scaled (never
+/// distorted) and with no interpolation, so the tile grid stays crisp and
+/// decodable.
 class _CimbarPainter extends CustomPainter {
   final ui.Image image;
   _CimbarPainter({required this.image});
 
   @override
   void paint(Canvas canvas, Size size) {
-    debugPrint('[Painter] canvas size: ${size.width}x${size.height}, '
-        'image: ${image.width}x${image.height}');
-    final paint = Paint()..filterQuality = FilterQuality.high;
+    // Largest centered square that fits - keeps the barcode square even if the
+    // canvas is not (e.g. a slightly short window), instead of stretching it.
+    final double side = size.shortestSide;
+    final double dx = (size.width - side) / 2;
+    final double dy = (size.height - side) / 2;
+    // FilterQuality.none: nearest-neighbour, so tiles are not blurred by
+    // interpolation (critical for decoding, especially at DPI scale != 1).
+    final paint = Paint()..filterQuality = FilterQuality.none;
     canvas.drawImageRect(
       image,
       Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
-      Rect.fromLTWH(0, 0, size.width, size.height),
+      Rect.fromLTWH(dx, dy, side, side),
       paint,
     );
   }
