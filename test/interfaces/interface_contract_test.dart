@@ -142,6 +142,7 @@ class MockCameraCapture implements ICameraCapture {
   Future<void> start({
     int preferredWidth = 1920,
     int preferredHeight = 1080,
+    int frameIntervalMs = 200,
   }) async {
     _streaming = true;
   }
