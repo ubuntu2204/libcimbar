@@ -27,34 +27,37 @@ Future<void> coverTaskbar() async {
   await windowManager.setAlwaysOnTop(true);
 }
 
-/// Return the window to a normal windowed layout that always fits fully on
-/// screen.
+/// Return the window to a normal, bottom-anchored windowed layout that stays
+/// on top of (above) the taskbar.
 ///
-/// The desired [size] is clamped to the monitor's visible work area (the
-/// region excluding the taskbar) so the window — including its top control
-/// buttons (fullscreen / minimize / close) — is never pushed off the screen
-/// edges on smaller displays. The window is horizontally centered and anchored
-/// to the bottom of the work area, and stays topmost (always-on-top) so it
-/// always sits above other windows.
+/// The desired [size] is clamped so the window never exceeds the monitor and
+/// always leaves a top margin — this keeps the top control buttons (fullscreen
+/// / minimize / close) on-screen even on small displays. The window is
+/// horizontally centered and its bottom edge is flush with the screen bottom,
+/// so it sits over the taskbar area. Because it is made topmost *after*
+/// positioning (same order as [coverTaskbar]), Windows draws it above the
+/// always-on-top taskbar instead of hiding it behind the taskbar.
 Future<void> restoreWindowed({Size size = kDefaultWindowedSize}) async {
   final display = await screenRetriever.getPrimaryDisplay();
-  // Work area = monitor minus the taskbar, in logical pixels (DPI already
-  // accounted for). Fall back to the full size if the platform omits it.
-  final Size work = display.visibleSize ?? display.size;
-  final Offset workOrigin = display.visiblePosition ?? Offset.zero;
+  // Full monitor size in logical pixels (DPI already accounted for).
+  final Size screen = display.size;
 
-  // Leave a small margin so the frameless window never sits flush against the
-  // screen edges, and never exceeds the usable area.
-  const double margin = 32.0;
-  final double w =
-      size.width < work.width - margin ? size.width : work.width - margin;
-  final double h =
-      size.height < work.height - margin ? size.height : work.height - margin;
+  // Keep the top of the window (and its control buttons) on-screen, and leave
+  // a small gap on the sides so it reads as a window rather than full screen.
+  const double topMargin = 40.0;
+  const double sideMargin = 24.0;
+  final double maxW = screen.width - sideMargin * 2;
+  final double maxH = screen.height - topMargin;
+  final double w = size.width < maxW ? size.width : maxW;
+  final double h = size.height < maxH ? size.height : maxH;
 
-  // Horizontally centered, anchored to the bottom of the work area.
-  final double left = workOrigin.dx + (work.width - w) / 2;
-  final double top = workOrigin.dy + (work.height - h);
+  // Horizontally centered, bottom edge flush with the screen bottom so the
+  // window covers the taskbar area rather than stopping above it.
+  final double left = (screen.width - w) / 2;
+  final double top = screen.height - h;
 
-  await windowManager.setAlwaysOnTop(true);
+  // Apply bounds first, then mark topmost LAST so Windows draws the window
+  // above the taskbar (this ordering is what makes it cover the taskbar).
   await windowManager.setBounds(Rect.fromLTWH(left, top, w, h));
+  await windowManager.setAlwaysOnTop(true);
 }
