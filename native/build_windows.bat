@@ -25,7 +25,7 @@ echo.
 
 REM ── Determine source path ──
 if "%~1"=="" (
-    set "LIBCIMBAR_SRC=C:\project\libcimbar\libcimbar"
+    set "LIBCIMBAR_SRC=%~dp0..\third_party\libcimbar_cpp"
 ) else (
     set "LIBCIMBAR_SRC=%~1"
 )

@@ -39,7 +39,7 @@ echo "[1/4] Emscripten: $(emcc --version | head -1)"
 
 # Source path
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIBCIMBAR_SRC="${1:-${SCRIPT_DIR}/../../libcimbar_cpp}"
+LIBCIMBAR_SRC="${1:-${SCRIPT_DIR}/../third_party/libcimbar_cpp}"
 if [ ! -f "$LIBCIMBAR_SRC/src/lib/encoder/Encoder.h" ]; then
     echo "ERROR: Cannot find libcimbar source at $LIBCIMBAR_SRC"
     exit 1

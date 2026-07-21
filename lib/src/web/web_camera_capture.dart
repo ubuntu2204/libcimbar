@@ -9,6 +9,8 @@ import 'dart:ui_web' as ui_web;
 
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../interfaces/camera_capture_interface.dart';
 
 /// How the camera frame is mapped into the square decoder input.
@@ -82,17 +84,32 @@ class WebCameraCapture implements ICameraCapture {
 
   /// Default capture cadence (~5 fps). Can be overridden via [start].
   static const int _defaultFrameIntervalMs = 200; // ~5 fps
-  static const _targetSize = 1024;
+
+  /// Square size used before the camera resolution is known.
+  static const int _fallbackTargetSize = 1024;
+
+  /// Upper bound for the square decoder input, to cap per-frame CPU/memory.
+  static const int _maxTargetSize = 1600;
+
+  /// Side length (px) of the square frame handed to the decoder.
+  ///
+  /// Chosen once the camera resolution is known (see [_computeTargetSize]):
+  /// for [WebCaptureMode.centerCrop] it tracks the cropped square (the shorter
+  /// video side) so the barcode keeps its native detail instead of being
+  /// downscaled to a fixed 1024. Capped by [_maxTargetSize].
+  int _targetSize = _fallbackTargetSize;
 
   /// Current capture cadence in milliseconds (driven by [start]).
   int _frameIntervalMs = _defaultFrameIntervalMs;
 
   /// How the video frame is mapped into the square decoder input.
   ///
-  /// Defaults to [WebCaptureMode.fit] so that off-center barcodes keep all
-  /// four anchors visible (a center crop would otherwise drop them and cause
-  /// decode failures).
-  WebCaptureMode captureMode = WebCaptureMode.fit;
+  /// Defaults to [WebCaptureMode.centerCrop]: the largest centered square of
+  /// the camera frame is used at (near) native resolution, so a barcode that
+  /// fills most of the view stays large enough for anchor detection. If the
+  /// barcode is far off-center, switch to [WebCaptureMode.fit] to keep all
+  /// four anchors in view at the cost of a smaller barcode.
+  WebCaptureMode captureMode = WebCaptureMode.centerCrop;
 
   @override
   bool get isSupported => true;
@@ -111,7 +128,8 @@ class WebCameraCapture implements ICameraCapture {
   }) async {
     if (_streaming) return;
 
-    _frameIntervalMs = frameIntervalMs <= 0 ? _defaultFrameIntervalMs : frameIntervalMs;
+    _frameIntervalMs =
+        frameIntervalMs <= 0 ? _defaultFrameIntervalMs : frameIntervalMs;
 
     // Build getUserMedia constraints
     final constraints = _buildConstraints(preferredWidth, preferredHeight);
@@ -155,7 +173,13 @@ class WebCameraCapture implements ICameraCapture {
     _videoWidth = _getIntProp(video, 'videoWidth') ?? preferredWidth;
     _videoHeight = _getIntProp(video, 'videoHeight') ?? preferredHeight;
 
-    // Create offscreen canvas at target size (1024x1024) from the start
+    // Size the square decoder input from the actual camera resolution so we
+    // don't throw away detail by hard-scaling every frame down to 1024.
+    _targetSize = _computeTargetSize(_videoWidth, _videoHeight);
+    debugPrint('[Camera] video ${_videoWidth}x$_videoHeight, '
+        'mode=${captureMode.name}, decoder input ${_targetSize}x$_targetSize');
+
+    // Create the offscreen canvas at the chosen target size.
     final canvas = _createElement('canvas');
     _setProp(canvas, 'width', _targetSize.toJS);
     _setProp(canvas, 'height', _targetSize.toJS);
@@ -194,6 +218,19 @@ class WebCameraCapture implements ICameraCapture {
     return obj;
   }
 
+  /// Pick the square decoder-input size from the camera resolution.
+  ///
+  /// centerCrop uses the largest centered square (the shorter side); fit maps
+  /// the whole frame in, so we key off the longer side. Clamped to
+  /// [_fallbackTargetSize] .. [_maxTargetSize].
+  int _computeTargetSize(int vw, int vh) {
+    if (vw <= 0 || vh <= 0) return _fallbackTargetSize;
+    final base = captureMode == WebCaptureMode.centerCrop
+        ? math.min(vw, vh)
+        : math.max(vw, vh);
+    return base.clamp(_fallbackTargetSize, _maxTargetSize);
+  }
+
   void _setProp(JSObject obj, String key, JSAny? value) {
     _reflectSet(obj, key.toJS, value);
   }
@@ -221,8 +258,8 @@ class WebCameraCapture implements ICameraCapture {
     final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
     if (vw <= 0 || vh <= 0) return;
 
-    // Target size: 1024x1024 (optimal for cimbar decoder)
-    const targetSize = _targetSize;
+    // Square decoder input size (chosen from camera resolution in start()).
+    final targetSize = _targetSize;
 
     // Source rect (region of the video) and dest rect (region of the canvas).
     int sx, sy, sw, sh; // source
@@ -282,7 +319,7 @@ class WebCameraCapture implements ICameraCapture {
     final rgbaPixels = Uint8List.fromList(clampedArray.toDart);
 
     // Convert RGBA to RGB (strip alpha channel) for cimbar decoder
-    const pixelCount = targetSize * targetSize;
+    final pixelCount = targetSize * targetSize;
     final rgbPixels = Uint8List(pixelCount * 3);
     for (int i = 0; i < pixelCount; i++) {
       rgbPixels[i * 3] = rgbaPixels[i * 4]; // R

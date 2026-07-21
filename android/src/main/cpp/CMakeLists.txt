@@ -19,8 +19,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Override with -DLIBCIMBAR_SRC_PATH=/path/to/libcimbar
 if(NOT DEFINED LIBCIMBAR_SRC_PATH)
-    # Default: assume libcimbar is alongside the flutter project
-    set(LIBCIMBAR_SRC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../libcimbar/libcimbar")
+    # Default: vendored C++ core inside the plugin repo (third_party/libcimbar_cpp)
+    set(LIBCIMBAR_SRC_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../../third_party/libcimbar_cpp")
 endif()
 
 set(LIBCIMBAR_LIB "${LIBCIMBAR_SRC_PATH}/src/lib")

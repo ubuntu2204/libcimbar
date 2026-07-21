@@ -23,7 +23,8 @@ echo "============================================================"
 echo ""
 
 # Source path
-LIBCIMBAR_SRC="${1:-$(pwd)/../C:/project/libcimbar/libcimbar}"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIBCIMBAR_SRC="${1:-$SCRIPT_DIR/../third_party/libcimbar_cpp}"
 if [ ! -f "$LIBCIMBAR_SRC/src/lib/encoder/Encoder.h" ]; then
     echo "ERROR: Cannot find libcimbar source at $LIBCIMBAR_SRC"
     echo "Usage: $0 [path-to-libcimbar-source]"

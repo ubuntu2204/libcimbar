@@ -120,3 +120,15 @@ example/web/assets/wasm/
 *.png
 !assets/**/*.png
 !example/**/assets/**/*.png
+
+# ====================
+# Vendored libcimbar C++ core (third_party/libcimbar_cpp)
+# ====================
+# Track the full source tree, INCLUDING bitmap/*.png tiles (loaded at runtime
+# by the C++ core) which the global *.png rule above would otherwise ignore.
+# Build outputs are still ignored via third_party/libcimbar_cpp/.gitignore.
+!third_party/libcimbar_cpp/**
+# ...but keep local, machine-specific dev helpers out of git:
+third_party/libcimbar_cpp/.clangd
+third_party/libcimbar_cpp/compile_commands.json
+third_party/libcimbar_cpp/.cache/

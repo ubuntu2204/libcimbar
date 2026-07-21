@@ -48,8 +48,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Path to the libcimbar source tree.
 if(NOT DEFINED LIBCIMBAR_SRC)
-    # Default: sibling directory
-    set(LIBCIMBAR_SRC "C:/project/libcimbar/libcimbar")
+    # Default: vendored C++ core inside the plugin repo
+    set(LIBCIMBAR_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libcimbar_cpp")
 endif()
 
 if(NOT EXISTS "${LIBCIMBAR_SRC}/src/lib/encoder/Encoder.h")

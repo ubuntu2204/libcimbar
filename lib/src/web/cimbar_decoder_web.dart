@@ -112,10 +112,6 @@ class CimbarDecoderFfi implements ICimbarDecoder {
 
     // Copy image data to WASM heap
     final imgPtr = module.allocate(imageData.length);
-    debugPrint('[Decoder] decodeFrame($width'
-        'x$height, fmt=${format.value}, '
-        'data=${imageData.length}B): '
-        'imgPtr=$imgPtr, _decodeBufPtr=$_decodeBufPtr');
     try {
       copyToWasmHeap(module, imageData, imgPtr);
 
@@ -128,18 +124,27 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         _decodeBufPtr.toJS,
         _decodeBufSize.toJS,
       ));
-      debugPrint('[Decoder] scan_extract_decode => $bytesDecoded '
-          '(runtimeType=${bytesDecoded.runtimeType})');
 
       if (bytesDecoded < 0) {
-        debugPrint('[Decoder] scan_extract_decode($width'
-            'x$height, fmt=${format.value}, '
-            'buf=${imageData.length}B) => $bytesDecoded');
-        return DecodeResult.error('scan_extract_decode failed: $bytesDecoded');
+        // Pull the native diagnostic (anchor counts, brightness/contrast) so
+        // the *reason* for the failure is visible, not just the error code.
+        //  -1 = bad image dims, -2 = decode buffer too small,
+        //  -3 = fewer than 4 corner anchors found (barcode not located).
+        final report = _readReport();
+        _diag('scan_extract_decode => $bytesDecoded '
+            '(${width}x$height, fmt=${format.value}, ${imageData.length}B) — '
+            '$report');
+        return DecodeResult.error(
+            'scan_extract_decode failed: $bytesDecoded — $report');
       }
       if (bytesDecoded == 0) {
+        // Barcode located but no payload recovered from this frame yet.
+        _diag('scan_extract_decode => 0 bytes (anchors found, no payload) — '
+            '${_readReport()}');
         return DecodeResult.inProgress(progress: _progress);
       }
+      _diag('scan_extract_decode => $bytesDecoded bytes — ${_readReport()}',
+          force: true);
 
       // Feed into fountain decoder
       // Align to chunk size
@@ -237,6 +242,39 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       if (_decompressBufPtr != 0) module.deallocate(_decompressBufPtr);
     }
     _ready = false;
+  }
+
+  // Throttle diagnostic logging so a live camera stream (many fps) does not
+  // flood the console with the same failure. Successful/complete decodes pass
+  // force:true so they are always logged.
+  DateTime _lastDiagLog = DateTime.fromMillisecondsSinceEpoch(0);
+
+  void _diag(String msg, {bool force = false}) {
+    final now = DateTime.now();
+    if (!force && now.difference(_lastDiagLog).inMilliseconds < 1000) return;
+    _lastDiagLog = now;
+    debugPrint('[Decoder] $msg');
+  }
+
+  /// Read the native decoder's latest diagnostic report (populated by
+  /// `cimbard_scan_extract_decode`). Includes anchor counts and image
+  /// brightness/contrast stats, e.g. "scan FAIL: found 0 anchor(s) ...".
+  /// Returns '' if unavailable.
+  String _readReport() {
+    final module = cimbarModule;
+    if (module == null) return '';
+    const maxLen = 512;
+    final ptr = module.allocate(maxLen);
+    try {
+      final len = jsNumberToInt(cimbardGetReport(ptr.toJS, maxLen.toJS));
+      if (len <= 0) return '';
+      final bytes = copyFromWasmHeap(module, ptr, len);
+      return String.fromCharCodes(bytes);
+    } catch (e) {
+      return '(report unavailable: $e)';
+    } finally {
+      module.deallocate(ptr);
+    }
   }
 
   void _checkReady() {
