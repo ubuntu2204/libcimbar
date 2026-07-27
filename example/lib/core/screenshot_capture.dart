@@ -69,6 +69,15 @@ class ScreenshotCapture {
 
   WindowCtrl get _winCtrl => WindowCtrl.instance;
 
+  /// Date-first timestamp for saved file names, e.g. `20260727_090805`.
+  /// Reports/debug shots sort chronologically in the file manager.
+  static String _timestampPrefix() {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}${two(n.month)}${two(n.day)}_'
+        '${two(n.hour)}${two(n.minute)}${two(n.second)}';
+  }
+
   // --- Public API ---
 
   /// Pre-compile the native C# screenshot tool (call on app startup).
@@ -91,8 +100,7 @@ class ScreenshotCapture {
       final appDir = await getApplicationDocumentsDirectory();
       final dir = '${appDir.path}/libcimbar_screenshots';
       await Directory(dir).create(recursive: true);
-      final path =
-          '$dir/encoder_fullscreen_${DateTime.now().millisecondsSinceEpoch}.png';
+      final path = '$dir/${_timestampPrefix()}_encoder_fullscreen.png';
       final ok = await _captureFullScreen(path);
       return ok ? path : null;
     } catch (e) {
@@ -108,8 +116,7 @@ class ScreenshotCapture {
       final appDir = await getApplicationDocumentsDirectory();
       final dir = '${appDir.path}/libcimbar_screenshots';
       await Directory(dir).create(recursive: true);
-      final path =
-          '$dir/quality_report_${DateTime.now().millisecondsSinceEpoch}.txt';
+      final path = '$dir/${_timestampPrefix()}_quality_report.txt';
       await File(path).writeAsString(content);
       return path;
     } catch (e) {

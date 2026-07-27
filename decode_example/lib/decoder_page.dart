@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert' show utf8;
 import 'dart:io' show File;
 import 'dart:typed_data';
 
@@ -62,6 +63,10 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // Last camera frame for screenshot
   CameraFrame? _lastFrame;
+
+  // Last decode error (kept verbatim for the diagnostic report; contains the
+  // native scan diagnostics: anchor counts, brightness, etc.).
+  String _lastFrameError = '';
 
   @override
   void initState() {
@@ -207,6 +212,7 @@ class _DecoderPageState extends State<DecoderPage> {
         await _stopCamera();
         _saveFile();
       } else if (result.error != null) {
+        _lastFrameError = result.error!;
         _statusMessage = 'Frame error: ${result.error}';
       } else {
         _statusMessage =
@@ -267,12 +273,12 @@ class _DecoderPageState extends State<DecoderPage> {
 
       if (kIsWeb) {
         // On web, trigger download via JS
-        _downloadBytesWeb(
-            pngBytes, 'cimbar_frame_${frame.width}x${frame.height}.png');
+        _downloadBytesWeb(pngBytes,
+            '${_timestampPrefix()}_cimbar_frame_${frame.width}x${frame.height}.png');
       } else {
         final dir = await getApplicationDocumentsDirectory();
         final path =
-            '${dir.path}/cimbar_frame_${frame.width}x${frame.height}.png';
+            '${dir.path}/${_timestampPrefix()}_cimbar_frame_${frame.width}x${frame.height}.png';
         await File(path).writeAsBytes(pngBytes);
         _statusMessage = 'Frame saved: $path';
       }
@@ -292,6 +298,101 @@ class _DecoderPageState extends State<DecoderPage> {
           'Check browser downloads for "$filename".';
     } catch (e) {
       _statusMessage = 'Web download error: $e';
+    }
+    setState(() {});
+  }
+
+  // ─── Diagnostic report ────────────────────────────────────────
+
+  /// Date-first timestamp for report file names, e.g. `20260727_090805`.
+  String _timestampPrefix() {
+    final n = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}${two(n.month)}${two(n.day)}_'
+        '${two(n.hour)}${two(n.minute)}${two(n.second)}';
+  }
+
+  /// Read a camera property via dynamic access. Only [WebCameraCapture]
+  /// exposes the diagnostic getters; other implementations yield null.
+  T? _cameraProp<T>(T? Function(dynamic cam) getter) {
+    final cam = _camera;
+    if (cam == null) return null;
+    try {
+      return getter(cam as dynamic);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Build a plain-text diagnostic report of the whole decode pipeline —
+  /// camera resolution included — for troubleshooting "cannot decode" cases.
+  String _buildDiagnosticReport() {
+    final vw = _cameraProp<int>((c) => c.videoWidth as int?);
+    final vh = _cameraProp<int>((c) => c.videoHeight as int?);
+    final input = _cameraProp<int>((c) => c.decoderInputSize as int?);
+    final capMode = _cameraProp<String>((c) => c.captureMode?.name as String?);
+    final frame = _lastFrame;
+
+    final b = StringBuffer()
+      ..writeln('libcimbar decoder - diagnostic report')
+      ..writeln('Generated  : ${DateTime.now().toIso8601String()}')
+      ..writeln('Platform   : ${kIsWeb ? 'Web (WASM)' : 'native'}')
+      ..writeln()
+      ..writeln('[Config]')
+      ..writeln('  Mode             : ${_config.mode.name} '
+          '(value ${_config.modeValue})')
+      ..writeln('  Capture FPS      : $_captureFps /s')
+      ..writeln()
+      ..writeln('[Camera]')
+      ..writeln('  Video resolution : ${vw ?? '?'} x ${vh ?? '?'} '
+          '(actual from getUserMedia)')
+      ..writeln('  Capture mode     : ${capMode ?? '?'}')
+      ..writeln('  Decoder input    : ${input ?? '?'} x ${input ?? '?'} px')
+      ..writeln('  Camera active    : $_isCameraActive')
+      ..writeln()
+      ..writeln('[Decode session]')
+      ..writeln('  Frames processed : $_framesProcessed')
+      ..writeln('  Progress         : ${(_progress * 100).toStringAsFixed(1)}%')
+      ..writeln(
+          '  Recovered file   : ${_recoveredFilename.isEmpty ? '(none)' : '$_recoveredFilename (${_recoveredData?.length ?? 0} bytes)'}')
+      ..writeln()
+      ..writeln('[Last camera frame]')
+      ..writeln(frame == null
+          ? '  (none captured yet)'
+          : '  ${frame.width} x ${frame.height}, format=${frame.format}, '
+              '${frame.data.length} bytes')
+      ..writeln()
+      ..writeln('[Last decode error]')
+      ..writeln(_lastFrameError.isEmpty ? '  (none)' : '  $_lastFrameError')
+      ..writeln()
+      ..writeln('[Status]')
+      ..writeln('  $_statusMessage')
+      ..writeln()
+      ..writeln('[Hints]')
+      ..writeln('  found 0 anchors   -> barcode too small/blurry in view: '
+          'move closer, fill the frame, check focus/glare')
+      ..writeln('  found 1-3 anchors -> barcode partially cropped or '
+          'off-center: center it, keep all 4 corners in view');
+    return b.toString();
+  }
+
+  /// Save the diagnostic report with a date-first filename.
+  /// Web: triggers a browser download; native: writes to Documents.
+  Future<void> _saveDiagnosticReport() async {
+    final content = _buildDiagnosticReport();
+    final filename = '${_timestampPrefix()}_decode_report.txt';
+    try {
+      if (kIsWeb) {
+        downloadBytesWeb(Uint8List.fromList(utf8.encode(content)), filename);
+        _statusMessage = 'Report downloaded: $filename';
+      } else {
+        final dir = await getApplicationDocumentsDirectory();
+        final path = '${dir.path}/$filename';
+        await File(path).writeAsString(content);
+        _statusMessage = 'Report saved: $path';
+      }
+    } catch (e) {
+      _statusMessage = 'Report error: $e';
     }
     setState(() {});
   }
@@ -455,10 +556,9 @@ class _DecoderPageState extends State<DecoderPage> {
                           style: Theme.of(context).textTheme.labelSmall),
                       Text(
                         '$_captureFps /s',
-                        style:
-                            Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                     ],
                   ),
@@ -501,6 +601,14 @@ class _DecoderPageState extends State<DecoderPage> {
                     onPressed: _lastFrame != null ? _screenshotFrame : null,
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Screenshot'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _saveDiagnosticReport,
+                    icon: const Icon(Icons.description),
+                    label: const Text('Report'),
                   ),
                 ),
               ],

@@ -17,13 +17,20 @@ import '../interfaces/camera_capture_interface.dart';
 enum WebCaptureMode {
   /// Fit the *entire* video frame into the target square, preserving aspect
   /// ratio (letterboxed). Nothing is cropped, so all four cimbar anchors stay
-  /// in view even when the barcode is off-center. Recommended default.
+  /// in view even when the barcode is off-center.
   fit,
 
   /// Crop the largest centered square from the video frame. Yields a larger
   /// barcode when it is well-centered, but drops content (and anchors) that
   /// fall outside the center square.
   centerCrop,
+
+  /// Alternate between [centerCrop] and [fit] on successive frames.
+  /// centerCrop frames give a large, detailed barcode when it is centered;
+  /// fit frames guarantee all four anchors stay in view when the barcode
+  /// (or monitor) extends past the center square. Whichever framing
+  /// satisfies the 4-anchor scan first wins. Recommended default.
+  alternate,
 }
 
 // ─── JS interop declarations (top-level only) ───────────────────
@@ -104,12 +111,15 @@ class WebCameraCapture implements ICameraCapture {
 
   /// How the video frame is mapped into the square decoder input.
   ///
-  /// Defaults to [WebCaptureMode.centerCrop]: the largest centered square of
-  /// the camera frame is used at (near) native resolution, so a barcode that
-  /// fills most of the view stays large enough for anchor detection. If the
-  /// barcode is far off-center, switch to [WebCaptureMode.fit] to keep all
-  /// four anchors in view at the cost of a smaller barcode.
-  WebCaptureMode captureMode = WebCaptureMode.centerCrop;
+  /// Defaults to [WebCaptureMode.alternate]: frames flip between a native-
+  /// resolution center crop (large barcode) and a letterboxed full-frame fit
+  /// (all anchors guaranteed in view). This rescues the common failure where
+  /// the center crop of a landscape camera chops one side of the barcode
+  /// (scan reports exactly 2 of 4 anchors).
+  WebCaptureMode captureMode = WebCaptureMode.alternate;
+
+  /// Counts delivered frames; drives the [WebCaptureMode.alternate] flip.
+  int _frameCounter = 0;
 
   @override
   bool get isSupported => true;
@@ -119,6 +129,15 @@ class WebCameraCapture implements ICameraCapture {
 
   /// Platform view type for embedding the video element.
   String? get viewType => _viewType;
+
+  /// Actual camera resolution reported by getUserMedia (0 until [start]).
+  /// Useful for diagnostics: shows what the camera really delivered vs the
+  /// preferred/requested size.
+  int get videoWidth => _videoWidth;
+  int get videoHeight => _videoHeight;
+
+  /// Side length (px) of the square frame handed to the decoder.
+  int get decoderInputSize => _targetSize;
 
   @override
   Future<void> start({
@@ -220,14 +239,13 @@ class WebCameraCapture implements ICameraCapture {
 
   /// Pick the square decoder-input size from the camera resolution.
   ///
-  /// centerCrop uses the largest centered square (the shorter side); fit maps
-  /// the whole frame in, so we key off the longer side. Clamped to
-  /// [_fallbackTargetSize] .. [_maxTargetSize].
+  /// centerCrop/alternate use the largest centered square (the shorter side);
+  /// pure fit maps the whole frame in, so we key off the longer side. Clamped
+  /// to [_fallbackTargetSize] .. [_maxTargetSize].
   int _computeTargetSize(int vw, int vh) {
     if (vw <= 0 || vh <= 0) return _fallbackTargetSize;
-    final base = captureMode == WebCaptureMode.centerCrop
-        ? math.min(vw, vh)
-        : math.max(vw, vh);
+    final base =
+        captureMode == WebCaptureMode.fit ? math.max(vw, vh) : math.min(vw, vh);
     return base.clamp(_fallbackTargetSize, _maxTargetSize);
   }
 
@@ -261,10 +279,26 @@ class WebCameraCapture implements ICameraCapture {
     // Square decoder input size (chosen from camera resolution in start()).
     final targetSize = _targetSize;
 
+    // Resolve the effective mapping for THIS frame. In alternate mode we flip
+    // between centerCrop (big barcode, may chop off-center anchors) and fit
+    // (whole frame visible, smaller barcode) so at least one framing can
+    // satisfy the 4-anchor scan.
+    var mode = captureMode;
+    if (mode == WebCaptureMode.alternate) {
+      mode =
+          _frameCounter.isEven ? WebCaptureMode.centerCrop : WebCaptureMode.fit;
+    }
+    _frameCounter++;
+    if (_frameCounter % 50 == 1) {
+      debugPrint('[Camera] frame #$_frameCounter mode=${mode.name} '
+          '(configured=${captureMode.name}, video ${vw}x$vh -> '
+          '${targetSize}x$targetSize)');
+    }
+
     // Source rect (region of the video) and dest rect (region of the canvas).
     int sx, sy, sw, sh; // source
     int dx, dy, dw, dh; // destination
-    if (captureMode == WebCaptureMode.centerCrop) {
+    if (mode == WebCaptureMode.centerCrop) {
       // Largest centered square, scaled to fill the whole canvas.
       final cropSize = vw < vh ? vw : vh;
       sx = (vw - cropSize) ~/ 2;
