@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:http/http.dart' as http;
 import 'package:libcimbar/libcimbar.dart';
 // ignore: implementation_imports
 import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
@@ -67,6 +68,18 @@ class _DecoderPageState extends State<DecoderPage> {
   // Last decode error (kept verbatim for the diagnostic report; contains the
   // native scan diagnostics: anchor counts, brightness, etc.).
   String _lastFrameError = '';
+
+  // ─── Network debug link (encoder <-> decoder alignment) ─────
+  // Talks to the encoder's DebugServer over LAN: pull the pristine frame it
+  // is displaying (bypasses the camera entirely -> isolates whether the WASM
+  // decode pipeline or the camera capture is at fault), and push our camera
+  // view + report back for side-by-side comparison on the encoder machine.
+  final TextEditingController _debugUrlCtrl =
+      TextEditingController(text: 'http://100.35.70.35:8765');
+  Timer? _remoteTimer;
+  bool _remotePolling = false;
+  bool _remoteBusy = false;
+  int _remoteFrames = 0;
 
   @override
   void initState() {
@@ -231,6 +244,42 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // ─── Save recovered file ──────────────────────────────────────
 
+  /// Encode the last camera frame to PNG bytes (shared by the local
+  /// screenshot download and the network upload to the encoder).
+  Future<Uint8List?> _lastFramePng() async {
+    final frame = _lastFrame;
+    if (frame == null) return null;
+    // Convert RGB to RGBA
+    final pixelCount = frame.width * frame.height;
+    final rgba = Uint8List(pixelCount * 4);
+    final isRgba = frame.format == 'rgba';
+    for (int i = 0; i < pixelCount; i++) {
+      if (isRgba) {
+        rgba[i * 4] = frame.data[i * 4];
+        rgba[i * 4 + 1] = frame.data[i * 4 + 1];
+        rgba[i * 4 + 2] = frame.data[i * 4 + 2];
+        rgba[i * 4 + 3] = frame.data[i * 4 + 3];
+      } else {
+        rgba[i * 4] = frame.data[i * 3];
+        rgba[i * 4 + 1] = frame.data[i * 3 + 1];
+        rgba[i * 4 + 2] = frame.data[i * 3 + 2];
+        rgba[i * 4 + 3] = 255;
+      }
+    }
+    final completer = Completer<ui.Image>();
+    ui.decodeImageFromPixels(
+      rgba,
+      frame.width,
+      frame.height,
+      ui.PixelFormat.rgba8888,
+      (img) => completer.complete(img),
+    );
+    final image = await completer.future;
+    final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    return byteData?.buffer.asUint8List();
+  }
+
   /// Save camera frame as PNG for debugging
   Future<void> _screenshotFrame() async {
     final frame = _lastFrame;
@@ -240,36 +289,8 @@ class _DecoderPageState extends State<DecoderPage> {
       return;
     }
     try {
-      // Convert RGB to RGBA
-      final pixelCount = frame.width * frame.height;
-      final rgba = Uint8List(pixelCount * 4);
-      final isRgba = frame.format == 'rgba';
-      for (int i = 0; i < pixelCount; i++) {
-        if (isRgba) {
-          rgba[i * 4] = frame.data[i * 4];
-          rgba[i * 4 + 1] = frame.data[i * 4 + 1];
-          rgba[i * 4 + 2] = frame.data[i * 4 + 2];
-          rgba[i * 4 + 3] = frame.data[i * 4 + 3];
-        } else {
-          rgba[i * 4] = frame.data[i * 3];
-          rgba[i * 4 + 1] = frame.data[i * 3 + 1];
-          rgba[i * 4 + 2] = frame.data[i * 3 + 2];
-          rgba[i * 4 + 3] = 255;
-        }
-      }
-      final completer = Completer<ui.Image>();
-      ui.decodeImageFromPixels(
-        rgba,
-        frame.width,
-        frame.height,
-        ui.PixelFormat.rgba8888,
-        (img) => completer.complete(img),
-      );
-      final image = await completer.future;
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (byteData == null) return;
-      final pngBytes = byteData.buffer.asUint8List();
+      final pngBytes = await _lastFramePng();
+      if (pngBytes == null) return;
 
       if (kIsWeb) {
         // On web, trigger download via JS
@@ -298,6 +319,135 @@ class _DecoderPageState extends State<DecoderPage> {
           'Check browser downloads for "$filename".';
     } catch (e) {
       _statusMessage = 'Web download error: $e';
+    }
+    setState(() {});
+  }
+
+  // ─── Network debug link ─────────────────────────────────────
+
+  String get _debugBaseUrl {
+    var s = _debugUrlCtrl.text.trim();
+    while (s.endsWith('/')) {
+      s = s.substring(0, s.length - 1);
+    }
+    return s;
+  }
+
+  /// Toggle pulling pristine frames straight from the encoder's debug server
+  /// and feeding them into the decoder — a camera-free ground-truth test.
+  /// If this completes but camera decode never does, the decode pipeline is
+  /// healthy and ONLY the camera capture needs fixing (and vice versa).
+  void _toggleRemoteDecode() {
+    if (_remotePolling) {
+      _remoteTimer?.cancel();
+      _remoteTimer = null;
+      setState(() {
+        _remotePolling = false;
+        _statusMessage = 'Remote decode stopped ($_remoteFrames frames).';
+      });
+      return;
+    }
+    if (_debugBaseUrl.isEmpty || _decoder == null) {
+      setState(() => _statusMessage = 'Enter the encoder debug server URL '
+          '(shown in the encoder status line, e.g. http://192.168.1.5:8765)');
+      return;
+    }
+    _remoteFrames = 0;
+    _remotePolling = true;
+    _statusMessage = 'Remote decode: pulling frames from $_debugBaseUrl ...';
+    _remoteTimer = Timer.periodic(
+        const Duration(milliseconds: 200), (_) => _pollRemoteFrame());
+    setState(() {});
+  }
+
+  Future<void> _pollRemoteFrame() async {
+    if (_remoteBusy || _decoder == null) return;
+    _remoteBusy = true;
+    try {
+      final resp = await http
+          .get(Uri.parse('$_debugBaseUrl/frame.png'))
+          .timeout(const Duration(seconds: 3));
+      if (resp.statusCode != 200) {
+        _statusMessage = 'Remote frame: HTTP ${resp.statusCode} — is the '
+            'encoder in "Encode & Display" mode?';
+        if (mounted) setState(() {});
+        return;
+      }
+
+      // PNG -> raw RGBA for the decoder.
+      final completer = Completer<ui.Image>();
+      ui.decodeImageFromList(resp.bodyBytes, (img) => completer.complete(img));
+      final image = await completer.future;
+      final byteData =
+          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+      final w = image.width, h = image.height;
+      image.dispose();
+      if (byteData == null) return;
+
+      final result = await _decoder!.decodeFrame(
+        byteData.buffer.asUint8List(),
+        width: w,
+        height: h,
+        format: CimbarImageFormat.rgba,
+      );
+      if (!mounted) return;
+
+      _remoteFrames++;
+      _framesProcessed++;
+      _progress = result.progress;
+      if (result.isComplete) {
+        _recoveredData = result.data;
+        _recoveredFilename = result.filename;
+        _statusMessage = 'REMOTE decode COMPLETE: "${result.filename}" '
+            '(${result.data?.length ?? 0} bytes, $_remoteFrames frames). '
+            'WASM pipeline is healthy — remaining problem is camera capture.';
+        _toggleRemoteDecode(); // stop polling
+        _saveFile();
+      } else if (result.error != null) {
+        _lastFrameError = result.error!;
+        _statusMessage = 'REMOTE frame #$_remoteFrames: ${result.error}';
+      } else {
+        _statusMessage = 'REMOTE decoding... '
+            '${(result.progress * 100).toStringAsFixed(1)}% '
+            '($_remoteFrames frames)';
+      }
+      setState(() {});
+    } catch (e) {
+      _statusMessage = 'Remote poll failed: $e';
+      if (mounted) setState(() {});
+    } finally {
+      _remoteBusy = false;
+    }
+  }
+
+  /// Push our camera view (PNG) + diagnostic report to the encoder machine,
+  /// where they are saved date-prefixed for side-by-side comparison.
+  Future<void> _uploadToEncoder() async {
+    if (_debugBaseUrl.isEmpty) {
+      setState(() => _statusMessage = 'Enter the encoder debug server URL.');
+      return;
+    }
+    try {
+      var uploaded = 0;
+      final png = await _lastFramePng();
+      if (png != null) {
+        final r = await http
+            .post(Uri.parse('$_debugBaseUrl/captured'),
+                headers: {'Content-Type': 'application/octet-stream'},
+                body: png)
+            .timeout(const Duration(seconds: 5));
+        if (r.statusCode == 200) uploaded++;
+      }
+      final r2 = await http
+          .post(Uri.parse('$_debugBaseUrl/report'),
+              headers: {'Content-Type': 'text/plain; charset=utf-8'},
+              body: utf8.encode(_buildDiagnosticReport()))
+          .timeout(const Duration(seconds: 5));
+      if (r2.statusCode == 200) uploaded++;
+      _statusMessage = 'Uploaded $uploaded item(s) to encoder '
+          '(camera frame + report, saved in libcimbar_screenshots).';
+    } catch (e) {
+      _statusMessage = 'Upload failed: $e';
     }
     setState(() {});
   }
@@ -556,29 +706,16 @@ class _DecoderPageState extends State<DecoderPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
-            // Capture FPS control (affects how often frames are delivered
-            // from the web camera; only used when starting the camera).
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 2),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Capture FPS',
-                          style: Theme.of(context).textTheme.labelSmall),
-                      Text(
-                        '$_captureFps /s',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
-                  ),
-                  Slider(
+            // Capture FPS control, single compact row so the camera preview
+            // below gets as much height as possible.
+            Row(
+              children: [
+                Text('Capture FPS',
+                    style: Theme.of(context).textTheme.labelSmall),
+                Expanded(
+                  child: Slider(
                     value: _captureFps.toDouble(),
                     min: 1,
                     max: 30,
@@ -586,11 +723,17 @@ class _DecoderPageState extends State<DecoderPage> {
                     label: '$_captureFps fps',
                     onChanged: (v) => setState(() => _captureFps = v.round()),
                   ),
-                ],
-              ),
+                ),
+                Text(
+                  '$_captureFps /s',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
             // Camera controls
             Row(
@@ -629,7 +772,39 @@ class _DecoderPageState extends State<DecoderPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+
+            // Network debug link: pull pristine frames from the encoder's
+            // debug server / push our camera view back to it.
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _debugUrlCtrl,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                      labelText: 'Encoder debug server',
+                      hintText: 'http://<encoder-ip>:8765',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonalIcon(
+                  onPressed: _toggleRemoteDecode,
+                  icon:
+                      Icon(_remotePolling ? Icons.stop : Icons.cloud_download),
+                  label: Text(_remotePolling ? 'Stop' : 'Pull+Decode'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _lastFrame != null ? _uploadToEncoder : null,
+                  icon: const Icon(Icons.cloud_upload),
+                  label: const Text('Upload view'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
             // Camera preview / placeholder
             Expanded(
@@ -734,8 +909,11 @@ class _DecoderPageState extends State<DecoderPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        // Square frame size: 70% of the shorter dimension
-        final frameSize = (size.shortestSide * 0.7).clamp(200.0, 500.0);
+        // Square guide frame: 92% of the shorter dimension, no hard cap.
+        // This mirrors the centered square the decoder actually captures
+        // (centerCrop) — the old 500px cap made users hold the barcode far
+        // too small in the camera view to ever resolve the 4 anchors.
+        final frameSize = (size.shortestSide * 0.92).clamp(150.0, 4096.0);
         final frameLeft = (size.width - frameSize) / 2;
         final frameTop = (size.height - frameSize) / 2;
         final frameRect =
@@ -761,11 +939,12 @@ class _DecoderPageState extends State<DecoderPage> {
                 strokeWidth: 3.0,
               ),
             ),
-            // Scanning hint text below frame
+            // Scanning hint text pinned to the bottom of the preview (the
+            // enlarged frame leaves no room below it).
             Positioned(
               left: 0,
               right: 0,
-              top: frameRect.bottom + 16,
+              bottom: 10,
               child: Text(
                 'Fit the whole barcode inside the frame '
                 '(all four corners visible)',
@@ -818,6 +997,8 @@ class _DecoderPageState extends State<DecoderPage> {
 
   @override
   void dispose() {
+    _remoteTimer?.cancel();
+    _debugUrlCtrl.dispose();
     _camera?.dispose();
     _decoder?.dispose();
     super.dispose();

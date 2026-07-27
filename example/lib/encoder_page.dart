@@ -9,6 +9,7 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:libcimbar/libcimbar.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/debug_server.dart';
 import 'core/screenshot_capture.dart';
 import 'core/window_display.dart';
 
@@ -142,10 +143,29 @@ class _EncoderPageState extends State<EncoderPage>
         keyDownHandler: (_) => _checkBarcodeQuality(),
       );
 
+      // Start the LAN debug server: the decoder can pull the pristine frame
+      // being displayed (/frame.png) and push back its camera view, so the
+      // two ends can be aligned in real time instead of debugging blind.
+      DebugServer.instance
+        ..frameProvider = (() => _frames.isEmpty
+            ? null
+            : _frames[_currentFrameIndex % _frames.length])
+        ..statusProvider = (() => <String, Object?>{
+              'ready': _isReady,
+              'mode': _config.mode.name,
+              'displayFps': _config.fps,
+              'frames': _frames.length,
+              'currentFrame': _currentFrameIndex,
+              'nativeWidth': _frames.isEmpty ? 0 : _frames.first.width,
+              'nativeHeight': _frames.isEmpty ? 0 : _frames.first.height,
+            });
+      final debugUrl = await DebugServer.instance.start();
+
       setState(() {
         _isReady = _encoder!.isReady;
         _statusMessage = _isReady
             ? 'Ready. Press Alt+A to capture screen.'
+                '${debugUrl != null ? '\nDebug server: $debugUrl' : ''}'
             : 'Native library not loaded. Build libcimbar.dll first.';
       });
     } catch (e) {

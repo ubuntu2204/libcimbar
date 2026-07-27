@@ -163,8 +163,12 @@ class WebCameraCapture implements ICameraCapture {
     _setProp(video, 'muted', true.toJS);
     _setProp(video, 'playsInline', true.toJS);
     _setProp(video, 'srcObject', stream);
-    // Style the video element to fill its container
-    _setProp(video, 'style', 'width:100%;height:100%;object-fit:cover;'.toJS);
+    // Style the video element to fill its container. `contain` (not `cover`)
+    // so the preview shows the ENTIRE camera frame — what you see is what the
+    // decoder receives; `cover` would hide the edges and let the barcode
+    // drift out of the captured frame unnoticed.
+    _setProp(video, 'style',
+        'width:100%;height:100%;object-fit:contain;background:#000;'.toJS);
     _video = video;
 
     // Listen for loadedmetadata
