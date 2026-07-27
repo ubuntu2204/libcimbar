@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:libcimbar/libcimbar.dart';
 // ignore: implementation_imports
 import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
@@ -442,6 +443,17 @@ class _DecoderPageState extends State<DecoderPage> {
     setState(() {});
   }
 
+  /// Per-frame decode telemetry exposed by the web decoder (via dynamic).
+  String _decoderTelemetry() {
+    try {
+      final d = _decoder as dynamic;
+      return 'scan=${d.lastScanBytes}B fountain=${d.lastFountainResult} '
+          'accum=${d.lastFountainProgress}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   Future<void> _pollRemoteFrame() async {
     if (_remoteBusy || _decoder == null) return;
     _remoteBusy = true;
@@ -456,21 +468,24 @@ class _DecoderPageState extends State<DecoderPage> {
         return;
       }
 
-      // PNG -> raw RGBA for the decoder.
-      final completer = Completer<ui.Image>();
-      ui.decodeImageFromList(resp.bodyBytes, (img) => completer.complete(img));
-      final image = await completer.future;
-      final byteData =
-          await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-      final w = image.width, h = image.height;
-      image.dispose();
-      if (byteData == null) return;
+      // PNG -> raw RGB via pure-Dart decode (package:image). Deliberately
+      // NOT the browser image pipeline (ui.decodeImageFromList): browsers may
+      // color-manage PNGs, silently shifting pixel values — fatal for cimbar
+      // color bits. This path is byte-exact.
+      final decoded = img.decodePng(resp.bodyBytes);
+      if (decoded == null) {
+        _statusMessage = 'Remote frame: PNG decode failed';
+        if (mounted) setState(() {});
+        return;
+      }
+      final w = decoded.width, h = decoded.height;
+      final rgb = decoded.getBytes(order: img.ChannelOrder.rgb);
 
       final result = await _decoder!.decodeFrame(
-        byteData.buffer.asUint8List(),
+        rgb,
         width: w,
         height: h,
-        format: CimbarImageFormat.rgba,
+        format: CimbarImageFormat.rgb,
       );
       if (!mounted) return;
 
@@ -493,12 +508,10 @@ class _DecoderPageState extends State<DecoderPage> {
         _lastRemoteResult = 'frame #$_remoteFrames FAILED: ${result.error}';
         _statusMessage = 'REMOTE frame #$_remoteFrames: ${result.error}';
       } else {
-        _lastRemoteResult = 'in progress '
-            '${(result.progress * 100).toStringAsFixed(1)}% '
-            '($_remoteFrames frames)';
-        _statusMessage = 'REMOTE decoding... '
-            '${(result.progress * 100).toStringAsFixed(1)}% '
-            '($_remoteFrames frames)';
+        _lastRemoteResult = 'in progress ($_remoteFrames frames) '
+            '${_decoderTelemetry()}';
+        _statusMessage = 'REMOTE decoding... ($_remoteFrames frames) '
+            '${_decoderTelemetry()}';
       }
       setState(() {});
     } catch (e) {
@@ -615,7 +628,31 @@ class _DecoderPageState extends State<DecoderPage> {
     b
       ..writeln()
       ..writeln('[Ground truth (Pull+Decode, camera-free)]')
-      ..writeln('  $_lastRemoteResult')
+      ..writeln(
+          '  Polling          : $_remotePolling ($_remoteFrames frames pulled)')
+      ..writeln('  Last result      : $_lastRemoteResult')
+      ..writeln()
+      ..writeln('[Decoder engine]');
+    try {
+      final d = _decoder as dynamic;
+      final heap = (d.heapBytes as int?) ?? 0;
+      final dbuf = (d.decodeBufSize as int?) ?? 0;
+      b
+        ..writeln('  WASM heap        : $heap bytes '
+            '(${(heap / (1024 * 1024)).toStringAsFixed(0)} MB)')
+        ..writeln('  Decode buffer    : $dbuf B '
+            '(= chunks_per_frame x fountain_chunk_size)')
+        ..writeln('  Last scan        : ${d.lastScanBytes} B '
+            '(>0 payload, 0 no payload, <0 error code)')
+        ..writeln('  Last fountain    : ${d.lastFountainResult} '
+            '(0 accepted/incomplete, >0 file id = DONE, <0 rejected)')
+        ..writeln('  Stream accum     : ${d.lastFountainProgress} '
+            '(received/required per stream; ~1.0 -> completes; '
+            '>1.0 -> blocks corrupt: enough received but never assembles)');
+    } catch (_) {
+      b.writeln('  (telemetry unavailable on this platform)');
+    }
+    b
       ..writeln()
       ..writeln('[Camera]')
       ..writeln('  Video resolution : ${vw ?? '?'} x ${vh ?? '?'} '
@@ -646,7 +683,11 @@ class _DecoderPageState extends State<DecoderPage> {
       ..writeln('  found 0 anchors   -> barcode too small/blurry in view: '
           'move closer, fill the frame, check focus/glare')
       ..writeln('  found 1-3 anchors -> barcode partially cropped or '
-          'off-center: center it, keep all 4 corners in view');
+          'off-center: center it, keep all 4 corners in view')
+      ..writeln('  accum > 1.0       -> chunks arrive but are corrupt '
+          '(pixel-level data damage between encode and decode)')
+      ..writeln('  re-encode restarts the fountain stream: do NOT click '
+          'Encode & Display while pulling/scanning');
     return b.toString();
   }
 

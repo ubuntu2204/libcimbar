@@ -61,6 +61,7 @@ set (LINK_WASM_EXPORTED_FUNCTIONS
 	, "_cimbare_encode_bufsize"
 	, "_cimbare_configure"
 	, "_cimbare_get_aspect_ratio"
+	, "_cimbare_get_frame_buff"
 )
 
 if(NOT USE_WASM EQUAL "2")
@@ -90,6 +91,7 @@ set (LINK_WASM_LIST
 	-s WASM_BIGINT=1
 	-s FILESYSTEM=0
 	-s TOTAL_MEMORY=134217728
+	-s ALLOW_MEMORY_GROWTH=1
 	-s EXPORTED_FUNCTIONS='[${LINK_WASM_EXPORTED_FUNCTIONS}]'
 	-s EXPORTED_RUNTIME_METHODS=['HEAPU8']
 )

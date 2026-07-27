@@ -1,5 +1,5 @@
 // Platform responsibilities:
-//   Windows  → Encoder (screen capture + AVIF + cimbar encoding)
+//   Windows / Linux → Encoder (screen capture on Windows; test payload on both)
 //   Android / Web → see decode_example project
 
 import 'dart:io' show Platform;
@@ -15,11 +15,15 @@ import 'encoder_page.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// Desktop platforms that can run the encoder (Windows + Linux).
+bool get isEncoderDesktop =>
+    !kIsWeb && (Platform.isWindows || Platform.isLinux);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Windows only: initialize window_manager for screenshot hide/show
-  if (!kIsWeb && Platform.isWindows) {
+  // Desktop only: initialize window_manager for screenshot hide/show
+  if (isEncoderDesktop) {
     await windowManager.ensureInitialized();
 
     const windowOptions = WindowOptions(
@@ -39,13 +43,13 @@ void main() async {
     });
   }
 
-  // Windows only: set navigator key for screenshot overlay
-  if (!kIsWeb && Platform.isWindows) {
+  // Desktop only: set navigator key for screenshot overlay
+  if (isEncoderDesktop) {
     ScreenshotCapture.navigatorKey = navigatorKey;
   }
 
-  // Windows only: initialize hotkey manager
-  if (!kIsWeb && Platform.isWindows) {
+  // Desktop only: initialize hotkey manager
+  if (isEncoderDesktop) {
     await hotKeyManager.unregisterAll();
   }
 
@@ -79,15 +83,13 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  bool get _isWindows => !kIsWeb && Platform.isWindows;
-
   @override
   Widget build(BuildContext context) {
-    if (_isWindows) {
+    if (isEncoderDesktop) {
       return const Scaffold(body: EncoderPage());
     }
     return const Scaffold(
-      body: Center(child: Text('Encoder is only available on Windows.')),
+      body: Center(child: Text('Encoder is only available on Windows/Linux.')),
     );
   }
 }

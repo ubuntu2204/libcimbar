@@ -36,6 +36,25 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   /// Last diagnostic snapshot (for debugging).
   WasmDiagnostics? diagnostics;
 
+  /// Per-frame decode telemetry (readable by the app for reports):
+  /// bytes returned by the last scan, the last fountain_decode result, and
+  /// the native per-stream accumulation progress ("[ n, m, ... ]").
+  int lastScanBytes = 0;
+  int lastFountainResult = 0;
+  String lastFountainProgress = '';
+
+  /// Current WASM linear-memory size in bytes (for reports).
+  int get heapBytes {
+    try {
+      return cimbarModule!.heapU8.toDart.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Size of the native decode buffer (chunks_per_frame x chunk_size).
+  int get decodeBufSize => _decodeBufSize;
+
   CimbarDecoderFfi() {
     diagnostics = checkWasmDiagnostics();
     _ready = diagnostics!.ready;
@@ -126,6 +145,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       ));
 
       if (bytesDecoded < 0) {
+        lastScanBytes = bytesDecoded;
         // Pull the native diagnostic (anchor counts, brightness/contrast) so
         // the *reason* for the failure is visible, not just the error code.
         //  -1 = bad image dims, -2 = decode buffer too small,
@@ -138,6 +158,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
             'scan_extract_decode failed: $bytesDecoded — $report');
       }
       if (bytesDecoded == 0) {
+        lastScanBytes = 0;
         // Barcode located but no payload recovered from this frame yet.
         _diag('scan_extract_decode => 0 bytes (anchors found, no payload) — '
             '${_readReport()}');
@@ -146,16 +167,21 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       _diag('scan_extract_decode => $bytesDecoded bytes — ${_readReport()}',
           force: true);
 
-      // Feed into fountain decoder
-      // Align to chunk size
-      const chunkSize = 930; // approximate fountain_chunk_size
-      final alignedSize = (bytesDecoded ~/ chunkSize) * chunkSize;
-      if (alignedSize <= 0) {
-        return DecodeResult.inProgress(progress: _progress);
-      }
-
+      // Feed into the fountain decoder. scan_extract_decode returns
+      // buffers_in_use * fountain_chunk_size, i.e. the value is ALREADY
+      // chunk-aligned for the active mode — pass it through verbatim.
+      //
+      // (A former hardcoded 930-byte "alignment" was wrong for modeB, whose
+      // real chunk is 625 (frame = 12 x 625 = 7500): it truncated 7500 -> 7440,
+      // which cimbard_fountain_decode rejects outright (-5) — so decode
+      // progress stayed at 0% forever even on pristine frames.)
+      lastScanBytes = bytesDecoded;
       final fileId = jsNumberToInt(
-          cimbardFountainDecode(_decodeBufPtr.toJS, alignedSize.toJS));
+          cimbardFountainDecode(_decodeBufPtr.toJS, bytesDecoded.toJS));
+      lastFountainResult = fileId;
+      // fountain_decode refreshes the native report with the per-stream
+      // chunk-accumulation list — capture it for diagnostics.
+      lastFountainProgress = _readReport();
       debugPrint('[Decoder] fountain_decode => $fileId '
           '(runtimeType=${fileId.runtimeType})');
 

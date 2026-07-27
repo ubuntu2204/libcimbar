@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -75,7 +76,7 @@ class _EncoderPageState extends State<EncoderPage>
     super.initState();
     // Project rule: the encoder window must stay frontmost (always-on-top).
     // Listen for focus changes so we can re-assert it (see [onWindowBlur]).
-    if (!kIsWeb && Platform.isWindows) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
       windowManager.addListener(this);
       // Refresh the "decoder linked" light from the debug server's last-seen
       // timestamp (green while the decoder polled/uploaded within ~6s).
@@ -117,10 +118,12 @@ class _EncoderPageState extends State<EncoderPage>
   }
 
   Future<void> _initialize() async {
-    // Guard: encoder is Windows-only
-    if (kIsWeb || !Platform.isWindows) {
+    // Guard: encoder runs on desktop (Windows: full feature set incl. screen
+    // capture; Linux: encode/display + test payload + debug server).
+    if (kIsWeb || !(Platform.isWindows || Platform.isLinux)) {
       setState(() {
-        _statusMessage = 'Error: Encoding is only supported on Windows.';
+        _statusMessage = 'Error: Encoding is only supported on '
+            'Windows/Linux desktop.';
       });
       return;
     }
@@ -242,6 +245,22 @@ class _EncoderPageState extends State<EncoderPage>
       _statusMessage = path != null
           ? 'Saved full-screen screenshot:\n$path'
           : 'Full-screen screenshot failed.';
+    });
+  }
+
+  /// Fill the encode input with deterministic random bytes — no screen
+  /// capture needed. This is the data source on Linux (where the Windows
+  /// capture tool is unavailable) and a quick loopback payload everywhere.
+  void _useTestPayload() {
+    final rnd = math.Random(42);
+    final data = Uint8List.fromList(
+        List<int>.generate(200 * 1024, (_) => rnd.nextInt(256)));
+    _compressedData = data;
+    _capturedWidth = 0;
+    _capturedHeight = 0;
+    setState(() {
+      _statusMessage = 'Test payload ready: ${data.length} bytes of random '
+          'data. Click "Encode & Display".';
     });
   }
 
@@ -606,6 +625,12 @@ class _EncoderPageState extends State<EncoderPage>
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
+                          onPressed: _isReady ? _useTestPayload : null,
+                          icon: const Icon(Icons.science, size: 18),
+                          label: const Text('Test payload (200KB)'),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
                           onPressed: _saveDebugScreenshot,
                           icon: const Icon(Icons.bug_report, size: 18),
                           label: const Text('Debug shot (Alt+S)'),
@@ -739,7 +764,7 @@ class _EncoderPageState extends State<EncoderPage>
   @override
   void dispose() {
     _linkTimer?.cancel();
-    if (!kIsWeb && Platform.isWindows) {
+    if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
       windowManager.removeListener(this);
     }
     _frameAnimationController?.dispose();

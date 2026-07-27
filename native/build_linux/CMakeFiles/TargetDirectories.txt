@@ -1,0 +1,10 @@
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/zstd_static.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/wirehair_static.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/correct_static.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/cimbar.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/edit_cache.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/rebuild_cache.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/list_install_components.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/install.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/install/local.dir
+/home/ubuntu/project/libcimbar/native/build_linux/CMakeFiles/install/strip.dir

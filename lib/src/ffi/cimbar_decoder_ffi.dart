@@ -97,17 +97,12 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         return DecodeResult.inProgress(progress: _progress);
       }
 
-      // Step 2: Feed decoded chunks into fountain decoder.
-      // Align to chunk size (fountain_chunk_size ≈ 930 bytes for mode B).
-      const approximateChunkSize = 930;
-      final alignedSize = (bytesDecoded ~/ approximateChunkSize) *
-          approximateChunkSize;
-
-      if (alignedSize <= 0) {
-        return DecodeResult.inProgress(progress: _progress);
-      }
-
-      final fileId = _native.fountainDecode(_decodeBuffer!, alignedSize);
+      // Step 2: Feed decoded chunks into the fountain decoder.
+      // scan_extract_decode returns buffers_in_use * fountain_chunk_size,
+      // which is already chunk-aligned for the active mode — pass it through
+      // verbatim. (A former hardcoded 930-byte alignment corrupted modeB,
+      // whose real chunk size is 625: 7500 -> 7440 gets rejected with -5.)
+      final fileId = _native.fountainDecode(_decodeBuffer!, bytesDecoded);
 
       if (fileId < 0) {
         return DecodeResult.error('fountain_decode error: $fileId');

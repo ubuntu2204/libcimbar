@@ -44,6 +44,17 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# wirehair / libcorrect use SSSE3 intrinsics on x86 (gcc/clang need the flag
+# up-front, before the third-party targets below are defined).
+if(NOT MSVC)
+    include(CheckCXXCompilerFlag)
+    check_cxx_compiler_flag("-msse4.1" HAS_MSSE41)
+    if(HAS_MSSE41)
+        # implies SSSE3; needed by wirehair (ssse3) and libcorrect (sse4.1)
+        add_compile_options(-msse4.1)
+    endif()
+endif()
+
 # ─── Configuration ────────────────────────────────────────────────
 
 # Path to the libcimbar source tree.
@@ -110,6 +121,9 @@ endif()
 file(GLOB_RECURSE ZSTD_SRC ${THIRD_DIR}/zstd/*.c)
 add_library(zstd_static STATIC ${ZSTD_SRC})
 target_include_directories(zstd_static PUBLIC ${THIRD_DIR}/zstd)
+# We only compile the .c sources (no huf_decompress_amd64.S), so tell zstd
+# not to reference the asm fast loops.
+target_compile_definitions(zstd_static PRIVATE ZSTD_DISABLE_ASM)
 set_target_properties(zstd_static PROPERTIES OUTPUT_NAME "zstd")
 
 # wirehair (fountain codes)

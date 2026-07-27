@@ -61,11 +61,19 @@ extension CimbarModuleMembers on CimbarModule {
   /// Allocate bytes in the WASM heap and return an int pointer.
   ///
   /// Wraps [malloc] (which returns [JSNumber]) to give callers a normal
-  /// Dart [int] suitable for use as a `Uint8List` index. The value is
-  /// routed through `dartify()` to handle both regular JS numbers and
-  /// the rare case where the heap address is large enough to be
-  /// surfaced as a [BigInt].
-  int allocate(int size) => jsNumberToInt(malloc(size.toJS));
+  /// Dart [int] suitable for use as a `Uint8List` index. Throws a
+  /// [StateError] when the WASM allocator is out of memory (malloc -> 0):
+  /// silently writing through a NULL pointer would corrupt the module's
+  /// low memory and surface later as "memory access out of bounds".
+  int allocate(int size) {
+    final ptr = jsNumberToInt(malloc(size.toJS));
+    if (ptr == 0) {
+      throw StateError('WASM malloc($size) failed: out of linear memory. '
+          'Rebuild with -s ALLOW_MEMORY_GROWTH=1 or reduce concurrent '
+          'decode streams.');
+    }
+    return ptr;
+  }
 
   /// Free a pointer previously obtained from [allocate].
   void deallocate(int ptr) => free(ptr.toJS);
