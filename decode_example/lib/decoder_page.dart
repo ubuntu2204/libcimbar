@@ -330,7 +330,10 @@ class _DecoderPageState extends State<DecoderPage> {
     final vw = _cameraProp<int>((c) => c.videoWidth as int?);
     final vh = _cameraProp<int>((c) => c.videoHeight as int?);
     final input = _cameraProp<int>((c) => c.decoderInputSize as int?);
-    final capMode = _cameraProp<String>((c) => c.captureMode?.name as String?);
+    final capMode = _cameraProp<String>(
+        // Enum .name is an extension getter and cannot be invoked on a
+        // dynamic receiver -> use toString() and strip the type prefix.
+        (c) => c.captureMode?.toString().split('.').last);
     final frame = _lastFrame;
 
     final b = StringBuffer()
@@ -465,13 +468,26 @@ class _DecoderPageState extends State<DecoderPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
                           _isReady ? Icons.check_circle : Icons.error,
                           color: _isReady ? Colors.green : Colors.red,
                         ),
                         const SizedBox(width: 12),
-                        Expanded(child: SelectableText(_statusMessage)),
+                        // Fixed-height, scrollable status text. Messages flip
+                        // between short progress lines and long scan
+                        // diagnostics every frame; a variable-height text box
+                        // would make the whole layout (and the camera
+                        // viewfinder below) jump around while decoding.
+                        Expanded(
+                          child: SizedBox(
+                            height: 72,
+                            child: SingleChildScrollView(
+                              child: SelectableText(_statusMessage),
+                            ),
+                          ),
+                        ),
                         if (!_isReady ||
                             _statusMessage.contains('error') ||
                             _statusMessage.contains('Error'))
