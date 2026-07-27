@@ -65,6 +65,11 @@ class _EncoderPageState extends State<EncoderPage>
   // Measures the on-screen size of the cimbar display (for the quality check).
   final GlobalKey _displayKey = GlobalKey();
 
+  // Green light: lit while the decoder is actively talking to our debug
+  // server (poll/upload within the last few seconds).
+  Timer? _linkTimer;
+  bool _decoderLinked = false;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +77,16 @@ class _EncoderPageState extends State<EncoderPage>
     // Listen for focus changes so we can re-assert it (see [onWindowBlur]).
     if (!kIsWeb && Platform.isWindows) {
       windowManager.addListener(this);
+      // Refresh the "decoder linked" light from the debug server's last-seen
+      // timestamp (green while the decoder polled/uploaded within ~6s).
+      _linkTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+        final last = DebugServer.instance.lastPeerRequestAt;
+        final ok =
+            last != null && DateTime.now().difference(last).inSeconds < 6;
+        if (ok != _decoderLinked && mounted) {
+          setState(() => _decoderLinked = ok);
+        }
+      });
     }
     _initialize();
   }
@@ -527,6 +542,25 @@ class _EncoderPageState extends State<EncoderPage>
                               .toList(),
                         ),
                         const SizedBox(height: 12),
+                        // Debug-link status: green once the decoder has
+                        // connected (negotiation/pull/upload traffic seen).
+                        Row(
+                          children: [
+                            Icon(Icons.circle,
+                                size: 10,
+                                color: _decoderLinked
+                                    ? Colors.greenAccent
+                                    : Colors.grey),
+                            const SizedBox(width: 6),
+                            Text(
+                              _decoderLinked
+                                  ? 'Decoder linked'
+                                  : 'Decoder not connected',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -704,6 +738,7 @@ class _EncoderPageState extends State<EncoderPage>
 
   @override
   void dispose() {
+    _linkTimer?.cancel();
     if (!kIsWeb && Platform.isWindows) {
       windowManager.removeListener(this);
     }

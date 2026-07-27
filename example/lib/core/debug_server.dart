@@ -47,6 +47,10 @@ class DebugServer {
   bool get isRunning => _server != null;
   int get port => _server?.port ?? 0;
 
+  /// When the decoder last talked to us (any request except CORS preflight).
+  /// Drives the encoder-side "decoder linked" green light.
+  DateTime? lastPeerRequestAt;
+
   /// Bind on all IPv4 interfaces. Returns the reachable URL(s), or null on
   /// failure (e.g. port already in use).
   Future<String?> start({int port = 8765}) async {
@@ -98,6 +102,7 @@ class DebugServer {
   Future<void> _handle(HttpRequest req) async {
     final res = req.response;
     _cors(res);
+    if (req.method != 'OPTIONS') lastPeerRequestAt = DateTime.now();
     try {
       if (req.method == 'OPTIONS') {
         res.statusCode = HttpStatus.noContent;

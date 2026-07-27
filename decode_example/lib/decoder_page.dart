@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert' show utf8;
+import 'dart:convert' show jsonDecode, utf8;
 import 'dart:io' show File;
 import 'dart:typed_data';
 
@@ -75,11 +75,24 @@ class _DecoderPageState extends State<DecoderPage> {
   // decode pipeline or the camera capture is at fault), and push our camera
   // view + report back for side-by-side comparison on the encoder machine.
   final TextEditingController _debugUrlCtrl =
-      TextEditingController(text: 'http://100.35.70.35:8765');
+      TextEditingController(text: 'http://100.65.70.35:8765');
   Timer? _remoteTimer;
   bool _remotePolling = false;
   bool _remoteBusy = false;
   int _remoteFrames = 0;
+
+  // Encoder-side state fetched over the debug link (for reports/negotiation).
+  Map<String, dynamic>? _lastEncoderStatus;
+  String _lastSyncResult = '(not attempted)';
+
+  // Negotiation light: null = not attempted, true = negotiated OK (green),
+  // false = unreachable / unresolved mismatch (red).
+  bool? _linkOk;
+
+  // Outcome of the Pull+Decode ground-truth test (pristine frames over LAN,
+  // no camera). Recorded separately from camera errors so the report can
+  // state definitively whether the decode pipeline itself is healthy.
+  String _lastRemoteResult = '(never run - click Pull+Decode)';
 
   @override
   void initState() {
@@ -160,6 +173,12 @@ class _DecoderPageState extends State<DecoderPage> {
       _statusMessage = 'Camera active. Point at a cimbar code...';
       _framesProcessed = 0;
     });
+
+    // Best-effort negotiation: align decode mode with the encoder before
+    // scanning (a silent mode mismatch fails every frame with -3).
+    if (_debugBaseUrl.isNotEmpty) {
+      await _syncWithEncoder();
+    }
 
     await _camera!.start(
       preferredWidth: 1920,
@@ -333,11 +352,71 @@ class _DecoderPageState extends State<DecoderPage> {
     return s;
   }
 
+  /// Fetch the encoder's /status JSON (mode, fps, frames, native size).
+  Future<Map<String, dynamic>?> _fetchEncoderStatus(
+      {Duration timeout = const Duration(milliseconds: 1500)}) async {
+    if (_debugBaseUrl.isEmpty) return null;
+    try {
+      final r =
+          await http.get(Uri.parse('$_debugBaseUrl/status')).timeout(timeout);
+      if (r.statusCode == 200) {
+        final m = jsonDecode(r.body);
+        if (m is Map<String, dynamic>) {
+          _lastEncoderStatus = m;
+          return m;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Decoder] encoder /status fetch failed: $e');
+    }
+    return null;
+  }
+
+  /// Negotiate settings with the encoder: pull its /status and align the
+  /// decoder's mode with the encoder's. A silent mode mismatch makes every
+  /// frame fail with -3 regardless of capture quality, so rule it out first.
+  Future<String> _syncWithEncoder() async {
+    final st = await _fetchEncoderStatus();
+    if (st == null) {
+      _lastSyncResult = 'encoder unreachable at '
+          '${_debugBaseUrl.isEmpty ? '(URL not set)' : _debugBaseUrl}';
+      _linkOk = false;
+      if (mounted) setState(() {}); // refresh the negotiation light
+      return _lastSyncResult;
+    }
+    final encMode = st['mode']?.toString() ?? '';
+    if (encMode.isEmpty) {
+      _lastSyncResult = 'encoder reachable, but mode unknown';
+      _linkOk = false;
+    } else if (encMode == _config.mode.name) {
+      _lastSyncResult = 'mode match ($encMode)';
+      _linkOk = true;
+    } else {
+      final target = CimbarMode.values.where((m) => m.name == encMode).toList();
+      if (target.isEmpty) {
+        _lastSyncResult =
+            'MISMATCH: encoder mode "$encMode" unknown to decoder '
+            '(decoder stays ${_config.mode.name})';
+        _linkOk = false;
+      } else {
+        final old = _config.mode.name;
+        _config = _config.copyWith(mode: target.first);
+        await _decoder?.configure(_config);
+        _lastSyncResult =
+            'MISMATCH fixed: decoder mode $old -> $encMode (reconfigured)';
+        _linkOk = true;
+      }
+    }
+    debugPrint('[Decoder] negotiation: $_lastSyncResult');
+    if (mounted) setState(() {}); // refresh the negotiation light
+    return _lastSyncResult;
+  }
+
   /// Toggle pulling pristine frames straight from the encoder's debug server
   /// and feeding them into the decoder — a camera-free ground-truth test.
   /// If this completes but camera decode never does, the decode pipeline is
   /// healthy and ONLY the camera capture needs fixing (and vice versa).
-  void _toggleRemoteDecode() {
+  Future<void> _toggleRemoteDecode() async {
     if (_remotePolling) {
       _remoteTimer?.cancel();
       _remoteTimer = null;
@@ -354,7 +433,10 @@ class _DecoderPageState extends State<DecoderPage> {
     }
     _remoteFrames = 0;
     _remotePolling = true;
-    _statusMessage = 'Remote decode: pulling frames from $_debugBaseUrl ...';
+    // Negotiate first: align decoder mode with the encoder before decoding.
+    final sync = await _syncWithEncoder();
+    _statusMessage =
+        'Remote decode [$sync]: pulling frames from $_debugBaseUrl ...';
     _remoteTimer = Timer.periodic(
         const Duration(milliseconds: 200), (_) => _pollRemoteFrame());
     setState(() {});
@@ -398,6 +480,9 @@ class _DecoderPageState extends State<DecoderPage> {
       if (result.isComplete) {
         _recoveredData = result.data;
         _recoveredFilename = result.filename;
+        _lastRemoteResult = 'COMPLETE: "${result.filename}" '
+            '(${result.data?.length ?? 0} bytes, $_remoteFrames frames) '
+            '-> WASM pipeline healthy';
         _statusMessage = 'REMOTE decode COMPLETE: "${result.filename}" '
             '(${result.data?.length ?? 0} bytes, $_remoteFrames frames). '
             'WASM pipeline is healthy — remaining problem is camera capture.';
@@ -405,8 +490,12 @@ class _DecoderPageState extends State<DecoderPage> {
         _saveFile();
       } else if (result.error != null) {
         _lastFrameError = result.error!;
+        _lastRemoteResult = 'frame #$_remoteFrames FAILED: ${result.error}';
         _statusMessage = 'REMOTE frame #$_remoteFrames: ${result.error}';
       } else {
+        _lastRemoteResult = 'in progress '
+            '${(result.progress * 100).toStringAsFixed(1)}% '
+            '($_remoteFrames frames)';
         _statusMessage = 'REMOTE decoding... '
             '${(result.progress * 100).toStringAsFixed(1)}% '
             '($_remoteFrames frames)';
@@ -429,6 +518,8 @@ class _DecoderPageState extends State<DecoderPage> {
     }
     try {
       var uploaded = 0;
+      // Refresh encoder status so the uploaded report covers both ends.
+      await _syncWithEncoder();
       final png = await _lastFramePng();
       if (png != null) {
         final r = await http
@@ -496,6 +587,36 @@ class _DecoderPageState extends State<DecoderPage> {
           '(value ${_config.modeValue})')
       ..writeln('  Capture FPS      : $_captureFps /s')
       ..writeln()
+      ..writeln('[Encoder] (debug link: '
+          '${_debugBaseUrl.isEmpty ? 'not set' : _debugBaseUrl})');
+    final enc = _lastEncoderStatus;
+    if (enc == null) {
+      b.writeln('  (unreachable — decoder-side data only)');
+    } else {
+      b
+        ..writeln('  Ready            : ${enc['ready']}')
+        ..writeln('  Mode             : ${enc['mode']}')
+        ..writeln('  Display FPS      : ${enc['displayFps']}')
+        ..writeln('  Frames           : ${enc['frames']} '
+            '(currently showing #${enc['currentFrame']})')
+        ..writeln('  Native barcode   : ${enc['nativeWidth']} x '
+            '${enc['nativeHeight']} px');
+    }
+    b
+      ..writeln()
+      ..writeln('[Negotiation]')
+      ..writeln('  Mode sync        : $_lastSyncResult');
+    if (enc != null && input != null) {
+      final nw = (enc['nativeWidth'] as num?)?.toInt() ?? 0;
+      b.writeln('  Size check       : native barcode $nw px vs decoder '
+          'input $input px -> '
+          '${nw > 0 && input >= nw ? 'OK (input can hold the barcode 1:1)' : 'input SMALLER than native barcode (must not happen)'}');
+    }
+    b
+      ..writeln()
+      ..writeln('[Ground truth (Pull+Decode, camera-free)]')
+      ..writeln('  $_lastRemoteResult')
+      ..writeln()
       ..writeln('[Camera]')
       ..writeln('  Video resolution : ${vw ?? '?'} x ${vh ?? '?'} '
           '(actual from getUserMedia)')
@@ -532,6 +653,9 @@ class _DecoderPageState extends State<DecoderPage> {
   /// Save the diagnostic report with a date-first filename.
   /// Web: triggers a browser download; native: writes to Documents.
   Future<void> _saveDiagnosticReport() async {
+    // Refresh encoder status + mode negotiation so the report covers BOTH
+    // ends (best-effort; report degrades to decoder-only when unreachable).
+    await _syncWithEncoder();
     final content = _buildDiagnosticReport();
     final filename = '${_timestampPrefix()}_decode_report.txt';
     try {
@@ -778,6 +902,18 @@ class _DecoderPageState extends State<DecoderPage> {
             // debug server / push our camera view back to it.
             Row(
               children: [
+                // Negotiation light: green = link up & modes aligned.
+                Tooltip(
+                  message: 'Negotiation: $_lastSyncResult',
+                  child: Icon(
+                    Icons.circle,
+                    size: 14,
+                    color: _linkOk == null
+                        ? Colors.grey
+                        : (_linkOk! ? Colors.greenAccent : Colors.redAccent),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _debugUrlCtrl,
