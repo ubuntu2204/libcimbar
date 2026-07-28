@@ -117,6 +117,27 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     if (result < 0) {
       throw StateError('cimbard_configure_decode failed: $result');
     }
+    _modeVal = config.modeValue;
+  }
+
+  /// Active mode value (for [resetStreams]'s bounce trick).
+  int _modeVal = 68;
+
+  /// Discard ALL accumulated fountain streams.
+  ///
+  /// Needed because a single corrupt-but-RS-passing chunk (e.g. from a bad
+  /// camera frame of the same barcode) permanently poisons the wirehair
+  /// codec for that stream AND marks its block id as seen, so later good
+  /// copies are ignored — accum grows past 1.0 but never assembles.
+  /// cimbard_configure_decode only resets the sink on a mode CHANGE, so
+  /// bounce to a different mode and back.
+  Future<void> resetStreams() async {
+    _checkReady();
+    final bounce = _modeVal == 67 ? 68 : 67;
+    cimbardConfigureDecode(bounce.toJS);
+    cimbardConfigureDecode(_modeVal.toJS);
+    debugPrint('[Decoder] fountain streams reset (mode bounce '
+        '$_modeVal->$bounce->$_modeVal)');
   }
 
   @override

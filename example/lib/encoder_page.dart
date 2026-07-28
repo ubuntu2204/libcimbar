@@ -35,7 +35,9 @@ class _EncoderPageState extends State<EncoderPage>
   bool _isReady = false;
   bool _isEncoding = false;
   bool _isCapturing = false;
-  bool _coveringTaskbar = false; // app starts windowed (still topmost)
+  // Windows starts windowed (still topmost); Linux starts in cover mode
+  // (fullscreen layer) — see main.dart — so the toggle state must match.
+  bool _coveringTaskbar = !kIsWeb && Platform.isLinux;
   String _statusMessage = 'Initializing...';
 
   CimbarConfig _config = const CimbarConfig(
@@ -176,7 +178,13 @@ class _EncoderPageState extends State<EncoderPage>
               'currentFrame': _currentFrameIndex,
               'nativeWidth': _frames.isEmpty ? 0 : _frames.first.width,
               'nativeHeight': _frames.isEmpty ? 0 : _frames.first.height,
-            });
+            })
+        ..onEncodeTest = () async {
+          // Script-driven loop (POST /encode-test): test payload -> encode.
+          _useTestPayload();
+          await _startEncoding();
+          return '${_frames.length} frames';
+        };
       final debugUrl = await DebugServer.instance.start();
 
       setState(() {
@@ -400,6 +408,14 @@ class _EncoderPageState extends State<EncoderPage>
 
       _statusMessage =
           'Generated ${_frames.length} cimbar frames. Displaying animation...';
+
+      // Linux: force cover mode (WM fullscreen layer) when the barcode starts
+      // playing so it is guaranteed to sit above the dock/top bar for the
+      // camera. Always-on-top is re-asserted inside coverTaskbar() last.
+      if (!kIsWeb && Platform.isLinux && !_coveringTaskbar) {
+        await coverTaskbar();
+        if (mounted) setState(() => _coveringTaskbar = true);
+      }
 
       _currentFrameIndex = 0;
       _frameAnimationController?.dispose();

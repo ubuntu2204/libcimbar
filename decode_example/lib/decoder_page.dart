@@ -75,8 +75,12 @@ class _DecoderPageState extends State<DecoderPage> {
   // is displaying (bypasses the camera entirely -> isolates whether the WASM
   // decode pipeline or the camera capture is at fault), and push our camera
   // view + report back for side-by-side comparison on the encoder machine.
+  // Default to localhost: encoder (Linux example) and this decoder now run
+  // on the SAME machine, so 127.0.0.1 always reaches the debug server — no
+  // NIC guessing, no firewall. Type a LAN IP here only for cross-machine
+  // setups (e.g. the Windows encoder).
   final TextEditingController _debugUrlCtrl =
-      TextEditingController(text: 'http://100.65.70.35:8765');
+      TextEditingController(text: 'http://127.0.0.1:8765');
   Timer? _remoteTimer;
   bool _remotePolling = false;
   bool _remoteBusy = false;
@@ -85,6 +89,37 @@ class _DecoderPageState extends State<DecoderPage> {
   // Encoder-side state fetched over the debug link (for reports/negotiation).
   Map<String, dynamic>? _lastEncoderStatus;
   String _lastSyncResult = '(not attempted)';
+
+  // Consecutive fatal WASM traps (corrupted/exhausted heap).
+  int _fatalWasmErrors = 0;
+
+  /// WASM traps (memory corruption / OOM) are unrecoverable within this
+  /// page: the Module instance SURVIVES Flutter hot restarts, so only a full
+  /// browser reload creates a fresh heap. Detect them, stop hammering the
+  /// dead runtime, and tell the user exactly what to do.
+  bool _noteFatalWasmError(Object e) {
+    final s = e.toString();
+    if (!s.contains('memory access out of bounds') &&
+        !s.contains('WASM malloc')) {
+      return false;
+    }
+    _fatalWasmErrors++;
+    if (_fatalWasmErrors >= 3) {
+      _remoteTimer?.cancel();
+      _remoteTimer = null;
+      _remotePolling = false;
+      if (_isCameraActive) unawaited(_stopCamera());
+      _statusMessage =
+          'WASM heap corrupted/exhausted ($_fatalWasmErrors traps) — RELOAD '
+          'the browser page (Ctrl+Shift+R). A Flutter hot restart does NOT '
+          'recreate the WASM instance, so the trap persists until reload.';
+    } else {
+      _statusMessage = 'WASM trap #$_fatalWasmErrors: $s';
+    }
+    _lastFrameError = _statusMessage;
+    if (mounted) setState(() {});
+    return true;
+  }
 
   // Negotiation light: null = not attempted, true = negotiated OK (green),
   // false = unreachable / unresolved mismatch (red).
@@ -180,6 +215,11 @@ class _DecoderPageState extends State<DecoderPage> {
     if (_debugBaseUrl.isNotEmpty) {
       await _syncWithEncoder();
     }
+    // Fresh fountain state: drop streams possibly poisoned by earlier
+    // corrupt chunks so a clean scan session can actually complete.
+    try {
+      await (_decoder as dynamic).resetStreams();
+    } catch (_) {}
 
     await _camera!.start(
       preferredWidth: 1920,
@@ -255,6 +295,7 @@ class _DecoderPageState extends State<DecoderPage> {
 
       setState(() {});
     } catch (e, stack) {
+      if (_noteFatalWasmError(e)) return;
       debugPrint('Frame decode error: $e');
       debugPrint('Frame decode stack:\n$stack');
       debugPrint('Frame info: ${frame.width}x${frame.height}, '
@@ -434,6 +475,17 @@ class _DecoderPageState extends State<DecoderPage> {
     }
     _remoteFrames = 0;
     _remotePolling = true;
+    // Camera frames of the SAME barcode occasionally yield corrupt chunks
+    // that still parse: they poison the wirehair stream permanently (the
+    // block id is marked "seen", later GOOD copies get dropped — accum
+    // grows past 1.0 but never assembles). Ground truth must run
+    // exclusively: stop the camera and drop poisoned streams first.
+    if (_isCameraActive) {
+      await _stopCamera();
+    }
+    try {
+      await (_decoder as dynamic).resetStreams();
+    } catch (_) {}
     // Negotiate first: align decoder mode with the encoder before decoding.
     final sync = await _syncWithEncoder();
     _statusMessage =
@@ -515,6 +567,7 @@ class _DecoderPageState extends State<DecoderPage> {
       }
       setState(() {});
     } catch (e) {
+      if (_noteFatalWasmError(e)) return;
       _statusMessage = 'Remote poll failed: $e';
       if (mounted) setState(() {});
     } finally {
@@ -684,8 +737,9 @@ class _DecoderPageState extends State<DecoderPage> {
           'move closer, fill the frame, check focus/glare')
       ..writeln('  found 1-3 anchors -> barcode partially cropped or '
           'off-center: center it, keep all 4 corners in view')
-      ..writeln('  accum > 1.0       -> chunks arrive but are corrupt '
-          '(pixel-level data damage between encode and decode)')
+      ..writeln('  accum > 1.0       -> stream poisoned by corrupt chunks '
+          '(typically camera frames of the same barcode); Pull+Decode now '
+          'auto-stops the camera and resets streams first')
       ..writeln('  re-encode restarts the fountain stream: do NOT click '
           'Encode & Display while pulling/scanning');
     return b.toString();

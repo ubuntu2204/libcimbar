@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:window_manager/window_manager.dart';
@@ -18,6 +21,17 @@ const Size kDefaultWindowedSize = Size(1400, 1100);
 /// working (the capture flow hides the window before grabbing the screen, so
 /// the desktop — not this window — is captured).
 Future<void> coverTaskbar() async {
+  if (!kIsWeb && Platform.isLinux) {
+    // Linux: panels (GNOME top bar, docks) live in a layer ABOVE keep-above
+    // windows, so a topmost normal window cannot cover them. The reliable
+    // way to sit above the taskbar/panel is the WM fullscreen layer. The
+    // Windows-only screenshot capture flow doesn't exist on Linux, so
+    // fullscreen has no downside here. Per the project rule, always-on-top
+    // is still asserted LAST.
+    await windowManager.setFullScreen(true);
+    await windowManager.setAlwaysOnTop(true);
+    return;
+  }
   final display = await screenRetriever.getPrimaryDisplay();
   // Full monitor rect in logical pixels (includes the taskbar area).
   final full = display.size;
@@ -36,6 +50,11 @@ Future<void> coverTaskbar() async {
 /// made topmost *after* positioning (same order as [coverTaskbar]) so Windows
 /// draws it above the taskbar instead of hiding it behind the taskbar.
 Future<void> restoreWindowed({Size size = kDefaultWindowedSize}) async {
+  // Linux cover mode uses the WM fullscreen layer (see coverTaskbar): leave
+  // it before applying windowed bounds. Harmless when not fullscreen.
+  if (!kIsWeb && Platform.isLinux) {
+    await windowManager.setFullScreen(false);
+  }
   final display = await screenRetriever.getPrimaryDisplay();
   // Full monitor size in logical pixels (DPI already accounted for).
   final Size screen = display.size;

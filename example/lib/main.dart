@@ -36,10 +36,19 @@ void main() async {
       await windowManager.setAsFrameless();
       await windowManager.show();
       await windowManager.focus();
-      // Start in a normal centered windowed size, kept topmost so it stays
-      // above the taskbar. This is NOT fullscreen mode, so the screenshot
-      // capture flow keeps working (it hides the window before grabbing).
-      await restoreWindowed();
+      if (Platform.isLinux) {
+        // Linux (esp. Wayland/GNOME): the dock & top bar live above the
+        // keep-above layer, so a windowed layout CANNOT stay in front of the
+        // taskbar. Start directly in cover mode — the WM fullscreen layer is
+        // the only layer guaranteed to draw over panels.
+        await coverTaskbar();
+      } else {
+        // Windows: start in a normal centered windowed size, kept topmost so
+        // it stays above the taskbar. This is NOT fullscreen mode, so the
+        // screenshot capture flow keeps working (it hides the window before
+        // grabbing).
+        await restoreWindowed();
+      }
     });
   }
 

@@ -39,6 +39,11 @@ class DebugServer {
   /// Supplies the /status JSON payload.
   Map<String, Object?> Function()? statusProvider;
 
+  /// Starts a test-payload encode when POST /encode-test is called — lets
+  /// scripts drive the whole encode->pull->decode loop with no UI clicks.
+  /// Returns a short human-readable result.
+  Future<String> Function()? onEncodeTest;
+
   // PNG cache: polls are usually faster than the display frame rate, so
   // avoid re-encoding the same frame over and over.
   int _cachedIndex = -1;
@@ -73,11 +78,13 @@ class DebugServer {
     _server = null;
   }
 
-  /// LAN URL(s) the decoder can reach, e.g. `http://192.168.1.5:8765`.
+  /// URL(s) the decoder can reach, e.g. `http://192.168.1.5:8765`.
+  /// Localhost first: when the decoder runs on the same machine (the local
+  /// Linux debug loop) it should always use 127.0.0.1.
   Future<String> describeEndpoints() async {
     final srv = _server;
     if (srv == null) return '(not running)';
-    final urls = <String>[];
+    final urls = <String>['http://127.0.0.1:${srv.port}'];
     try {
       final ifaces =
           await NetworkInterface.list(type: InternetAddressType.IPv4);
@@ -87,7 +94,6 @@ class DebugServer {
         }
       }
     } catch (_) {}
-    if (urls.isEmpty) urls.add('http://127.0.0.1:${srv.port}');
     return urls.join('  ');
   }
 
@@ -130,6 +136,21 @@ class DebugServer {
             '_remote_decode_report.txt', await _readBody(req));
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode({'saved': path}));
+      } else if (req.method == 'POST' && req.uri.path == '/encode-test') {
+        final hook = onEncodeTest;
+        if (hook == null) {
+          res.statusCode = HttpStatus.serviceUnavailable;
+          res.write('encoder page not ready');
+        } else {
+          // Fire and forget: encoding 200 frames takes a while; callers poll
+          // GET /status until `frames` > 0.
+          unawaited(hook().then(
+              (r) => debugPrint('[DebugServer] encode-test done: $r'),
+              onError: (Object e) =>
+                  debugPrint('[DebugServer] encode-test failed: $e')));
+          res.headers.contentType = ContentType.json;
+          res.write(jsonEncode({'started': true}));
+        }
       } else {
         res.statusCode = HttpStatus.notFound;
       }
