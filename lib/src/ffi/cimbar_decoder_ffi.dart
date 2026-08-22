@@ -57,7 +57,16 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   @override
   Future<void> configure(CimbarConfig config) async {
     _checkReady();
-    final result = _native.configureDecode(config.modeValue);
+    // Force-reset the process-global fountain sink. The C implementation
+    // (cimbar_recv_js.cpp) only refreshes its static `_sink` when the mode
+    // value CHANGES — re-configuring with the same mode leaves a completed
+    // stream in place and every subsequent fountain_decode returns -1.
+    // Toggling to a different mode value and back triggers two refreshes,
+    // guaranteeing a clean sink for each new decode session.
+    final modeVal = config.modeValue;
+    final toggleVal = modeVal == 4 ? 68 : 4;
+    _native.configureDecode(toggleVal);
+    final result = _native.configureDecode(modeVal);
     if (result < 0) {
       throw StateError('cimbard_configure_decode failed: $result');
     }

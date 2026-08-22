@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:flutter/services.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:libcimbar/libcimbar.dart';
@@ -67,6 +68,13 @@ class _EncoderPageState extends State<EncoderPage>
 
   // Measures the on-screen size of the cimbar display (for the quality check).
   final GlobalKey _displayKey = GlobalKey();
+
+  /// Captures the *rendered* cimbar display (physical pixels) for the
+  /// screenshot decode self-test.
+  final GlobalKey _displayBoundaryKey = GlobalKey();
+
+  /// True while the screenshot → decode loopback self-test is running.
+  bool _isDecodeTesting = false;
 
   // Green light: lit while the decoder is actively talking to our debug
   // server (poll/upload within the last few seconds).
@@ -163,6 +171,17 @@ class _EncoderPageState extends State<EncoderPage>
         keyDownHandler: (_) => _checkBarcodeQuality(),
       );
 
+      // Register Alt+D hotkey for the screenshot decode self-test: capture
+      // the rendered barcode and decode it locally, verifying the whole
+      // encode→display→decode chain without a phone/web camera.
+      await hotKeyManager.register(
+        HotKey(
+          key: LogicalKeyboardKey.keyD,
+          modifiers: [HotKeyModifier.alt],
+        ),
+        keyDownHandler: (_) => _runDecodeTest(),
+      );
+
       // Start the LAN debug server: the decoder can pull the pristine frame
       // being displayed (/frame.png) and push back its camera view, so the
       // two ends can be aligned in real time instead of debugging blind.
@@ -184,6 +203,11 @@ class _EncoderPageState extends State<EncoderPage>
           _useTestPayload();
           await _startEncoding();
           return '${_frames.length} frames';
+        }
+        ..onDecodeTest = () async {
+          // Script-driven loop (POST /decode-test): screenshot decode
+          // self-test, returns the PASS/FAIL summary.
+          return _runDecodeTest();
         };
       final debugUrl = await DebugServer.instance.start();
 
@@ -356,6 +380,203 @@ class _EncoderPageState extends State<EncoderPage>
     });
   }
 
+  // --- Screenshot → decode loopback self-test ---
+
+  /// Screenshot → decode loopback self-test.
+  ///
+  /// Captures the *rendered* cimbar display (exactly what is on screen,
+  /// including any scaling/interpolation) frame by frame, feeds each capture
+  /// to the native FFI decoder, and verifies the recovered data is
+  /// byte-identical to the payload that was encoded.
+  ///
+  /// This runs the full pipeline — encode → display → screenshot → scan →
+  /// fountain decode → decompress — so bugs anywhere in the chain are caught
+  /// locally, without a phone/web camera. A detailed report (and the first
+  /// capture as PNG) is saved next to the quality reports, pinpointing the
+  /// failing stage:
+  /// - capture missing / no anchors → compare the sample PNG, run Alt+Q
+  /// - per-frame decode errors → native scan/fountain issue
+  /// - complete but data mismatch → compression/format issue
+  ///
+  /// Returns the final PASS/FAIL summary (also shown in the status area and
+  /// served by the debug server's POST /decode-test endpoint).
+  Future<String> _runDecodeTest() async {
+    if (_isDecodeTesting) return 'Decode test already running.';
+    if (_frames.isEmpty || _compressedData == null) {
+      setState(
+          () => _statusMessage = 'No barcode yet - encode & display first.');
+      return 'No barcode yet - encode & display first.';
+    }
+
+    _isDecodeTesting = true;
+    final wasAnimating = _frameAnimationController != null &&
+        _frameAnimationController!.isAnimating;
+    _frameAnimationController?.stop();
+
+    final report = StringBuffer()
+      ..writeln('libcimbar encoder - screenshot decode self-test')
+      ..writeln('Generated  : ${DateTime.now().toIso8601String()}')
+      ..writeln('Mode       : ${_config.mode.name} '
+          '(compression ${_config.compressionLevel})')
+      ..writeln('Frames     : ${_frames.length} '
+          '(${_frames.first.width}x${_frames.first.height} native)')
+      ..writeln('Payload    : ${_compressedData!.length} bytes');
+
+    int framesTried = 0;
+    bool complete = false;
+    DecodeResult? lastResult;
+    bool pass = false;
+    String? samplePath;
+    String summary = '';
+
+    try {
+      setState(() => _statusMessage = 'Decode test: creating decoder...');
+      final decoder = await _platform.createDecoder();
+      try {
+        if (!decoder.isReady) {
+          throw StateError(
+              'Decoder not ready - native library not loaded?');
+        }
+        await decoder.configure(_config);
+
+        final views = WidgetsBinding.instance.platformDispatcher.views;
+        final dpr = views.isNotEmpty ? views.first.devicePixelRatio : 1.0;
+        report
+          ..writeln('Capture DPR: ${dpr.toStringAsFixed(3)}')
+          ..writeln('');
+
+        for (int i = 0; i < _frames.length && !complete; i++) {
+          // Seek the display to frame i and wait until it is painted.
+          if (mounted) setState(() => _currentFrameIndex = i);
+          await Future<void>.delayed(Duration.zero);
+          await WidgetsBinding.instance.endOfFrame;
+          await Future<void>.delayed(const Duration(milliseconds: 16));
+
+          // Screenshot the rendered barcode (physical pixels, raw RGBA).
+          final boundary = _displayBoundaryKey.currentContext
+              ?.findRenderObject() as RenderRepaintBoundary?;
+          if (boundary == null) {
+            report.writeln('frame ${i + 1}: capture boundary missing');
+            continue;
+          }
+          final image = await boundary.toImage(pixelRatio: dpr);
+          final capW = image.width;
+          final capH = image.height;
+          final rgba =
+              await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+          if (i == 0) {
+            // Keep the first capture as PNG for offline inspection.
+            final png =
+                await image.toByteData(format: ui.ImageByteFormat.png);
+            if (png != null) {
+              samplePath = await ScreenshotCapture.instance
+                  .saveCapturePng(png.buffer.asUint8List());
+            }
+          }
+          image.dispose();
+          if (rgba == null) {
+            report.writeln('frame ${i + 1}: capture failed (no bytes)');
+            continue;
+          }
+
+          final result = await decoder.decodeFrame(
+            rgba.buffer.asUint8List(),
+            width: capW,
+            height: capH,
+            format: CimbarImageFormat.rgba,
+          );
+          framesTried++;
+          lastResult = result;
+
+          if (result.isComplete) {
+            complete = true;
+            report.writeln('frame ${i + 1}: ${capW}x$capH -> COMPLETE');
+          } else if (result.error != null) {
+            report.writeln(
+                'frame ${i + 1}: ${capW}x$capH -> ERROR ${result.error}');
+          } else {
+            report.writeln('frame ${i + 1}: ${capW}x$capH -> ok '
+                '(progress ${(result.progress * 100).toStringAsFixed(0)}%)');
+          }
+        }
+      } finally {
+        await decoder.dispose();
+      }
+
+      // ── Verdict ──
+      final original = _compressedData!;
+      report.writeln('');
+      if (complete && lastResult?.data != null) {
+        final decoded = lastResult!.data!;
+        pass = decoded.length == original.length;
+        int firstDiff = -1;
+        if (pass) {
+          for (int b = 0; b < original.length; b++) {
+            if (decoded[b] != original[b]) {
+              firstDiff = b;
+              pass = false;
+              break;
+            }
+          }
+        }
+        report
+          ..writeln('[Result]')
+          ..writeln('  Frames tried : $framesTried / ${_frames.length}')
+          ..writeln('  Filename     : "${lastResult.filename}"')
+          ..writeln('  Decoded size : ${decoded.length} bytes')
+          ..writeln('  Payload size : ${original.length} bytes')
+          ..writeln('  Byte-exact   : ${pass ? 'YES' : 'NO'}');
+        if (pass) {
+          report
+            ..writeln('')
+            ..writeln('Verdict: PASS - encode -> display -> screenshot -> '
+                'decode roundtrip is byte-exact.');
+        } else {
+          report
+            ..writeln('  First diff   : ${firstDiff >= 0 ? 'offset $firstDiff' : (decoded.length == original.length ? 'content mismatch' : 'size mismatch')}')
+            ..writeln('')
+            ..writeln('Verdict: FAIL - decoded data differs from the encoded '
+                'payload.');
+        }
+      } else {
+        report
+          ..writeln('[Result]')
+          ..writeln('  Frames tried : $framesTried / ${_frames.length}')
+          ..writeln('  Complete     : NO'
+              '${lastResult?.error != null ? ' (last error: ${lastResult!.error})' : ''}')
+          ..writeln('')
+          ..writeln('Verdict: FAIL - the fountain stream never completed. If '
+              'every frame stays at 0% progress, the capture is missing the '
+              'corner anchors - inspect the sample PNG and run Check quality '
+              '(Alt+Q). If frames error out, the native scan/fountain stage '
+              'is the culprit.');
+      }
+    } catch (e) {
+      report
+        ..writeln('')
+        ..writeln('EXCEPTION: $e')
+        ..writeln('')
+        ..writeln('Verdict: FAIL - unexpected error (see exception above).');
+    } finally {
+      final reportPath = await ScreenshotCapture.instance
+          .saveDebugReport(report.toString(), name: 'decode_test_report');
+      summary =
+          '${pass ? 'PASS' : 'FAIL'} - decode test: $framesTried/'
+              '${_frames.length} frames'
+              '${complete ? ', ${lastResult?.data?.length ?? 0} bytes recovered' : ', not complete'}.'
+              '\nReport: $reportPath'
+              '${samplePath != null ? '\nSample capture: $samplePath' : ''}';
+      if (mounted) {
+        setState(() => _statusMessage = summary);
+      }
+      if (wasAnimating && _frameAnimationController != null) {
+        _frameAnimationController!.forward();
+      }
+      _isDecodeTesting = false;
+    }
+    return summary;
+  }
+
   // --- Encoding flow ---
 
   Future<void> _startEncoding() async {
@@ -497,9 +718,12 @@ class _EncoderPageState extends State<EncoderPage>
                   key: _displayKey,
                   width: 1024,
                   height: 1024,
-                  child: _frames.isNotEmpty
-                      ? _buildFrameDisplay()
-                      : _buildPlaceholder(),
+                  child: RepaintBoundary(
+                    key: _displayBoundaryKey,
+                    child: _frames.isNotEmpty
+                        ? _buildFrameDisplay()
+                        : _buildPlaceholder(),
+                  ),
                 ),
               ),
             ),
@@ -657,6 +881,16 @@ class _EncoderPageState extends State<EncoderPage>
                               _frames.isNotEmpty ? _checkBarcodeQuality : null,
                           icon: const Icon(Icons.high_quality, size: 18),
                           label: const Text('Check quality (Alt+Q)'),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: _frames.isNotEmpty && !_isDecodeTesting
+                              ? _runDecodeTest
+                              : null,
+                          icon: const Icon(Icons.fact_check, size: 18),
+                          label: Text(_isDecodeTesting
+                              ? 'Testing...'
+                              : 'Decode test (Alt+D)'),
                         ),
                         if (_frames.isNotEmpty) ...[
                           const SizedBox(height: 8),

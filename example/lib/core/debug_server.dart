@@ -5,13 +5,18 @@
 // camera capture. This tiny HTTP server lets the decoder talk to the
 // encoder directly over LAN:
 //
-//   GET  /status     -> encoder state as JSON (mode, fps, frame count...)
-//   GET  /frame.png  -> the CURRENTLY DISPLAYED cimbar frame, lossless PNG.
-//                       The decoder can decode these pristine frames to
-//                       verify the whole WASM pipeline without any camera.
-//   POST /captured   -> decoder uploads its captured camera frame (PNG);
-//                       saved date-prefixed for side-by-side comparison.
-//   POST /report     -> decoder uploads its diagnostic report (text).
+//   GET  /status      -> encoder state as JSON (mode, fps, frame count...)
+//   GET  /frame.png   -> the CURRENTLY DISPLAYED cimbar frame, lossless PNG.
+//                        The decoder can decode these pristine frames to
+//                        verify the whole WASM pipeline without any camera.
+//   POST /captured    -> decoder uploads its captured camera frame (PNG);
+//                        saved date-prefixed for side-by-side comparison.
+//   POST /report      -> decoder uploads its diagnostic report (text).
+//   POST /encode-test -> encode the deterministic test payload (async).
+//   POST /decode-test -> run the screenshot decode self-test; the response
+//                        carries the final PASS/FAIL summary. Lets scripts
+//                        verify the full encode→display→capture→decode
+//                        roundtrip with zero UI interaction.
 //
 // All responses carry permissive CORS headers so the Flutter-web decoder
 // (different origin) can call them. Windows Firewall may prompt once to
@@ -43,6 +48,13 @@ class DebugServer {
   /// scripts drive the whole encode->pull->decode loop with no UI clicks.
   /// Returns a short human-readable result.
   Future<String> Function()? onEncodeTest;
+
+  /// Runs the screenshot decode self-test when POST /decode-test is called —
+  /// scripts can verify the whole encode→display→capture→decode roundtrip
+  /// (byte-exact) with no UI interaction. Returns the final PASS/FAIL
+  /// summary. May take a while: it captures and decodes frames until the
+  /// fountain stream completes.
+  Future<String> Function()? onDecodeTest;
 
   // PNG cache: polls are usually faster than the display frame rate, so
   // avoid re-encoding the same frame over and over.
@@ -150,6 +162,19 @@ class DebugServer {
                   debugPrint('[DebugServer] encode-test failed: $e')));
           res.headers.contentType = ContentType.json;
           res.write(jsonEncode({'started': true}));
+        }
+      } else if (req.method == 'POST' && req.uri.path == '/decode-test') {
+        final hook = onDecodeTest;
+        if (hook == null) {
+          res.statusCode = HttpStatus.serviceUnavailable;
+          res.write('encoder page not ready');
+        } else {
+          // Awaited: the response carries the final PASS/FAIL summary.
+          // Capturing + decoding takes seconds to a minute depending on
+          // frame count.
+          final summary = await hook();
+          res.headers.contentType = ContentType.json;
+          res.write(jsonEncode({'result': summary}));
         }
       } else {
         res.statusCode = HttpStatus.notFound;

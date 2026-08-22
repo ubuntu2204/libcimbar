@@ -347,6 +347,15 @@ int cimbard_configure_decode(int mode_val)
 		_modeVal = mode_val;
 		cimbar::Config::update(mode_val);
 		_sink.reset();
+		// The cached decompress state belongs to the old sink's stream:
+		// if a new session reuses the same file id (e.g. re-encoding the
+		// same payload), recover_contents() would see id == _decId and
+		// skip reassembly, leaving the exhausted zstd stream in place --
+		// cimbard_decompress_read() would then return 0 bytes forever.
+		// Resetting here makes each decode session start clean.
+		_decId = 0;
+		_dec.reset();
+		_reassembled.clear();
 	}
 
 	return 0;

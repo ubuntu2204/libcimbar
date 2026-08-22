@@ -78,10 +78,13 @@ class CimbarPlatform {
     return CimbarEncoderFfi();
   }
 
-  /// Create a cimbar decoder (Web and Android only).
+  /// Create a cimbar decoder.
   ///
-  /// Throws [UnsupportedError] on Windows — decoding is handled by
-  /// the receiving platforms (Web via WASM, Android via JNI).
+  /// - Web: WASM decoder via JS interop
+  /// - Android: MethodChannel decoder (JNI)
+  /// - Windows / Linux / macOS: native FFI decoder (`cimbard_*` C API in
+  ///   libcimbar.dll / libcimbar.so) — used by the encoder app for
+  ///   screenshot-based encode→decode loopback self-tests.
   Future<ICimbarDecoder> createDecoder() async {
     if (kIsWeb) {
       return CimbarDecoderFfi();
@@ -89,9 +92,11 @@ class CimbarPlatform {
     if (Platform.isAndroid) {
       return _MethodChannelDecoder();
     }
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      return CimbarDecoderFfi();
+    }
     throw UnsupportedError(
-      'Decoding is only supported on Web and Android. '
-      'Windows is the encoding platform.',
+      'Decoding is not supported on this platform.',
     );
   }
 

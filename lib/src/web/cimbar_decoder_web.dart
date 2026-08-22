@@ -113,7 +113,14 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   @override
   Future<void> configure(CimbarConfig config) async {
     _checkReady();
-    final result = jsNumberToInt(cimbardConfigureDecode(config.modeValue.toJS));
+    // Same sink-reset dance as the FFI decoder: the WASM module's
+    // cimbard_configure_decode only resets its fountain state when the
+    // mode value CHANGES (see cimbar_recv_js.cpp). Without the toggle, a
+    // second decode session in the same page fails with -1 on every frame.
+    final modeVal = config.modeValue;
+    final toggleVal = modeVal == 4 ? 68 : 4;
+    jsNumberToInt(cimbardConfigureDecode(toggleVal.toJS));
+    final result = jsNumberToInt(cimbardConfigureDecode(modeVal.toJS));
     if (result < 0) {
       throw StateError('cimbard_configure_decode failed: $result');
     }

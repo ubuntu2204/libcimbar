@@ -110,17 +110,35 @@ class ScreenshotCapture {
   }
 
   /// Save a plain-text debug/report file and return its path (or null on
-  /// failure). Used by the barcode quality check to persist a report.
-  Future<String?> saveDebugReport(String content) async {
+  /// failure). Used by the barcode quality check and the decode self-test to
+  /// persist reports.
+  Future<String?> saveDebugReport(String content,
+      {String name = 'quality_report'}) async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
       final dir = '${appDir.path}/libcimbar_screenshots';
       await Directory(dir).create(recursive: true);
-      final path = '$dir/${_timestampPrefix()}_quality_report.txt';
+      final path = '$dir/${_timestampPrefix()}_$name.txt';
       await File(path).writeAsString(content);
       return path;
     } catch (e) {
       debugPrint('[ScreenshotCapture] saveDebugReport failed: $e');
+      return null;
+    }
+  }
+
+  /// Save raw PNG bytes (e.g. a capture sample from the decode self-test)
+  /// and return the saved path, or null on failure.
+  Future<String?> saveCapturePng(Uint8List pngBytes) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final dir = '${appDir.path}/libcimbar_screenshots';
+      await Directory(dir).create(recursive: true);
+      final path = '$dir/${_timestampPrefix()}_decode_capture.png';
+      await File(path).writeAsBytes(pngBytes);
+      return path;
+    } catch (e) {
+      debugPrint('[ScreenshotCapture] saveCapturePng failed: $e');
       return null;
     }
   }
