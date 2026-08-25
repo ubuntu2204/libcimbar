@@ -397,6 +397,9 @@ cd example && flutter run -d windows
 # Web 接收端
 cd decode_example && flutter run -d chrome
 
+adb reverse tcp:8080 tcp:8080
+手机访问localhost:8080
+
 # Android 接收端
 cd decode_example && flutter run -d <android-device-id>
 ```
