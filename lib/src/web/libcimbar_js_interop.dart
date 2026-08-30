@@ -403,9 +403,9 @@ Future<void> loadLibcimbarWasm(String scriptUrl) async {
 /// Copy a Dart Uint8List into WASM heap memory at the given pointer.
 void copyToWasmHeap(CimbarModule module, Uint8List data, int ptr) {
   final heap = module.heapU8.toDart;
-  for (int i = 0; i < data.length; i++) {
-    heap[ptr + i] = data[i];
-  }
+  // Bulk memcpy instead of a per-byte Dart loop. At 4K capture sizes the
+  // loop alone cost hundreds of ms per frame and starved the scan step.
+  heap.setRange(ptr, ptr + data.length, data);
 }
 
 /// Copy bytes from WASM heap memory into a Dart Uint8List.

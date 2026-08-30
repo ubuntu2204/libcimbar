@@ -39,7 +39,7 @@ class _EncoderPageState extends State<EncoderPage>
   // Windows starts windowed (still topmost); Linux starts in cover mode
   // (fullscreen layer) — see main.dart — so the toggle state must match.
   bool _coveringTaskbar = !kIsWeb && Platform.isLinux;
-  String _statusMessage = 'Initializing...';
+  String _statusMessage = '初始化中…';
 
   CimbarConfig _config = const CimbarConfig(
     mode: CimbarMode.modeB,
@@ -132,8 +132,7 @@ class _EncoderPageState extends State<EncoderPage>
     // capture; Linux: encode/display + test payload + debug server).
     if (kIsWeb || !(Platform.isWindows || Platform.isLinux)) {
       setState(() {
-        _statusMessage = 'Error: Encoding is only supported on '
-            'Windows/Linux desktop.';
+        _statusMessage = '错误：编码仅支持 Windows/Linux 桌面端。';
       });
       return;
     }
@@ -214,12 +213,12 @@ class _EncoderPageState extends State<EncoderPage>
       setState(() {
         _isReady = _encoder!.isReady;
         _statusMessage = _isReady
-            ? 'Ready. Press Alt+A to capture screen.'
-                '${debugUrl != null ? '\nDebug server: $debugUrl' : ''}'
-            : 'Native library not loaded. Build libcimbar.dll first.';
+            ? '就绪。按 Alt+A 截取屏幕。'
+                '${debugUrl != null ? '\n调试服务器：$debugUrl' : ''}'
+            : '未加载原生库。请先构建 libcimbar.dll。';
       });
     } catch (e) {
-      setState(() => _statusMessage = 'Initialization error: $e');
+      setState(() => _statusMessage = '初始化出错：$e');
     }
   }
 
@@ -234,7 +233,7 @@ class _EncoderPageState extends State<EncoderPage>
 
       if (!result.isSuccess || result.pixels == null) {
         setState(() {
-          _statusMessage = result.error ?? 'Capture cancelled';
+          _statusMessage = result.error ?? '已取消截取';
           _isCapturing = false;
         });
         return;
@@ -244,7 +243,7 @@ class _EncoderPageState extends State<EncoderPage>
       _capturedHeight = result.height;
 
       // Compress to AVIF (or PNG fallback)
-      _statusMessage = 'Compressing to AVIF...';
+      _statusMessage = '正在压缩为 AVIF…';
       if (mounted) setState(() {});
 
       _compressedData = await _compressor!.compressRgba(
@@ -254,10 +253,10 @@ class _EncoderPageState extends State<EncoderPage>
         quality: CompressionQuality.balanced,
       );
 
-      _statusMessage = 'Captured ${result.width}x${result.height}, '
-          'compressed: ${_compressedData!.length} bytes. Ready to encode.';
+      _statusMessage = '已截取 ${result.width}x${result.height}，'
+          '压缩后 ${_compressedData!.length} 字节，可开始编码。';
     } catch (e) {
-      _statusMessage = 'Capture error: $e';
+      _statusMessage = '截取出错：$e';
     }
 
     if (mounted) setState(() => _isCapturing = false);
@@ -269,14 +268,14 @@ class _EncoderPageState extends State<EncoderPage>
   /// (which is selectable, so it can be copied).
   Future<void> _saveDebugScreenshot() async {
     if (mounted) {
-      setState(() => _statusMessage = 'Saving full-screen screenshot...');
+      setState(() => _statusMessage = '正在保存全屏截图…');
     }
     final path = await ScreenshotCapture.instance.captureFullScreenToFile();
     if (!mounted) return;
     setState(() {
       _statusMessage = path != null
-          ? 'Saved full-screen screenshot:\n$path'
-          : 'Full-screen screenshot failed.';
+          ? '已保存全屏截图：\n$path'
+          : '全屏截图失败。';
     });
   }
 
@@ -291,8 +290,8 @@ class _EncoderPageState extends State<EncoderPage>
     _capturedWidth = 0;
     _capturedHeight = 0;
     setState(() {
-      _statusMessage = 'Test payload ready: ${data.length} bytes of random '
-          'data. Click "Encode & Display".';
+      _statusMessage = '测试数据已就绪：${data.length} 字节随机数据。'
+          '点击「编码并显示」。';
     });
   }
 
@@ -305,7 +304,7 @@ class _EncoderPageState extends State<EncoderPage>
   Future<void> _checkBarcodeQuality() async {
     if (_frames.isEmpty) {
       setState(
-          () => _statusMessage = 'No barcode yet - encode & display first.');
+          () => _statusMessage = '还没有条码 - 请先「编码并显示」。');
       return;
     }
 
@@ -375,8 +374,8 @@ class _EncoderPageState extends State<EncoderPage>
     if (!mounted) return;
     setState(() {
       _statusMessage = path != null
-          ? '${pass ? 'PASS' : 'FAIL'} - quality report saved:\n$path'
-          : 'Quality report failed to save.';
+          ? '${pass ? '通过' : '未通过'} - 质量报告已保存：\n$path'
+          : '质量报告保存失败。';
     });
   }
 
@@ -401,11 +400,11 @@ class _EncoderPageState extends State<EncoderPage>
   /// Returns the final PASS/FAIL summary (also shown in the status area and
   /// served by the debug server's POST /decode-test endpoint).
   Future<String> _runDecodeTest() async {
-    if (_isDecodeTesting) return 'Decode test already running.';
+    if (_isDecodeTesting) return '解码自检正在进行中。';
     if (_frames.isEmpty || _compressedData == null) {
       setState(
-          () => _statusMessage = 'No barcode yet - encode & display first.');
-      return 'No barcode yet - encode & display first.';
+          () => _statusMessage = '还没有条码 - 请先「编码并显示」。');
+      return '还没有条码 - 请先「编码并显示」。';
     }
 
     _isDecodeTesting = true;
@@ -430,7 +429,7 @@ class _EncoderPageState extends State<EncoderPage>
     String summary = '';
 
     try {
-      setState(() => _statusMessage = 'Decode test: creating decoder...');
+      setState(() => _statusMessage = '解码自检：正在创建解码器…');
       final decoder = await _platform.createDecoder();
       try {
         if (!decoder.isReady) {
@@ -561,11 +560,11 @@ class _EncoderPageState extends State<EncoderPage>
       final reportPath = await ScreenshotCapture.instance
           .saveDebugReport(report.toString(), name: 'decode_test_report');
       summary =
-          '${pass ? 'PASS' : 'FAIL'} - decode test: $framesTried/'
-              '${_frames.length} frames'
-              '${complete ? ', ${lastResult?.data?.length ?? 0} bytes recovered' : ', not complete'}.'
-              '\nReport: $reportPath'
-              '${samplePath != null ? '\nSample capture: $samplePath' : ''}';
+          '${pass ? '通过' : '未通过'} - 解码自检：$framesTried/'
+              '${_frames.length} 帧'
+              '${complete ? '，恢复 ${lastResult?.data?.length ?? 0} 字节' : '，未完成'}。'
+              '\n报告：$reportPath'
+              '${samplePath != null ? '\n截图样本：$samplePath' : ''}';
       if (mounted) {
         setState(() => _statusMessage = summary);
       }
@@ -584,7 +583,7 @@ class _EncoderPageState extends State<EncoderPage>
     _isEncoding = true; // synchronous guard against double-click
 
     setState(() {
-      _statusMessage = 'Encoding data into cimbar frames...';
+      _statusMessage = '正在将数据编码为 cimbar 帧…';
     });
 
     try {
@@ -594,13 +593,13 @@ class _EncoderPageState extends State<EncoderPage>
       );
 
       if (_frames.isEmpty) {
-        _statusMessage = 'Encoding produced no frames.';
+        _statusMessage = '编码未生成任何帧。';
         setState(() => _isEncoding = false);
         return;
       }
 
       // Decode RGB frames to ui.Image for display
-      _statusMessage = 'Decoding ${_frames.length} frames...';
+      _statusMessage = '正在生成 ${_frames.length} 帧显示图像…';
       setState(() {});
       _decodedFrames = [];
       for (final frame in _frames) {
@@ -628,7 +627,7 @@ class _EncoderPageState extends State<EncoderPage>
           '[UI Images] first: ${_decodedFrames[0].width}x${_decodedFrames[0].height}');
 
       _statusMessage =
-          'Generated ${_frames.length} cimbar frames. Displaying animation...';
+          '已生成 ${_frames.length} 帧 cimbar 条码，正在播放…';
 
       // Linux: force cover mode (WM fullscreen layer) when the barcode starts
       // playing so it is guaranteed to sit above the dock/top bar for the
@@ -659,7 +658,7 @@ class _EncoderPageState extends State<EncoderPage>
 
       _frameAnimationController!.forward();
     } catch (e) {
-      _statusMessage = 'Encoding error: $e';
+      _statusMessage = '编码出错：$e';
     }
 
     if (mounted) setState(() => _isEncoding = false);
@@ -675,7 +674,7 @@ class _EncoderPageState extends State<EncoderPage>
     setState(() {
       _frames = [];
       _decodedFrames = [];
-      _statusMessage = 'Encoding stopped.';
+      _statusMessage = '已停止。';
     });
   }
 
@@ -696,6 +695,14 @@ class _EncoderPageState extends State<EncoderPage>
         ..forward();
     }
   }
+
+  /// Chinese description of each barcode mode, shown in the mode menu.
+  String _modeDescription(CimbarMode mode) => switch (mode) {
+        CimbarMode.mode4C => '16x16 网格，兼容性最好',
+        CimbarMode.modeB => '24x24 网格，彩色大容量（默认）',
+        CimbarMode.modeBm => '24x24 网格，黑白单色，适合暗环境',
+        CimbarMode.modeBu => '24x24 网格，B 模式变体',
+      };
 
   // --- UI ---
 
@@ -764,18 +771,18 @@ class _EncoderPageState extends State<EncoderPage>
                                   ? Icons.fullscreen_exit
                                   : Icons.fullscreen,
                               tooltip: _coveringTaskbar
-                                  ? 'Windowed mode'
-                                  : 'Cover taskbar',
+                                  ? '窗口模式'
+                                  : '覆盖任务栏（铺满屏幕）',
                               onPressed: _toggleCoverTaskbar,
                             ),
                             _WindowButton(
                               icon: Icons.remove,
-                              tooltip: 'Minimize',
+                              tooltip: '最小化',
                               onPressed: () => windowManager.minimize(),
                             ),
                             _WindowButton(
                               icon: Icons.close,
-                              tooltip: 'Close',
+                              tooltip: '关闭',
                               onPressed: () => windowManager.close(),
                               isClose: true,
                             ),
@@ -783,12 +790,13 @@ class _EncoderPageState extends State<EncoderPage>
                         ),
                         const SizedBox(height: 4),
                         PopupMenuButton<CimbarMode>(
+                          tooltip: '选择条码模式',
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.settings, size: 18),
                               const SizedBox(width: 6),
-                              Text(_config.mode.name),
+                              Text('模式 ${_config.mode.name}'),
                             ],
                           ),
                           onSelected: (mode) async {
@@ -796,8 +804,27 @@ class _EncoderPageState extends State<EncoderPage>
                             await _encoder?.configure(_config);
                           },
                           itemBuilder: (_) => CimbarMode.values
-                              .map((m) =>
-                                  PopupMenuItem(value: m, child: Text(m.name)))
+                              .map((m) => PopupMenuItem(
+                                    value: m,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(m.name,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.w600)),
+                                        Text(
+                                          _modeDescription(m),
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.7)),
+                                        ),
+                                      ],
+                                    ),
+                                  ))
                               .toList(),
                         ),
                         const SizedBox(height: 12),
@@ -813,8 +840,8 @@ class _EncoderPageState extends State<EncoderPage>
                             const SizedBox(width: 6),
                             Text(
                               _decoderLinked
-                                  ? 'Decoder linked'
-                                  : 'Decoder not connected',
+                                  ? '解码器已连接'
+                                  : '解码器未连接',
                               style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ],
@@ -852,8 +879,8 @@ class _EncoderPageState extends State<EncoderPage>
                               : null,
                           icon: const Icon(Icons.screenshot, size: 18),
                           label: Text(_isCapturing
-                              ? 'Capturing...'
-                              : 'Capture (Alt+A)'),
+                              ? '截取中…'
+                              : '截取屏幕 (Alt+A)'),
                         ),
                         const SizedBox(height: 8),
                         FilledButton.icon(
@@ -861,26 +888,26 @@ class _EncoderPageState extends State<EncoderPage>
                               ? _startEncoding
                               : null,
                           icon: const Icon(Icons.qr_code, size: 18),
-                          label: const Text('Encode & Display'),
+                          label: const Text('编码并显示'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: _isReady ? _useTestPayload : null,
                           icon: const Icon(Icons.science, size: 18),
-                          label: const Text('Test payload (200KB)'),
+                          label: const Text('测试数据 (200KB)'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed: _saveDebugScreenshot,
                           icon: const Icon(Icons.bug_report, size: 18),
-                          label: const Text('Debug shot (Alt+S)'),
+                          label: const Text('调试截图 (Alt+S)'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
                           onPressed:
                               _frames.isNotEmpty ? _checkBarcodeQuality : null,
                           icon: const Icon(Icons.high_quality, size: 18),
-                          label: const Text('Check quality (Alt+Q)'),
+                          label: const Text('质量检查 (Alt+Q)'),
                         ),
                         const SizedBox(height: 8),
                         OutlinedButton.icon(
@@ -889,35 +916,35 @@ class _EncoderPageState extends State<EncoderPage>
                               : null,
                           icon: const Icon(Icons.fact_check, size: 18),
                           label: Text(_isDecodeTesting
-                              ? 'Testing...'
-                              : 'Decode test (Alt+D)'),
+                              ? '测试中…'
+                              : '解码自检 (Alt+D)'),
                         ),
                         if (_frames.isNotEmpty) ...[
                           const SizedBox(height: 8),
                           OutlinedButton.icon(
                             onPressed: _stopEncoding,
                             icon: const Icon(Icons.stop, size: 18),
-                            label: const Text('Stop'),
+                            label: const Text('停止'),
                           ),
                         ],
                         const SizedBox(height: 20),
                         if (_compressedData != null) ...[
                           _infoRow(
-                              'Capture', '${_capturedWidth}x$_capturedHeight'),
+                              '截图尺寸', '${_capturedWidth}x$_capturedHeight'),
                           const SizedBox(height: 6),
-                          _infoRow('Compressed',
+                          _infoRow('压缩后大小',
                               '${((_compressedData?.length ?? 0) / 1024).toStringAsFixed(1)} KB'),
                           const SizedBox(height: 6),
-                          _infoRow('Mode', _config.mode.name),
+                          _infoRow('模式', _config.mode.name),
                           const SizedBox(height: 6),
                           _fpsControl(),
                           const SizedBox(height: 6),
-                          _infoRow('Frames', '${_frames.length}'),
+                          _infoRow('帧数', '${_frames.length}'),
                         ],
                         const Spacer(),
                         if (_frames.isNotEmpty)
                           Text(
-                            'Frame ${_currentFrameIndex + 1} / ${_frames.length}',
+                            '第 ${_currentFrameIndex + 1} / ${_frames.length} 帧',
                             style: Theme.of(context).textTheme.bodySmall,
                             textAlign: TextAlign.center,
                           ),
@@ -953,7 +980,7 @@ class _EncoderPageState extends State<EncoderPage>
               size: 80, color: Theme.of(context).colorScheme.outline),
           const SizedBox(height: 16),
           Text(
-            'Press Alt+A or click "Capture"\nto select a screen region',
+            '按 Alt+A 或点击「截取屏幕」\n框选要编码的屏幕区域',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Theme.of(context).colorScheme.outline,
@@ -988,7 +1015,7 @@ class _EncoderPageState extends State<EncoderPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Display FPS',
+              Text('显示帧率',
                   style: Theme.of(context).textTheme.labelSmall),
               Text(
                 '${_config.fps} /s',

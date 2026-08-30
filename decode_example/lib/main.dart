@@ -11,7 +11,7 @@ class DecoderApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'libcimbar Decoder',
+      title: 'libcimbar 解码器',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorSchemeSeed: Colors.deepPurple,

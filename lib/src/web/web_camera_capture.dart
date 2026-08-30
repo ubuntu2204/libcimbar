@@ -96,7 +96,13 @@ class WebCameraCapture implements ICameraCapture {
   static const int _fallbackTargetSize = 1024;
 
   /// Upper bound for the square decoder input, to cap per-frame CPU/memory.
-  static const int _maxTargetSize = 1600;
+  ///
+  /// Raised from 1600: a barcode photographed from across the room only fills
+  /// a fraction of the view, so shrinking the frame to 1600 left it below the
+  /// ~1024 px needed per barcode and the anchor scan failed. 2048 keeps the
+  /// barcode above that threshold while bounding per-frame cost (~12.6 MB
+  /// RGBA per frame at 5 fps).
+  static const int _maxTargetSize = 2048;
 
   /// Side length (px) of the square frame handed to the decoder.
   ///
@@ -117,6 +123,13 @@ class WebCameraCapture implements ICameraCapture {
   /// the center crop of a landscape camera chops one side of the barcode
   /// (scan reports exactly 2 of 4 anchors).
   WebCaptureMode captureMode = WebCaptureMode.alternate;
+
+  /// Upper bound for the square decoder input, in pixels.
+  ///
+  /// Higher keeps more of the barcode's detail (better anchoring when the
+  /// barcode is small in frame) at the cost of per-frame CPU/memory. Lower it
+  /// on devices where the scan step cannot keep up with the capture cadence.
+  int maxTargetSize = _maxTargetSize;
 
   /// Counts delivered frames; drives the [WebCaptureMode.alternate] flip.
   int _frameCounter = 0;
@@ -250,7 +263,7 @@ class WebCameraCapture implements ICameraCapture {
     if (vw <= 0 || vh <= 0) return _fallbackTargetSize;
     final base =
         captureMode == WebCaptureMode.fit ? math.max(vw, vh) : math.min(vw, vh);
-    return base.clamp(_fallbackTargetSize, _maxTargetSize);
+    return base.clamp(_fallbackTargetSize, maxTargetSize);
   }
 
   void _setProp(JSObject obj, String key, JSAny? value) {
@@ -356,20 +369,16 @@ class WebCameraCapture implements ICameraCapture {
     final clampedArray = jsData as JSUint8ClampedArray;
     final rgbaPixels = Uint8List.fromList(clampedArray.toDart);
 
-    // Convert RGBA to RGB (strip alpha channel) for cimbar decoder
-    final pixelCount = targetSize * targetSize;
-    final rgbPixels = Uint8List(pixelCount * 3);
-    for (int i = 0; i < pixelCount; i++) {
-      rgbPixels[i * 3] = rgbaPixels[i * 4]; // R
-      rgbPixels[i * 3 + 1] = rgbaPixels[i * 4 + 1]; // G
-      rgbPixels[i * 3 + 2] = rgbaPixels[i * 4 + 2]; // B
-    }
-
+    // Hand the frame to the decoder as RGBA (format 4). The native
+    // cimbard_scan_extract_decode() converts RGBA->RGB itself with OpenCV
+    // (cimbar_recv_js.cpp get_rgb()), which is far faster than stripping the
+    // alpha channel in a Dart loop — that loop alone cost ~100 ms per frame
+    // at 4K capture sizes and starved the scan step.
     _callback!(CameraFrame(
-      data: rgbPixels,
+      data: rgbaPixels,
       width: targetSize,
       height: targetSize,
-      format: 'rgb',
+      format: 'rgba',
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
   }

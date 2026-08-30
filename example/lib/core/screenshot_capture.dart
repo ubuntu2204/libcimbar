@@ -225,7 +225,7 @@ class ScreenshotCapture {
       if (selectedRect == null) {
         _cleanupTmpFile(tmpPath);
         await _winCtrl.restoreToNormal();
-        return const ScreenshotResult(error: 'Selection cancelled');
+        return const ScreenshotResult(error: '已取消选择');
       }
 
       // 4. Crop selected region from temp file (independent of window state)
@@ -535,7 +535,7 @@ class _RegionSelectOverlayState extends State<_RegionSelectOverlay> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    'Drag to select region. Release to capture. Esc to cancel.',
+                    '拖动框选区域，松开鼠标截取，Esc 取消。',
                     style: TextStyle(color: Colors.white, fontSize: 14),
                   ),
                 ),

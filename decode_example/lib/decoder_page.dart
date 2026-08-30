@@ -5,7 +5,8 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show Clipboard, ClipboardData;
+import 'package:flutter/services.dart'
+    show Clipboard, ClipboardData, SystemChrome, SystemUiMode;
 import 'package:http/http.dart' as http;
 import 'package:image/image.dart' as img;
 import 'package:libcimbar/libcimbar.dart';
@@ -18,6 +19,28 @@ import 'native/web_file_download_stub.dart'
 import 'package:path_provider/path_provider.dart';
 
 import 'dart:ui' as ui;
+
+/// A camera resolution preset requested from getUserMedia (`ideal`).
+///
+/// The browser picks the closest supported mode, so asking for the highest
+/// value is safe — it simply falls back to whatever the device offers.
+class _ResolutionPreset {
+  final String label;
+  final int width;
+  final int height;
+  const _ResolutionPreset(this.label, this.width, this.height);
+
+  @override
+  String toString() => '$label ($width×$height)';
+}
+
+/// Camera resolution presets, lowest to highest.
+const List<_ResolutionPreset> _resolutions = [
+  _ResolutionPreset('1080p', 1920, 1080),
+  _ResolutionPreset('2K', 2560, 1440),
+  _ResolutionPreset('4K', 3840, 2160),
+  _ResolutionPreset('Max 4K+', 4096, 3072),
+];
 
 /// Decoder page — receive cimbar barcodes via camera and decode them.
 ///
@@ -45,7 +68,7 @@ class _DecoderPageState extends State<DecoderPage> {
   bool _isReady = false;
   bool _isDecoding = false;
   bool _isCameraActive = false;
-  String _statusMessage = 'Initializing decoder...';
+  String _statusMessage = '正在初始化解码器…';
   double _progress = 0.0;
 
   CimbarConfig _config = const CimbarConfig(
@@ -63,6 +86,12 @@ class _DecoderPageState extends State<DecoderPage> {
   // Capture frame rate (frames per second) for the web camera.
   int _captureFps = 5;
 
+  // Requested camera resolution. A barcode photographed from across the room
+  // only fills a fraction of the view, so the raw camera frame must be much
+  // larger than the barcode's native 1024 px — otherwise the anchor scan
+  // cannot resolve it (it reports 2-3 of 4 anchors).
+  int _resolutionIndex = 3; // default: Max (4K+)
+
   // Last camera frame for screenshot
   CameraFrame? _lastFrame;
 
@@ -75,12 +104,11 @@ class _DecoderPageState extends State<DecoderPage> {
   // is displaying (bypasses the camera entirely -> isolates whether the WASM
   // decode pipeline or the camera capture is at fault), and push our camera
   // view + report back for side-by-side comparison on the encoder machine.
-  // Default to localhost: encoder (Linux example) and this decoder now run
-  // on the SAME machine, so 127.0.0.1 always reaches the debug server — no
-  // NIC guessing, no firewall. Type a LAN IP here only for cross-machine
-  // setups (e.g. the Windows encoder).
+  // Default points at the encoder machine's VPN/tailnet address, which the
+  // phone can reach from anywhere on that network. Switch to 127.0.0.1 only
+  // when encoder and decoder run on the SAME machine.
   final TextEditingController _debugUrlCtrl =
-      TextEditingController(text: 'http://127.0.0.1:8765');
+      TextEditingController(text: 'http://100.65.70.11:8765');
   Timer? _remoteTimer;
   bool _remotePolling = false;
   bool _remoteBusy = false;
@@ -88,7 +116,7 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // Encoder-side state fetched over the debug link (for reports/negotiation).
   Map<String, dynamic>? _lastEncoderStatus;
-  String _lastSyncResult = '(not attempted)';
+  String _lastSyncResult = '（未尝试）';
 
   // Consecutive fatal WASM traps (corrupted/exhausted heap).
   int _fatalWasmErrors = 0;
@@ -109,12 +137,11 @@ class _DecoderPageState extends State<DecoderPage> {
       _remoteTimer = null;
       _remotePolling = false;
       if (_isCameraActive) unawaited(_stopCamera());
-      _statusMessage =
-          'WASM heap corrupted/exhausted ($_fatalWasmErrors traps) — RELOAD '
-          'the browser page (Ctrl+Shift+R). A Flutter hot restart does NOT '
-          'recreate the WASM instance, so the trap persists until reload.';
+      _statusMessage = 'WASM 内存损坏/耗尽（已捕获 $_fatalWasmErrors 次）— 请强制刷新浏览器'
+          '页面（Ctrl+Shift+R）。Flutter 热重启不会重建 WASM 实例，'
+          '只有刷新页面才能恢复。';
     } else {
-      _statusMessage = 'WASM trap #$_fatalWasmErrors: $s';
+      _statusMessage = 'WASM 异常 #$_fatalWasmErrors：$s';
     }
     _lastFrameError = _statusMessage;
     if (mounted) setState(() {});
@@ -128,7 +155,7 @@ class _DecoderPageState extends State<DecoderPage> {
   // Outcome of the Pull+Decode ground-truth test (pristine frames over LAN,
   // no camera). Recorded separately from camera errors so the report can
   // state definitively whether the decode pipeline itself is healthy.
-  String _lastRemoteResult = '(never run - click Pull+Decode)';
+  String _lastRemoteResult = '（未运行 - 点击「拉取解码」）';
 
   @override
   void initState() {
@@ -140,7 +167,7 @@ class _DecoderPageState extends State<DecoderPage> {
     try {
       debugPrint('[Decoder] Waiting for WASM module...');
       setState(() {
-        _statusMessage = 'Waiting for WASM module to initialize...';
+        _statusMessage = '正在等待 WASM 模块初始化…';
       });
 
       final wasmDiag = await waitForWasmReady(
@@ -157,8 +184,7 @@ class _DecoderPageState extends State<DecoderPage> {
         debugPrint('[Decoder] WASM not ready. Diagnostics:');
         debugPrint('[Decoder] ${wasmDiag.toReport()}');
         setState(() {
-          _statusMessage =
-              'WASM module failed to initialize.\n\n${wasmDiag.toReport()}';
+          _statusMessage = 'WASM 模块初始化失败。\n\n${wasmDiag.toReport()}';
         });
         return;
       }
@@ -171,8 +197,8 @@ class _DecoderPageState extends State<DecoderPage> {
       setState(() {
         _isReady = _decoder!.isReady;
         _statusMessage = _isReady
-            ? 'Decoder ready. Start camera to begin scanning.'
-            : 'Decoder created but not ready.\n\n${_getDiagnostics()}';
+            ? '解码器就绪。启动摄像头开始扫描。'
+            : '解码器已创建但未就绪。\n\n${_getDiagnostics()}';
       });
 
       // Try to initialize camera
@@ -184,7 +210,7 @@ class _DecoderPageState extends State<DecoderPage> {
     } catch (e) {
       debugPrint('[Decoder] Initialization error: $e');
       setState(() {
-        _statusMessage = 'Initialization error: $e';
+        _statusMessage = '初始化出错：$e';
       });
     }
   }
@@ -203,10 +229,16 @@ class _DecoderPageState extends State<DecoderPage> {
   Future<void> _startCamera() async {
     if (_camera == null || !_isReady || _isDecoding) return;
 
+    // Immersive mode: hide the system bars so the viewfinder gets the
+    // entire display while scanning (no-op on web).
+    if (!kIsWeb) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+
     setState(() {
       _isCameraActive = true;
       _isDecoding = true;
-      _statusMessage = 'Camera active. Point at a cimbar code...';
+      _statusMessage = '摄像头已开启，请对准 cimbar 条码…';
       _framesProcessed = 0;
     });
 
@@ -221,9 +253,21 @@ class _DecoderPageState extends State<DecoderPage> {
       await (_decoder as dynamic).resetStreams();
     } catch (_) {}
 
+    // Request the chosen camera resolution. Higher raw resolution is what
+    // gives the barcode enough pixels to anchor — but it only pays off if the
+    // decoder input is allowed to stay large, so raise the input cap for
+    // 4K-class captures (otherwise the extra detail is scaled straight back
+    // down and the scan still fails).
+    final res = _resolutions[_resolutionIndex];
+    final maxTarget =
+        (res.width >= 3840 || res.height >= 2160) ? 2048 : 1600;
+    try {
+      (_camera as dynamic).maxTargetSize = maxTarget;
+    } catch (_) {}
+
     await _camera!.start(
-      preferredWidth: 1920,
-      preferredHeight: 1080,
+      preferredWidth: res.width,
+      preferredHeight: res.height,
       frameIntervalMs: (1000 / _captureFps).round(),
     );
 
@@ -234,10 +278,13 @@ class _DecoderPageState extends State<DecoderPage> {
 
   Future<void> _stopCamera() async {
     await _camera?.stop();
+    if (!kIsWeb) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
     setState(() {
       _isCameraActive = false;
       _isDecoding = false;
-      _statusMessage = 'Camera stopped.';
+      _statusMessage = '摄像头已停止。';
     });
   }
 
@@ -281,16 +328,15 @@ class _DecoderPageState extends State<DecoderPage> {
         _recoveredData = result.data;
         _recoveredFilename = result.filename;
         _statusMessage =
-            'File recovered: "${result.filename}" (${result.data?.length ?? 0} bytes)';
+            '文件已恢复："${result.filename}"（${result.data?.length ?? 0} 字节）';
         await _stopCamera();
         _saveFile();
       } else if (result.error != null) {
         _lastFrameError = result.error!;
-        _statusMessage = 'Frame error: ${result.error}';
+        _statusMessage = '帧解码出错：${result.error}';
       } else {
-        _statusMessage =
-            'Decoding... ${(result.progress * 100).toStringAsFixed(1)}% '
-            '($_framesProcessed frames)';
+        _statusMessage = '解码中… ${(result.progress * 100).toStringAsFixed(1)}%'
+            '（已处理 $_framesProcessed 帧）';
       }
 
       setState(() {});
@@ -345,7 +391,7 @@ class _DecoderPageState extends State<DecoderPage> {
   Future<void> _screenshotFrame() async {
     final frame = _lastFrame;
     if (frame == null) {
-      _statusMessage = 'No frame captured yet.';
+      _statusMessage = '还没有捕获到画面帧。';
       setState(() {});
       return;
     }
@@ -362,11 +408,11 @@ class _DecoderPageState extends State<DecoderPage> {
         final path =
             '${dir.path}/${_timestampPrefix()}_cimbar_frame_${frame.width}x${frame.height}.png';
         await File(path).writeAsBytes(pngBytes);
-        _statusMessage = 'Frame saved: $path';
+        _statusMessage = '画面帧已保存：$path';
       }
       setState(() {});
     } catch (e) {
-      _statusMessage = 'Screenshot error: $e';
+      _statusMessage = '截图出错：$e';
       setState(() {});
     }
   }
@@ -376,10 +422,10 @@ class _DecoderPageState extends State<DecoderPage> {
   void _downloadBytesWeb(Uint8List bytes, String filename) {
     try {
       downloadBytesWeb(bytes, filename);
-      _statusMessage = 'Frame captured: ${bytes.length} bytes. '
-          'Check browser downloads for "$filename".';
+      _statusMessage = '已捕获画面帧：${bytes.length} 字节。'
+          '请在浏览器下载中查看 "$filename"。';
     } catch (e) {
-      _statusMessage = 'Web download error: $e';
+      _statusMessage = '网页下载出错：$e';
     }
     setState(() {});
   }
@@ -420,32 +466,30 @@ class _DecoderPageState extends State<DecoderPage> {
   Future<String> _syncWithEncoder() async {
     final st = await _fetchEncoderStatus();
     if (st == null) {
-      _lastSyncResult = 'encoder unreachable at '
-          '${_debugBaseUrl.isEmpty ? '(URL not set)' : _debugBaseUrl}';
+      _lastSyncResult = '无法连接编码器：'
+          '${_debugBaseUrl.isEmpty ? '（未填写地址）' : _debugBaseUrl}';
       _linkOk = false;
       if (mounted) setState(() {}); // refresh the negotiation light
       return _lastSyncResult;
     }
     final encMode = st['mode']?.toString() ?? '';
     if (encMode.isEmpty) {
-      _lastSyncResult = 'encoder reachable, but mode unknown';
+      _lastSyncResult = '编码器可连接，但模式未知';
       _linkOk = false;
     } else if (encMode == _config.mode.name) {
-      _lastSyncResult = 'mode match ($encMode)';
+      _lastSyncResult = '模式一致（$encMode）';
       _linkOk = true;
     } else {
       final target = CimbarMode.values.where((m) => m.name == encMode).toList();
       if (target.isEmpty) {
-        _lastSyncResult =
-            'MISMATCH: encoder mode "$encMode" unknown to decoder '
-            '(decoder stays ${_config.mode.name})';
+        _lastSyncResult = '模式不一致：编码器模式 "$encMode" 解码器无法识别'
+            '（保持 ${_config.mode.name}）';
         _linkOk = false;
       } else {
         final old = _config.mode.name;
         _config = _config.copyWith(mode: target.first);
         await _decoder?.configure(_config);
-        _lastSyncResult =
-            'MISMATCH fixed: decoder mode $old -> $encMode (reconfigured)';
+        _lastSyncResult = '已修正不一致：解码器模式 $old -> $encMode（已重新配置）';
         _linkOk = true;
       }
     }
@@ -464,13 +508,13 @@ class _DecoderPageState extends State<DecoderPage> {
       _remoteTimer = null;
       setState(() {
         _remotePolling = false;
-        _statusMessage = 'Remote decode stopped ($_remoteFrames frames).';
+        _statusMessage = '远程解码已停止（共 $_remoteFrames 帧）。';
       });
       return;
     }
     if (_debugBaseUrl.isEmpty || _decoder == null) {
-      setState(() => _statusMessage = 'Enter the encoder debug server URL '
-          '(shown in the encoder status line, e.g. http://192.168.1.5:8765)');
+      setState(() => _statusMessage = '请填写编码器调试服务器地址'
+          '（显示在编码器的状态栏，例如 http://192.168.1.5:8765）');
       return;
     }
     _remoteFrames = 0;
@@ -488,8 +532,7 @@ class _DecoderPageState extends State<DecoderPage> {
     } catch (_) {}
     // Negotiate first: align decoder mode with the encoder before decoding.
     final sync = await _syncWithEncoder();
-    _statusMessage =
-        'Remote decode [$sync]: pulling frames from $_debugBaseUrl ...';
+    _statusMessage = '远程解码 [$sync]：正在从 $_debugBaseUrl 拉取帧…';
     _remoteTimer = Timer.periodic(
         const Duration(milliseconds: 200), (_) => _pollRemoteFrame());
     setState(() {});
@@ -514,8 +557,8 @@ class _DecoderPageState extends State<DecoderPage> {
           .get(Uri.parse('$_debugBaseUrl/frame.png'))
           .timeout(const Duration(seconds: 3));
       if (resp.statusCode != 200) {
-        _statusMessage = 'Remote frame: HTTP ${resp.statusCode} — is the '
-            'encoder in "Encode & Display" mode?';
+        _statusMessage = '远程帧：HTTP ${resp.statusCode} — 编码器是否'
+            '处于「编码并显示」状态？';
         if (mounted) setState(() {});
         return;
       }
@@ -526,7 +569,7 @@ class _DecoderPageState extends State<DecoderPage> {
       // color bits. This path is byte-exact.
       final decoded = img.decodePng(resp.bodyBytes);
       if (decoded == null) {
-        _statusMessage = 'Remote frame: PNG decode failed';
+        _statusMessage = '远程帧：PNG 解码失败';
         if (mounted) setState(() {});
         return;
       }
@@ -547,28 +590,28 @@ class _DecoderPageState extends State<DecoderPage> {
       if (result.isComplete) {
         _recoveredData = result.data;
         _recoveredFilename = result.filename;
-        _lastRemoteResult = 'COMPLETE: "${result.filename}" '
-            '(${result.data?.length ?? 0} bytes, $_remoteFrames frames) '
-            '-> WASM pipeline healthy';
-        _statusMessage = 'REMOTE decode COMPLETE: "${result.filename}" '
-            '(${result.data?.length ?? 0} bytes, $_remoteFrames frames). '
-            'WASM pipeline is healthy — remaining problem is camera capture.';
+        _lastRemoteResult = '完成："${result.filename}"'
+            '（${result.data?.length ?? 0} 字节，$_remoteFrames 帧）'
+            '-> WASM 解码链路正常';
+        _statusMessage = '远程解码完成："${result.filename}"'
+            '（${result.data?.length ?? 0} 字节，$_remoteFrames 帧）。'
+            'WASM 解码链路正常 — 剩余问题出在摄像头采集。';
         _toggleRemoteDecode(); // stop polling
         _saveFile();
       } else if (result.error != null) {
         _lastFrameError = result.error!;
-        _lastRemoteResult = 'frame #$_remoteFrames FAILED: ${result.error}';
-        _statusMessage = 'REMOTE frame #$_remoteFrames: ${result.error}';
+        _lastRemoteResult = '第 $_remoteFrames 帧失败：${result.error}';
+        _statusMessage = '远程帧 #$_remoteFrames：${result.error}';
       } else {
-        _lastRemoteResult = 'in progress ($_remoteFrames frames) '
+        _lastRemoteResult = '进行中（$_remoteFrames 帧）'
             '${_decoderTelemetry()}';
-        _statusMessage = 'REMOTE decoding... ($_remoteFrames frames) '
+        _statusMessage = '远程解码中…（$_remoteFrames 帧）'
             '${_decoderTelemetry()}';
       }
       setState(() {});
     } catch (e) {
       if (_noteFatalWasmError(e)) return;
-      _statusMessage = 'Remote poll failed: $e';
+      _statusMessage = '远程拉取出错：$e';
       if (mounted) setState(() {});
     } finally {
       _remoteBusy = false;
@@ -579,7 +622,7 @@ class _DecoderPageState extends State<DecoderPage> {
   /// where they are saved date-prefixed for side-by-side comparison.
   Future<void> _uploadToEncoder() async {
     if (_debugBaseUrl.isEmpty) {
-      setState(() => _statusMessage = 'Enter the encoder debug server URL.');
+      setState(() => _statusMessage = '请填写编码器调试服务器地址。');
       return;
     }
     try {
@@ -601,10 +644,10 @@ class _DecoderPageState extends State<DecoderPage> {
               body: utf8.encode(_buildDiagnosticReport()))
           .timeout(const Duration(seconds: 5));
       if (r2.statusCode == 200) uploaded++;
-      _statusMessage = 'Uploaded $uploaded item(s) to encoder '
-          '(camera frame + report, saved in libcimbar_screenshots).';
+      _statusMessage = '已上传 $uploaded 项到编码器'
+          '（摄像头画面 + 报告，保存在 libcimbar_screenshots）。';
     } catch (e) {
-      _statusMessage = 'Upload failed: $e';
+      _statusMessage = '上传失败：$e';
     }
     setState(() {});
   }
@@ -629,6 +672,28 @@ class _DecoderPageState extends State<DecoderPage> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// How much of the frame the barcode must cover to still reach its native
+  /// 1024 px, given the decoder input size.
+  ///
+  /// The barcode is only part of the view (it shrinks as the phone moves
+  /// away), so a larger decoder input buys real headroom: at 1080 px input
+  /// the barcode has to fill ~95% of the frame, at 2048 px only ~50%.
+  String _barcodeHeadroom(int? vw, int? vh, int? input) {
+    if (input == null || input <= 0) return 'unknown (camera not started)';
+    const native = 1024;
+    final pctForNative = (100 * native / input).round();
+    if (pctForNative <= 40) {
+      return 'GOOD — barcode reaches $native px while covering only '
+          '$pctForNative% of the frame';
+    }
+    if (pctForNative <= 70) {
+      return 'TIGHT — barcode must cover >= $pctForNative% of the frame to '
+          'reach $native px; move closer or raise resolution';
+    }
+    return 'LOW — barcode must fill >= $pctForNative% of the frame; '
+        'raise the camera resolution';
   }
 
   /// Build a plain-text diagnostic report of the whole decode pipeline —
@@ -708,10 +773,14 @@ class _DecoderPageState extends State<DecoderPage> {
     b
       ..writeln()
       ..writeln('[Camera]')
+      ..writeln('  Requested        : ${_resolutions[_resolutionIndex].width} x '
+          '${_resolutions[_resolutionIndex].height} '
+          '(${_resolutions[_resolutionIndex].label})')
       ..writeln('  Video resolution : ${vw ?? '?'} x ${vh ?? '?'} '
           '(actual from getUserMedia)')
       ..writeln('  Capture mode     : ${capMode ?? '?'}')
       ..writeln('  Decoder input    : ${input ?? '?'} x ${input ?? '?'} px')
+      ..writeln('  Barcode headroom : ${_barcodeHeadroom(vw, vh, input)}')
       ..writeln('  Camera active    : $_isCameraActive')
       ..writeln()
       ..writeln('[Decode session]')
@@ -735,8 +804,9 @@ class _DecoderPageState extends State<DecoderPage> {
       ..writeln('[Hints]')
       ..writeln('  found 0 anchors   -> barcode too small/blurry in view: '
           'move closer, fill the frame, check focus/glare')
-      ..writeln('  found 1-3 anchors -> barcode partially cropped or '
-          'off-center: center it, keep all 4 corners in view')
+      ..writeln('  found 1-3 anchors -> barcode partially cropped, '
+          'off-center, or too few pixels: center it, keep all 4 corners in '
+          'view, and raise 摄像头分辨率 (needs >= ~1024 px of barcode)')
       ..writeln('  accum > 1.0       -> stream poisoned by corrupt chunks '
           '(typically camera frames of the same barcode); Pull+Decode now '
           'auto-stops the camera and resets streams first')
@@ -756,15 +826,15 @@ class _DecoderPageState extends State<DecoderPage> {
     try {
       if (kIsWeb) {
         downloadBytesWeb(Uint8List.fromList(utf8.encode(content)), filename);
-        _statusMessage = 'Report downloaded: $filename';
+        _statusMessage = '报告已下载：$filename';
       } else {
         final dir = await getApplicationDocumentsDirectory();
         final path = '${dir.path}/$filename';
         await File(path).writeAsString(content);
-        _statusMessage = 'Report saved: $path';
+        _statusMessage = '报告已保存：$path';
       }
     } catch (e) {
-      _statusMessage = 'Report error: $e';
+      _statusMessage = '报告出错：$e';
     }
     setState(() {});
   }
@@ -777,7 +847,7 @@ class _DecoderPageState extends State<DecoderPage> {
       if (kIsWeb) {
         // On web, trigger a download
         // In production, use dart:js_interop to create a Blob and download link
-        _statusMessage = 'File decoded! In production, a download will start.';
+        _statusMessage = '文件解码成功！正式版本将自动开始下载。';
         return;
       }
 
@@ -790,263 +860,442 @@ class _DecoderPageState extends State<DecoderPage> {
       await file.writeAsBytes(_recoveredData!);
 
       setState(() {
-        _statusMessage = 'File saved to: $savePath';
+        _statusMessage = '文件已保存到：$savePath';
       });
     } catch (e) {
       setState(() {
-        _statusMessage = 'Save error: $e';
+        _statusMessage = '保存出错：$e';
       });
     }
   }
+
+  /// Chinese description of each barcode mode, shown in the mode menu.
+  String _modeDescription(CimbarMode mode) => switch (mode) {
+        CimbarMode.mode4C => '16x16 网格，兼容性最好',
+        CimbarMode.modeB => '24x24 网格，彩色大容量（默认）',
+        CimbarMode.modeBm => '24x24 网格，黑白单色，适合暗环境',
+        CimbarMode.modeBu => '24x24 网格，B 模式变体',
+      };
 
   // ─── UI ───────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('libcimbar Decoder'),
-        actions: [
-          // Mode selector
-          PopupMenuButton<CimbarMode>(
-            icon: const Icon(Icons.settings),
-            tooltip: 'Encoding mode',
-            onSelected: (mode) async {
-              _config = _config.copyWith(mode: mode);
-              await _decoder?.configure(_config);
-            },
-            itemBuilder: (_) => CimbarMode.values
-                .map((m) => PopupMenuItem(
-                      value: m,
-                      child: Text(m.name),
-                    ))
-                .toList(),
-          ),
-        ],
+      // Scanning is full-screen (no app bar) so the viewfinder gets almost
+      // the entire display, like a QR scanner app.
+      appBar: _isCameraActive ? null : _buildAppBar(),
+      body: SafeArea(
+        child: _isCameraActive ? _buildScanningLayout() : _buildIdleLayout(),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Status card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      title: const Text('libcimbar 解码器'),
+      actions: [
+        // Mode selector
+        PopupMenuButton<CimbarMode>(
+          icon: const Icon(Icons.settings),
+          tooltip: '条码模式',
+          onSelected: (mode) async {
+            _config = _config.copyWith(mode: mode);
+            await _decoder?.configure(_config);
+          },
+          itemBuilder: (_) => CimbarMode.values
+              .map((m) => PopupMenuItem(
+                    value: m,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(
-                          _isReady ? Icons.check_circle : Icons.error,
-                          color: _isReady ? Colors.green : Colors.red,
+                        Text(m.name,
+                            style:
+                                const TextStyle(fontWeight: FontWeight.w600)),
+                        Text(
+                          _modeDescription(m),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.7)),
                         ),
-                        const SizedBox(width: 12),
-                        // Fixed-height, scrollable status text. Messages flip
-                        // between short progress lines and long scan
-                        // diagnostics every frame; a variable-height text box
-                        // would make the whole layout (and the camera
-                        // viewfinder below) jump around while decoding.
-                        Expanded(
-                          child: SizedBox(
-                            height: 72,
-                            child: SingleChildScrollView(
-                              child: SelectableText(_statusMessage),
-                            ),
-                          ),
-                        ),
-                        if (!_isReady ||
-                            _statusMessage.contains('error') ||
-                            _statusMessage.contains('Error'))
-                          IconButton(
-                            icon: const Icon(Icons.copy, size: 18),
-                            tooltip: 'Copy error message',
-                            onPressed: () {
-                              Clipboard.setData(
-                                  ClipboardData(text: _statusMessage));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Error message copied to clipboard'),
-                                  duration: Duration(seconds: 2),
-                                ),
-                              );
-                            },
-                          ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        Chip(
-                          avatar: const Icon(
-                            Icons.settings_input_antenna,
-                            size: 16,
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  /// Idle control panel: settings and buttons in a scrollable column so
+  /// narrow phone screens never squeeze them (the viewfinder gets the whole
+  /// screen while scanning — see [_buildScanningLayout]).
+  Widget _buildIdleLayout() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Status card
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        _isReady ? Icons.check_circle : Icons.error,
+                        color: _isReady ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 12),
+                      // Fixed-height, scrollable status text. Messages flip
+                      // between short progress lines and long scan
+                      // diagnostics every frame; a variable-height text box
+                      // would make the whole layout (and the camera
+                      // viewfinder below) jump around while decoding.
+                      Expanded(
+                        child: SizedBox(
+                          height: 72,
+                          child: SingleChildScrollView(
+                            child: SelectableText(_statusMessage),
                           ),
-                          label: Text('Mode: ${_config.mode.name}'),
-                        ),
-                        if (_framesProcessed > 0)
-                          Chip(
-                            avatar: const Icon(Icons.photo_camera, size: 16),
-                            label: Text('$_framesProcessed frames'),
-                          ),
-                        if (_recoveredData != null)
-                          Chip(
-                            avatar: const Icon(Icons.check_circle, size: 16),
-                            label: Text(
-                              _recoveredFilename.isNotEmpty
-                                  ? _recoveredFilename
-                                  : 'recovered',
-                            ),
-                          ),
-                      ],
-                    ),
-                    if (_progress > 0 && _progress < 1.0) ...[
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: _progress,
-                          minHeight: 8,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${(_progress * 100).toStringAsFixed(1)}% — '
-                        '$_framesProcessed frames processed',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                      if (!_isReady ||
+                          _statusMessage.contains('error') ||
+                          _statusMessage.contains('Error') ||
+                          _statusMessage.contains('出错') ||
+                          _statusMessage.contains('失败'))
+                        IconButton(
+                          icon: const Icon(Icons.copy, size: 18),
+                          tooltip: '复制错误信息',
+                          onPressed: () {
+                            Clipboard.setData(
+                                ClipboardData(text: _statusMessage));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('错误信息已复制到剪贴板'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Chip(
+                        avatar: const Icon(
+                          Icons.settings_input_antenna,
+                          size: 16,
+                        ),
+                        label: Text('模式：${_config.mode.name}'),
+                      ),
+                      if (_framesProcessed > 0)
+                        Chip(
+                          avatar: const Icon(Icons.photo_camera, size: 16),
+                          label: Text('$_framesProcessed 帧'),
+                        ),
+                      if (_recoveredData != null)
+                        Chip(
+                          avatar: const Icon(Icons.check_circle, size: 16),
+                          label: Text(
+                            _recoveredFilename.isNotEmpty
+                                ? _recoveredFilename
+                                : '已恢复',
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (_progress > 0 && _progress < 1.0) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        minHeight: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${(_progress * 100).toStringAsFixed(1)}% — '
+                      '已处理 $_framesProcessed 帧',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
+          ),
+          const SizedBox(height: 8),
 
-            // Capture FPS control, single compact row so the camera preview
-            // below gets as much height as possible.
-            Row(
-              children: [
-                Text('Capture FPS',
-                    style: Theme.of(context).textTheme.labelSmall),
-                Expanded(
-                  child: Slider(
-                    value: _captureFps.toDouble(),
-                    min: 1,
-                    max: 30,
-                    divisions: 29,
-                    label: '$_captureFps fps',
-                    onChanged: (v) => setState(() => _captureFps = v.round()),
-                  ),
+          // Capture FPS control, single compact row so the camera preview
+          // below gets as much height as possible.
+          Row(
+            children: [
+              Text('采集帧率', style: Theme.of(context).textTheme.labelSmall),
+              Expanded(
+                child: Slider(
+                  value: _captureFps.toDouble(),
+                  min: 1,
+                  max: 30,
+                  divisions: 29,
+                  label: '$_captureFps fps',
+                  onChanged: (v) => setState(() => _captureFps = v.round()),
                 ),
-                Text(
-                  '$_captureFps /s',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Camera controls
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed:
-                        _isReady && !_isCameraActive ? _startCamera : null,
-                    icon: const Icon(Icons.videocam),
-                    label: const Text('Start Camera'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isCameraActive ? _stopCamera : null,
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Stop Camera'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: _lastFrame != null ? _screenshotFrame : null,
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Screenshot'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _saveDiagnosticReport,
-                    icon: const Icon(Icons.description),
-                    label: const Text('Report'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            // Network debug link: pull pristine frames from the encoder's
-            // debug server / push our camera view back to it.
-            Row(
-              children: [
-                // Negotiation light: green = link up & modes aligned.
-                Tooltip(
-                  message: 'Negotiation: $_lastSyncResult',
-                  child: Icon(
-                    Icons.circle,
-                    size: 14,
-                    color: _linkOk == null
-                        ? Colors.grey
-                        : (_linkOk! ? Colors.greenAccent : Colors.redAccent),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: TextField(
-                    controller: _debugUrlCtrl,
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      border: OutlineInputBorder(),
-                      labelText: 'Encoder debug server',
-                      hintText: 'http://<encoder-ip>:8765',
+              ),
+              Text(
+                '$_captureFps /s',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
+              ),
+            ],
+          ),
+
+          // Camera resolution: the barcode must occupy >= ~1024 px in the
+          // raw frame, so request the highest mode the device offers.
+          Row(
+            children: [
+              Text('摄像头分辨率',
+                  style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButton<int>(
+                  isDense: true,
+                  isExpanded: true,
+                  value: _resolutionIndex,
+                  items: [
+                    for (int i = 0; i < _resolutions.length; i++)
+                      DropdownMenuItem<int>(
+                        value: i,
+                        child: Text(
+                          '${_resolutions[i].label} '
+                          '(${_resolutions[i].width}×${_resolutions[i].height})',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _resolutionIndex = v ?? _resolutionIndex),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 8),
+
+          // Camera controls: 2x2 grid of buttons — a single row of four
+          // does not fit narrow phone screens.
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _isReady && !_isCameraActive ? _startCamera : null,
+                  icon: const Icon(Icons.videocam),
+                  label: const Text('启动摄像头'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _isCameraActive ? _stopCamera : null,
+                  icon: const Icon(Icons.stop),
+                  label: const Text('停止'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
+                  onPressed: _lastFrame != null ? _screenshotFrame : null,
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text('截图'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _saveDiagnosticReport,
+                  icon: const Icon(Icons.description),
+                  label: const Text('报告'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // Network debug link: pull pristine frames from the encoder's
+          // debug server / push our camera view back to it. Split into two
+          // rows (URL on top, actions below) so it fits phone widths.
+          Row(
+            children: [
+              // Negotiation light: green = link up & modes aligned.
+              Tooltip(
+                message: '模式协商：$_lastSyncResult',
+                child: Icon(
+                  Icons.circle,
+                  size: 14,
+                  color: _linkOk == null
+                      ? Colors.grey
+                      : (_linkOk! ? Colors.greenAccent : Colors.redAccent),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _debugUrlCtrl,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    labelText: '编码器调试服务器',
+                    hintText: 'http://<encoder-ip>:8765',
                   ),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.tonalIcon(
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.tonalIcon(
                   onPressed: _toggleRemoteDecode,
                   icon:
                       Icon(_remotePolling ? Icons.stop : Icons.cloud_download),
-                  label: Text(_remotePolling ? 'Stop' : 'Pull+Decode'),
+                  label: Text(_remotePolling ? '停止' : '拉取解码'),
                 ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton.icon(
                   onPressed: _lastFrame != null ? _uploadToEncoder : null,
                   icon: const Icon(Icons.cloud_upload),
-                  label: const Text('Upload view'),
+                  label: const Text('上传画面'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Preview placeholder: fixed height here; the whole screen is
+          // used by the preview while scanning.
+          SizedBox(height: 220, child: _buildCameraPreview()),
+
+          // Recovered file info
+          if (_recoveredData != null) ...[
+            const SizedBox(height: 12),
+            _buildResultPanel(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Full-screen scanning layout: the camera viewfinder fills the entire
+  /// screen, with a floating status strip on top and a minimal control bar
+  /// at the bottom.
+  Widget _buildScanningLayout() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _buildCameraPreview(fullBleed: true, overlayBottomInset: 80),
+        _buildScanningStatusBar(),
+        _buildScanningControls(),
+      ],
+    );
+  }
+
+  /// Floating status strip over the viewfinder (message + progress).
+  Widget _buildScanningStatusBar() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        color: Colors.black.withValues(alpha: 0.55),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  _isReady ? Icons.check_circle : Icons.error,
+                  size: 16,
+                  color: _isReady ? Colors.greenAccent : Colors.redAccent,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _statusMessage,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-
-            // Camera preview / placeholder
-            Expanded(
-              child: _buildCameraPreview(),
-            ),
-
-            // Recovered file info
-            if (_recoveredData != null) ...[
-              const SizedBox(height: 12),
-              _buildResultPanel(),
+            if (_progress > 0 && _progress < 1.0) ...[
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  minHeight: 6,
+                  color: Colors.greenAccent,
+                ),
+              ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Minimal control bar under the viewfinder while scanning.
+  Widget _buildScanningControls() {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+        color: Colors.black.withValues(alpha: 0.55),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _lastFrame != null ? _screenshotFrame : null,
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('截图'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                onPressed: _stopCamera,
+                icon: const Icon(Icons.stop),
+                label: const Text('停止扫描'),
+              ),
+            ),
           ],
         ),
       ),
@@ -1065,21 +1314,26 @@ class _DecoderPageState extends State<DecoderPage> {
     return null;
   }
 
-  Widget _buildCameraPreview() {
+  /// [fullBleed] renders the preview edge-to-edge (scanning layout);
+  /// [overlayBottomInset] lifts the hint text above the floating control bar.
+  Widget _buildCameraPreview(
+      {bool fullBleed = false, double overlayBottomInset = 0}) {
     final vType = _cameraViewType;
     if (_isCameraActive && vType != null) {
       // Show camera preview with scanning frame overlay
+      final stack = Stack(
+        fit: StackFit.expand,
+        children: [
+          // Camera video stream
+          HtmlElementView(viewType: vType),
+          // Scanning frame overlay
+          _buildScanningOverlay(bottomInset: overlayBottomInset),
+        ],
+      );
+      if (fullBleed) return stack;
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Camera video stream
-            HtmlElementView(viewType: vType),
-            // Scanning frame overlay
-            _buildScanningOverlay(),
-          ],
-        ),
+        child: stack,
       );
     }
 
@@ -1099,8 +1353,8 @@ class _DecoderPageState extends State<DecoderPage> {
               const CircularProgressIndicator(),
               const SizedBox(height: 16),
               Text(
-                'Scanning for cimbar codes...\n'
-                'Keep the entire barcode (all four corners) in view',
+                '正在扫描 cimbar 条码…\n'
+                '请让完整条码（四个角）都在画面内',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -1122,7 +1376,7 @@ class _DecoderPageState extends State<DecoderPage> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Start the camera to scan cimbar codes',
+              '启动摄像头以扫描 cimbar 条码',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
@@ -1135,8 +1389,9 @@ class _DecoderPageState extends State<DecoderPage> {
   }
 
   /// Scanning frame overlay: dark surroundings with a clear center frame
-  /// and animated corner brackets.
-  Widget _buildScanningOverlay() {
+  /// and animated corner brackets. [bottomInset] lifts the hint text above
+  /// the floating control bar in the full-screen scanning layout.
+  Widget _buildScanningOverlay({double bottomInset = 0}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
@@ -1175,10 +1430,9 @@ class _DecoderPageState extends State<DecoderPage> {
             Positioned(
               left: 0,
               right: 0,
-              bottom: 10,
+              bottom: 10 + bottomInset,
               child: Text(
-                'Fit the whole barcode inside the frame '
-                '(all four corners visible)',
+                '将整个条码放入取景框内（四个角都可见）',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.8),
@@ -1205,20 +1459,20 @@ class _DecoderPageState extends State<DecoderPage> {
                 const Icon(Icons.check_circle, color: Colors.green),
                 const SizedBox(width: 8),
                 Text(
-                  'File Recovered',
+                  '文件已恢复',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Filename: $_recoveredFilename'),
-            Text('Size: ${_recoveredData!.length} bytes'),
-            Text('Frames: $_framesProcessed'),
+            Text('文件名：$_recoveredFilename'),
+            Text('大小：${_recoveredData!.length} 字节'),
+            Text('帧数：$_framesProcessed'),
             const SizedBox(height: 8),
             FilledButton.icon(
               onPressed: _saveFile,
               icon: const Icon(Icons.save),
-              label: const Text('Save File'),
+              label: const Text('保存文件'),
             ),
           ],
         ),

@@ -98,7 +98,7 @@ class _HomePageState extends State<HomePage> {
       return const Scaffold(body: EncoderPage());
     }
     return const Scaffold(
-      body: Center(child: Text('Encoder is only available on Windows/Linux.')),
+      body: Center(child: Text('编码器仅支持 Windows/Linux 桌面端。')),
     );
   }
 }
