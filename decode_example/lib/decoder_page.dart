@@ -92,6 +92,11 @@ class _DecoderPageState extends State<DecoderPage> {
   // cannot resolve it (it reports 2-3 of 4 anchors).
   int _resolutionIndex = 3; // default: Max (4K+)
 
+  // Selected capture framing. Persists across the session so a user who
+  // switches to centerCrop (for a larger barcode) can toggle back without
+  // re-picking the mode every capture cycle.
+  String _captureModeName = 'fit'; // default: fit (all 4 anchors always in view)
+
   // Last camera frame for screenshot
   CameraFrame? _lastFrame;
 
@@ -263,6 +268,7 @@ class _DecoderPageState extends State<DecoderPage> {
         (res.width >= 3840 || res.height >= 2160) ? 2048 : 1600;
     try {
       (_camera as dynamic).maxTargetSize = maxTarget;
+      (_camera as dynamic).captureMode = _captureModeForName(_captureModeName);
     } catch (_) {}
 
     await _camera!.start(
@@ -672,6 +678,18 @@ class _DecoderPageState extends State<DecoderPage> {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Map the user-visible capture mode name to the underlying enum value.
+  ///
+  /// `WebCaptureMode` is exported from `package:libcimbar/libcimbar.dart` so
+  /// the page can convert its string-backed dropdown state to the actual
+  /// enum the capture expects.
+  WebCaptureMode _captureModeForName(String name) {
+    for (final m in WebCaptureMode.values) {
+      if (m.name == name) return m;
+    }
+    return WebCaptureMode.fit; // safe default
   }
 
   /// How much of the frame the barcode must cover to still reach its native
@@ -1087,6 +1105,51 @@ class _DecoderPageState extends State<DecoderPage> {
                   ],
                   onChanged: (v) =>
                       setState(() => _resolutionIndex = v ?? _resolutionIndex),
+                ),
+              ),
+            ],
+          ),
+
+          // Capture framing: how the camera frame maps into the square
+          // decoder input. `fit` is the safe default (always keeps all 4
+          // anchors in view); `centerCrop` gives a bigger barcode when the
+          // subject is reliably centered; `alternate` mixes both.
+          Row(
+            children: [
+              Text('取景模式',
+                  style: Theme.of(context).textTheme.labelSmall),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButton<String>(
+                  isDense: true,
+                  isExpanded: true,
+                  value: _captureModeName,
+                  items: const [
+                    DropdownMenuItem<String>(
+                      value: 'fit',
+                      child: Text('Fit（整帧入框，最稳）',
+                          style: TextStyle(fontSize: 13)),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'centerCrop',
+                      child: Text('Center crop（条码大，需居中）',
+                          style: TextStyle(fontSize: 13)),
+                    ),
+                    DropdownMenuItem<String>(
+                      value: 'alternate',
+                      child: Text('Alternate（交替）',
+                          style: TextStyle(fontSize: 13)),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _captureModeName = v);
+                    // Apply immediately so the next captured frame uses
+                    // the new framing.
+                    try {
+                      (_camera as dynamic).captureMode = _captureModeForName(v);
+                    } catch (_) {}
+                  },
                 ),
               ),
             ],

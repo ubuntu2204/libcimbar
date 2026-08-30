@@ -60,5 +60,10 @@ export 'src/interfaces/image_compressor_interface.dart';
 // Platform interface (auto-selects implementation)
 export 'src/cimbar_platform.dart';
 
+// Capture framing modes (used by apps that need to switch between
+// center-crop and full-frame fit on the fly). Kept in a platform-neutral
+// model file so native builds never pull in `dart:js_interop`.
+export 'src/models/capture_mode.dart' show WebCaptureMode;
+
 // Implementations (for direct use or testing)
 export 'src/impl/avif_compressor.dart';

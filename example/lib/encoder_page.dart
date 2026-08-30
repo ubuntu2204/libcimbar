@@ -15,6 +15,35 @@ import 'core/debug_server.dart';
 import 'core/screenshot_capture.dart';
 import 'core/window_display.dart';
 
+/// Parsed summary of a diagnostic report pushed by the decoder (phone).
+///
+/// The reports are long plain-text dumps; the encoder UI only needs the
+/// verdict plus the one thing the operator should DO about it.
+class _ReportInfo {
+  /// One-line verdict, e.g. "找到 0/4 个角标".
+  final String headline;
+
+  /// Actionable advice for the operator.
+  final String hint;
+
+  /// Secondary facts (camera resolution, stream progress...), pre-formatted.
+  final String detail;
+
+  /// True when the report signals a failure.
+  final bool isError;
+
+  /// True when a file was fully recovered.
+  final bool isSuccess;
+
+  const _ReportInfo({
+    required this.headline,
+    required this.hint,
+    required this.detail,
+    this.isError = false,
+    this.isSuccess = false,
+  });
+}
+
 /// Encoder page -- Windows only.
 ///
 /// Screen capture -> AVIF compression -> cimbar encoding.
@@ -80,6 +109,16 @@ class _EncoderPageState extends State<EncoderPage>
   // server (poll/upload within the last few seconds).
   Timer? _linkTimer;
   bool _decoderLinked = false;
+
+  // Last diagnostic report pushed by the decoder (phone) via POST /report,
+  // parsed down to a headline + actionable hint so the encoder side can see
+  // WHY the phone cannot decode, instead of the report silently landing in
+  // the documents folder.
+  _ReportInfo? _lastReport;
+  DateTime? _lastReportAt;
+
+  // Last camera frame the decoder uploaded (POST /captured).
+  String? _lastRemoteCapturePath;
 
   @override
   void initState() {
@@ -207,6 +246,20 @@ class _EncoderPageState extends State<EncoderPage>
           // Script-driven loop (POST /decode-test): screenshot decode
           // self-test, returns the PASS/FAIL summary.
           return _runDecodeTest();
+        }
+        ..onReportReceived = (text) {
+          // The phone pushed a diagnostic report: surface it in the UI.
+          final info = _parseReport(text);
+          if (mounted) {
+            setState(() {
+              _lastReport = info;
+              _lastReportAt = DateTime.now();
+            });
+          }
+          _announceReport(info);
+        }
+        ..onCaptureReceived = (path) {
+          if (mounted) setState(() => _lastRemoteCapturePath = path);
         };
       final debugUrl = await DebugServer.instance.start();
 
@@ -377,6 +430,218 @@ class _EncoderPageState extends State<EncoderPage>
           ? '${pass ? '通过' : '未通过'} - 质量报告已保存：\n$path'
           : '质量报告保存失败。';
     });
+  }
+
+  // --- Decoder (phone) report handling ---
+
+  /// Compact card showing the latest decoder (phone) report verdict.
+  Widget _reportCard(_ReportInfo info) {
+    final cs = Theme.of(context).colorScheme;
+    final Color accent = info.isSuccess
+        ? Colors.green
+        : (info.isError ? Colors.redAccent : Colors.blueGrey);
+    final ts = _lastReportAt;
+    final time = ts == null
+        ? ''
+        : '${ts.hour.toString().padLeft(2, '0')}:'
+            '${ts.minute.toString().padLeft(2, '0')}:'
+            '${ts.second.toString().padLeft(2, '0')}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: accent.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Icon(
+                info.isSuccess
+                    ? Icons.check_circle
+                    : (info.isError ? Icons.error_outline : Icons.info_outline),
+                size: 14,
+                color: accent,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '手机报告${time.isEmpty ? '' : ' · $time'}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: accent),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            info.headline,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            info.hint,
+            style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.8)),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            info.detail,
+            style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.55)),
+          ),
+          if (_lastRemoteCapturePath != null) ...[
+            const SizedBox(height: 3),
+            Text(
+              '摄像头画面：${_lastRemoteCapturePath!.split(RegExp(r'[\\/]')).last}',
+              style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Reduce a decoder diagnostic report to a headline + one actionable hint.
+  ///
+  /// The phone pushes these via POST /report; without this the operator only
+  /// sees a file appear in the documents folder and has to open it manually
+  /// to learn why the scan is failing.
+  _ReportInfo _parseReport(String text) {
+    String? grab(String key, {String section = ''}) {
+      // Report lines pad the key with spaces before the colon, e.g.
+      // "Stream accum     : [ 0.6 ]" or "Recovered file   : (none)",
+      // so match on `key` + any whitespace + ':' rather than an exact prefix.
+      final re = RegExp('^${RegExp.escape(key)}\\s*:\\s*(.*)\$');
+      for (final line in text.split('\n')) {
+        final m = re.firstMatch(line.trim());
+        if (m != null) return m.group(1)!.trim();
+      }
+      return null;
+    }
+
+    final errLine = grab('scan_extract_decode failed') ??
+        (text.contains('[Last decode error]')
+            ? text
+                .split('[Last decode error]')
+                .last
+                .split('[')
+                .first
+                .trim()
+            : null);
+    final recovered = grab('Recovered file') ?? '(none)';
+    final accum = grab('Stream accum') ?? '';
+    final videoRes = grab('Video resolution') ?? '?';
+    final headroom = grab('Barcode headroom') ?? '';
+    final progress = grab('Progress') ?? '0.0%';
+    final frames = grab('Frames processed') ?? '0';
+
+    // "Stream accum : [ 0.614458 ] (received/required ...)" -> 0.614458
+    final accNum = RegExp(r'\[\s*([\d.]+)').firstMatch(accum)?.group(1);
+    final accText = accNum != null ? '累积 ${(double.parse(accNum) * 100).toStringAsFixed(0)}%' : '累积 —';
+    final detail = '摄像头 $videoRes ｜ $accText ｜ 已处理 $frames 帧';
+
+    // 1) Success — a file came back.
+    if (!recovered.contains('(none)') && recovered.isNotEmpty) {
+      return _ReportInfo(
+        headline: '解码成功：$recovered',
+        hint: '手机端已完整恢复文件。',
+        detail: detail,
+        isSuccess: true,
+      );
+    }
+
+    // 2) Anchor problems — the dominant real-world failure.
+    final anchorMatch =
+        RegExp(r'found (\d+) anchor', caseSensitive: false).firstMatch(
+      errLine ?? text,
+    );
+    if (anchorMatch != null) {
+      final n = int.tryParse(anchorMatch.group(1)!) ?? 0;
+      if (n == 0) {
+        return _ReportInfo(
+          headline: '手机端找不到角标（0/4）',
+          hint: '条码在画面里太小/模糊：请让手机靠近、把条码填满画面，'
+              '并确认对焦与反光正常。',
+          detail: detail,
+          isError: true,
+        );
+      }
+      return _ReportInfo(
+        headline: '手机端只找到 $n/4 个角标',
+        hint: '条码被裁切或偏离中心：请把四个角都收进画面（取景模式建议选 Fit），'
+            '并确认条码像素 ≥ 1024。',
+        detail: detail,
+        isError: true,
+      );
+    }
+
+    // 3) Accumulation overshoot — corrupt chunks mixed in.
+    final accVal = double.tryParse(accNum ?? '');
+    if (accVal != null && accVal > 1.0) {
+      return _ReportInfo(
+        headline: '喷泉流被污染（accum $accVal > 1.0）',
+        hint: '收到足够的块却无法组装：通常是同一条码的摄像头帧混入了坏块。'
+            '请停止扫描后重新编码再试。',
+        detail: detail,
+        isError: true,
+      );
+    }
+
+    // 4) Still working — report progress.
+    if (errLine == null || errLine.isEmpty) {
+      return _ReportInfo(
+        headline: '手机端解码进行中（$progress）',
+        hint: headroom.startsWith('LOW') || headroom.startsWith('TIGHT')
+            ? '注意：$headroom'
+            : '继续扫描直到累积进度达到 1.0。',
+        detail: detail,
+      );
+    }
+
+    return _ReportInfo(
+      headline: '手机端解码失败',
+      hint: errLine,
+      detail: detail,
+      isError: true,
+    );
+  }
+
+  /// Show a transient snackbar so a report arriving is impossible to miss
+  /// even when the side panel is scrolled out of view.
+  void _announceReport(_ReportInfo info) {
+    if (!mounted) return;
+    final ctx = context;
+    final color = info.isSuccess
+        ? Colors.green
+        : (info.isError ? Colors.redAccent : Colors.blueGrey);
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              info.isSuccess
+                  ? Icons.check_circle
+                  : (info.isError ? Icons.error_outline : Icons.info_outline),
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(info.headline)),
+          ],
+        ),
+        backgroundColor: color,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   // --- Screenshot → decode loopback self-test ---
@@ -846,6 +1111,12 @@ class _EncoderPageState extends State<EncoderPage>
                             ),
                           ],
                         ),
+                        // Latest report pushed by the decoder (phone): the
+                        // verdict + the one thing to do about it.
+                        if (_lastReport != null) ...[
+                          const SizedBox(height: 8),
+                          _reportCard(_lastReport!),
+                        ],
                         const SizedBox(height: 6),
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,9 +6,11 @@ libcimbar Web/Android 解码接收端示例应用。
 
 ```bash
 # Web
-cd decode_example
+
+
+cd ~/project/libcimbar/decode_example
 adb reverse tcp:8080 tcp:8080
-flutter run -d web-server --release --web-port 8080
+flutter run -d web-server --release --web-port 8080 --web-hostname 0.0.0.0
 
 
 

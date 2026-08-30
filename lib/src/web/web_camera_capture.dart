@@ -12,26 +12,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../interfaces/camera_capture_interface.dart';
-
-/// How the camera frame is mapped into the square decoder input.
-enum WebCaptureMode {
-  /// Fit the *entire* video frame into the target square, preserving aspect
-  /// ratio (letterboxed). Nothing is cropped, so all four cimbar anchors stay
-  /// in view even when the barcode is off-center.
-  fit,
-
-  /// Crop the largest centered square from the video frame. Yields a larger
-  /// barcode when it is well-centered, but drops content (and anchors) that
-  /// fall outside the center square.
-  centerCrop,
-
-  /// Alternate between [centerCrop] and [fit] on successive frames.
-  /// centerCrop frames give a large, detailed barcode when it is centered;
-  /// fit frames guarantee all four anchors stay in view when the barcode
-  /// (or monitor) extends past the center square. Whichever framing
-  /// satisfies the 4-anchor scan first wins. Recommended default.
-  alternate,
-}
+import '../models/capture_mode.dart';
 
 // ─── JS interop declarations (top-level only) ───────────────────
 
@@ -117,12 +98,15 @@ class WebCameraCapture implements ICameraCapture {
 
   /// How the video frame is mapped into the square decoder input.
   ///
-  /// Defaults to [WebCaptureMode.alternate]: frames flip between a native-
-  /// resolution center crop (large barcode) and a letterboxed full-frame fit
-  /// (all anchors guaranteed in view). This rescues the common failure where
-  /// the center crop of a landscape camera chops one side of the barcode
-  /// (scan reports exactly 2 of 4 anchors).
-  WebCaptureMode captureMode = WebCaptureMode.alternate;
+  /// Defaults to [WebCaptureMode.fit]: the entire camera frame is letterboxed
+  /// into the decoder input, so all four corner anchors are ALWAYS in view
+  /// regardless of where the monitor/barcode sits in the camera view. This is
+  /// the safe choice when the phone is hand-held — the monitor rarely ends up
+  /// centered in the frame, and a center crop will cut the top or bottom of
+  /// the barcode (losing two anchors and breaking the scan). `alternate` and
+  /// `centerCrop` are kept available for setups where the subject is reliably
+  /// centered and every extra pixel matters.
+  WebCaptureMode captureMode = WebCaptureMode.fit;
 
   /// Upper bound for the square decoder input, in pixels.
   ///
@@ -369,16 +353,28 @@ class WebCameraCapture implements ICameraCapture {
     final clampedArray = jsData as JSUint8ClampedArray;
     final rgbaPixels = Uint8List.fromList(clampedArray.toDart);
 
-    // Hand the frame to the decoder as RGBA (format 4). The native
-    // cimbard_scan_extract_decode() converts RGBA->RGB itself with OpenCV
-    // (cimbar_recv_js.cpp get_rgb()), which is far faster than stripping the
-    // alpha channel in a Dart loop — that loop alone cost ~100 ms per frame
-    // at 4K capture sizes and starved the scan step.
+    // Strip the alpha channel here and hand the decoder RGB (format 3).
+    //
+    // The WASM build's RGBA->RGB conversion path (getUMat + cvtColor with
+    // COLOR_RGBA2RGB) is unreliable on Emscripten — the OpenCV.js backend
+    // falls back to a Mat path that mangles 4-channel data, and the anchor
+    // scanner then reports 0 anchors on frames that decode perfectly when
+    // the same data is fed to the native FFI. The Dart loop below is the
+    // only reliable way to hand RGB to WASM; at 2048x2048 it costs ~50-80 ms
+    // per frame, which is acceptable at the 5 fps default capture rate.
+    final pixelCount = targetSize * targetSize;
+    final rgbPixels = Uint8List(pixelCount * 3);
+    for (int i = 0; i < pixelCount; i++) {
+      rgbPixels[i * 3] = rgbaPixels[i * 4];
+      rgbPixels[i * 3 + 1] = rgbaPixels[i * 4 + 1];
+      rgbPixels[i * 3 + 2] = rgbaPixels[i * 4 + 2];
+    }
+
     _callback!(CameraFrame(
-      data: rgbaPixels,
+      data: rgbPixels,
       width: targetSize,
       height: targetSize,
-      format: 'rgba',
+      format: 'rgb',
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
   }

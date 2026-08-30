@@ -56,6 +56,15 @@ class DebugServer {
   /// fountain stream completes.
   Future<String> Function()? onDecodeTest;
 
+  /// Called when the decoder uploads a diagnostic report (POST /report).
+  /// Receives the raw report text so the encoder UI can surface what the
+  /// decoder is seeing, instead of the report silently landing on disk.
+  void Function(String reportText)? onReportReceived;
+
+  /// Called when the decoder uploads a camera capture (POST /captured).
+  /// Receives the saved file path.
+  void Function(String savedPath)? onCaptureReceived;
+
   // PNG cache: polls are usually faster than the display frame rate, so
   // avoid re-encoding the same frame over and over.
   int _cachedIndex = -1;
@@ -139,15 +148,29 @@ class DebugServer {
           res.add(png);
         }
       } else if (req.method == 'POST' && req.uri.path == '/captured') {
-        final path =
-            await _saveUpload('_remote_capture.png', await _readBody(req));
+        final bytes = await _readBody(req);
+        final path = await _saveUpload('_remote_capture.png', bytes);
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode({'saved': path}));
+        if (path != null) {
+          // Surface it in the encoder UI: the engineer can then see at a
+          // glance what the phone's camera is actually pointed at.
+          onCaptureReceived?.call(path);
+        }
       } else if (req.method == 'POST' && req.uri.path == '/report') {
-        final path = await _saveUpload(
-            '_remote_decode_report.txt', await _readBody(req));
+        final body = await _readBody(req);
+        final path = await _saveUpload('_remote_decode_report.txt', body);
         res.headers.contentType = ContentType.json;
         res.write(jsonEncode({'saved': path}));
+        // Notify the UI. Reports are the main "why can't the phone decode
+        // this" signal, so they must be visible, not just saved.
+        String text = '';
+        try {
+          text = const Utf8Decoder().convert(body);
+        } catch (_) {
+          text = '';
+        }
+        onReportReceived?.call(text);
       } else if (req.method == 'POST' && req.uri.path == '/encode-test') {
         final hook = onEncodeTest;
         if (hook == null) {
