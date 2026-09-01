@@ -117,8 +117,13 @@ class _EncoderPageState extends State<EncoderPage>
   _ReportInfo? _lastReport;
   DateTime? _lastReportAt;
 
-  // Last camera frame the decoder uploaded (POST /captured).
+  // Last camera frame the decoder uploaded (POST /captured) — the
+  // PROCESSED frame that was actually fed to the decoder engine.
   String? _lastRemoteCapturePath;
+
+  // Last RAW camera photo the decoder uploaded (POST /raw) — the
+  // unprocessed frame straight off the sensor, before crop/scale.
+  String? _lastRawCapturePath;
 
   @override
   void initState() {
@@ -260,6 +265,13 @@ class _EncoderPageState extends State<EncoderPage>
         }
         ..onCaptureReceived = (path) {
           if (mounted) setState(() => _lastRemoteCapturePath = path);
+        }
+        ..onRawCaptureReceived = (path) {
+          // Raw camera photo: unprocessed ground truth of what the phone's
+          // sensor actually saw (before cropping/scaling). Compare it with
+          // the processed capture to separate a framing problem from a
+          // real decode problem.
+          if (mounted) setState(() => _lastRawCapturePath = path);
         };
       final debugUrl = await DebugServer.instance.start();
 
@@ -499,7 +511,15 @@ class _EncoderPageState extends State<EncoderPage>
           if (_lastRemoteCapturePath != null) ...[
             const SizedBox(height: 3),
             Text(
-              '摄像头画面：${_lastRemoteCapturePath!.split(RegExp(r'[\\/]')).last}',
+              '加工帧（喂解码器）：${_lastRemoteCapturePath!.split(RegExp(r'[\\/]')).last}',
+              style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (_lastRawCapturePath != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              '原始帧（未加工）：${_lastRawCapturePath!.split(RegExp(r'[\\/]')).last}',
               style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
               overflow: TextOverflow.ellipsis,
             ),
@@ -1315,6 +1335,23 @@ class _EncoderPageState extends State<EncoderPage>
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
       windowManager.removeListener(this);
     }
+    // Stop the LAN debug server and detach every hook.
+    //
+    // Leaving the HttpServer listening keeps the port bound across
+    // hot-restarts, and its callbacks still point at this (now disposed)
+    // State — a request arriving during shutdown would run setState() on an
+    // unmounted widget and race the Flutter/GTK teardown, which is what
+    // produces "g_mutex_clear() called on uninitialised or locked mutex"
+    // and "Lost connection to device" on exit.
+    unawaited(DebugServer.instance.stop());
+    DebugServer.instance
+      ..frameProvider = null
+      ..statusProvider = null
+      ..onEncodeTest = null
+      ..onDecodeTest = null
+      ..onReportReceived = null
+      ..onCaptureReceived = null
+      ..onRawCaptureReceived = null;
     _frameAnimationController?.dispose();
     for (final img in _decodedFrames) {
       img.dispose();

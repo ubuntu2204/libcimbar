@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import 'dart:async';
+import 'dart:convert' show base64Decode;
 import 'dart:js_interop';
 import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
@@ -61,6 +62,13 @@ Future<JSAny?> _jsAwait(JSPromise<JSAny?> promise) {
 class WebCameraCapture implements ICameraCapture {
   JSObject? _video;
   JSObject? _ctx;
+
+  /// The offscreen canvas itself (not just its context).
+  ///
+  /// Needed as the *source* when re-drawing a cropped region back into the
+  /// canvas: `ctx.drawImage(...)` accepts only image sources (canvas/video/
+  /// image elements), never a 2D context.
+  JSObject? _canvas;
   JSObject? _stream;
   Timer? _frameTimer;
   CameraFrameCallback? _callback;
@@ -205,6 +213,7 @@ class WebCameraCapture implements ICameraCapture {
     _setProp(canvas, 'height', _targetSize.toJS);
     final getCtx = _reflectGet(canvas, 'getContext'.toJS) as JSFunction?;
     _ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
+    _canvas = canvas;
 
     // Register video element as a Flutter platform view
     _viewType = 'libcimbar-camera-${DateTime.now().millisecondsSinceEpoch}';
@@ -345,13 +354,119 @@ class WebCameraCapture implements ICameraCapture {
     final getImageData = _reflectGet(ctx, 'getImageData'.toJS) as JSFunction?;
     final imageData = getImageData?.callAsFunction(
         ctx, 0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS) as JSObject?;
-    if (imageData == null) return;
+    if (imageData == null) {
+      // Without this the frame is dropped in silence and the UI just says
+      // "no frame captured yet" while the preview looks perfectly fine.
+      debugPrint('[Camera] getImageData returned null — frame dropped');
+      return;
+    }
 
     final jsData = _reflectGet(imageData, 'data'.toJS);
-    if (jsData == null) return;
+    if (jsData == null) {
+      debugPrint('[Camera] imageData.data missing — frame dropped');
+      return;
+    }
 
     final clampedArray = jsData as JSUint8ClampedArray;
     final rgbaPixels = Uint8List.fromList(clampedArray.toDart);
+
+    // ----- Auto-crop to the cimbar region -----
+    //
+    // The raw camera frame often has a lot of wasted background (e.g. a
+    // portrait phone photographing a monitor on a desk: large black bars
+    // on the sides, the wall above, the desk below). Without cropping, all
+    // that space gets upscaled into the 2048x2048 decoder input — the
+    // cimbar ends up at ~30% of the frame and the scanner's anchor search
+    // window has to traverse thousands of useless black pixels.
+    //
+    // A quick stride scan for saturated/colored pixels (the cimbar's
+    // bright cells) finds the actual barcode bounding box. If that box is
+    // much smaller than the canvas, we redraw only the cropped + upscaled
+    // content into the canvas, then proceed as before.
+    //
+    // At stride=16, a 2048x2048 canvas samples ~16K pixels — well under
+    // a frame budget.
+    Uint8List rgbaForDecoder = rgbaPixels;
+    int frameW = targetSize, frameH = targetSize;
+    // The whole auto-crop step is best-effort. It is only an optimisation,
+    // so any failure here must never stop the frame from reaching the
+    // decoder — a thrown exception used to silently kill every capture.
+    try {
+      const int stride = 16;
+      const int satThresh = 50;
+      int minX = targetSize, minY = targetSize, maxX = -1, maxY = -1;
+      for (int y = 0; y < targetSize; y += stride) {
+        final rowBase = y * targetSize * 4;
+        for (int x = 0; x < targetSize; x += stride) {
+          final i = rowBase + x * 4;
+          final r = rgbaPixels[i];
+          final g = rgbaPixels[i + 1];
+          final b = rgbaPixels[i + 2];
+          final int mn = r < g
+              ? (r < b ? r : b)
+              : (g < b ? g : b);
+          final int mx = r > g
+              ? (r > b ? r : b)
+              : (g > b ? g : b);
+          if (mx - mn >= satThresh) {
+            if (x < minX) minX = x;
+            if (y < minY) minY = y;
+            if (x > maxX) maxX = x;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (maxX >= minX && maxY >= minY) {
+        // Pad the bbox by one stride in each direction so the upscaled
+        // crop preserves a few pixels of dark margin around the barcode
+        // (helps the Otsu threshold near the edges).
+        minX = (minX - stride).clamp(0, targetSize - 1);
+        minY = (minY - stride).clamp(0, targetSize - 1);
+        maxX = (maxX + stride).clamp(0, targetSize - 1);
+        maxY = (maxY + stride).clamp(0, targetSize - 1);
+        final bboxW = maxX - minX + 1;
+        final bboxH = maxY - minY + 1;
+        final bboxArea = bboxW * bboxH;
+        final canvasArea = targetSize * targetSize;
+        // Only crop when the bbox is meaningfully smaller than the canvas —
+        // for a tightly framed capture the bbox spans most of the canvas
+        // and cropping would lose no overhead.
+        if (bboxArea < canvasArea * 7 ~/ 10 &&
+            _canvas != null &&
+            drawImage != null) {
+          // Redraw the cropped + upscaled region back into the canvas.
+          //
+          // The first argument must be an *image source* (here the canvas
+          // element itself) — passing the 2D context instead makes the
+          // browser throw a TypeError, which used to abort the whole
+          // capture so no frame ever reached the decoder (the camera
+          // preview still showed a picture, so it looked like it worked).
+          final drawArgs = [
+            _canvas!,
+            minX.toJS, minY.toJS, bboxW.toJS, bboxH.toJS,
+            0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS,
+          ].toJS;
+          _reflectApply(drawImage, ctx, drawArgs);
+          // Re-read the canvas.
+          final imageData2 = getImageData?.callAsFunction(
+              ctx, 0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS)
+              as JSObject?;
+          if (imageData2 != null) {
+            final jsData2 = _reflectGet(imageData2, 'data'.toJS);
+            if (jsData2 != null) {
+              rgbaForDecoder = Uint8List.fromList(
+                  (jsData2 as JSUint8ClampedArray).toDart);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Auto-crop is purely an optimisation — never let it stop a frame
+      // from reaching the decoder. Fall back to the uncropped pixels so
+      // capture keeps working even if this path breaks.
+      debugPrint('[Camera] auto-crop failed, using full frame: $e');
+      rgbaForDecoder = rgbaPixels;
+    }
 
     // Strip the alpha channel here and hand the decoder RGB (format 3).
     //
@@ -362,21 +477,61 @@ class WebCameraCapture implements ICameraCapture {
     // the same data is fed to the native FFI. The Dart loop below is the
     // only reliable way to hand RGB to WASM; at 2048x2048 it costs ~50-80 ms
     // per frame, which is acceptable at the 5 fps default capture rate.
-    final pixelCount = targetSize * targetSize;
+    final pixelCount = frameW * frameH;
     final rgbPixels = Uint8List(pixelCount * 3);
     for (int i = 0; i < pixelCount; i++) {
-      rgbPixels[i * 3] = rgbaPixels[i * 4];
-      rgbPixels[i * 3 + 1] = rgbaPixels[i * 4 + 1];
-      rgbPixels[i * 3 + 2] = rgbaPixels[i * 4 + 2];
+      rgbPixels[i * 3] = rgbaForDecoder[i * 4];
+      rgbPixels[i * 3 + 1] = rgbaForDecoder[i * 4 + 1];
+      rgbPixels[i * 3 + 2] = rgbaForDecoder[i * 4 + 2];
     }
 
     _callback!(CameraFrame(
       data: rgbPixels,
-      width: targetSize,
-      height: targetSize,
+      width: frameW,
+      height: frameH,
       format: 'rgb',
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
+  }
+
+  /// Grab the RAW camera frame exactly as the sensor delivered it — no
+  /// cropping, no scaling, no RGBA→RGB conversion, no auto-crop.
+  ///
+  /// This is the ground truth for "what did the camera actually see".
+  /// Comparing it against the processed frame handed to the decoder is what
+  /// tells you whether a failure is a framing/scale problem (the raw shot
+  /// looks fine but the crop cut the anchors) or a genuine decode problem
+  /// (the raw shot itself is blurry / too small / badly lit).
+  ///
+  /// Returns PNG bytes, or null if the video is not ready.
+  Future<Uint8List?> captureRawFramePng() async {
+    final video = _video;
+    if (video == null) return null;
+    final vw = _getIntProp(video, 'videoWidth') ?? _videoWidth;
+    final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
+    if (vw <= 0 || vh <= 0) return null;
+
+    // Canvas at the camera's native resolution (e.g. 2176x3840).
+    final canvas = _createElement('canvas');
+    _setProp(canvas, 'width', vw.toJS);
+    _setProp(canvas, 'height', vh.toJS);
+    final getCtx = _reflectGet(canvas, 'getContext'.toJS) as JSFunction?;
+    final ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
+    if (ctx == null) return null;
+
+    final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
+    if (drawImage == null) return null;
+    _reflectApply(
+        drawImage, ctx, [video, 0.toJS, 0.toJS, vw.toJS, vh.toJS].toJS);
+
+    final toDataURL = _reflectGet(canvas, 'toDataURL'.toJS) as JSFunction?;
+    if (toDataURL == null) return null;
+    final url = toDataURL.callAsFunction(canvas, 'image/png'.toJS) as JSString?;
+    if (url == null) return null;
+    final dataUrl = url.toDart;
+    final comma = dataUrl.indexOf(',');
+    if (comma < 0) return null;
+    return base64Decode(dataUrl.substring(comma + 1));
   }
 
   @override
@@ -416,6 +571,7 @@ class WebCameraCapture implements ICameraCapture {
 
     _video = null;
     _ctx = null;
+    _canvas = null;
     _viewType = null;
     _streaming = false;
   }

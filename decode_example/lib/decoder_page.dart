@@ -271,15 +271,52 @@ class _DecoderPageState extends State<DecoderPage> {
       (_camera as dynamic).captureMode = _captureModeForName(_captureModeName);
     } catch (_) {}
 
-    await _camera!.start(
-      preferredWidth: res.width,
-      preferredHeight: res.height,
-      frameIntervalMs: (1000 / _captureFps).round(),
-    );
+    try {
+      await _camera!.start(
+        preferredWidth: res.width,
+        preferredHeight: res.height,
+        frameIntervalMs: (1000 / _captureFps).round(),
+      );
+    } catch (e) {
+      // Without this the exception escapes, the state stays "active" and
+      // every frame-dependent control (截图, and the report upload) is left
+      // grey with no explanation. The dominant cause on a phone is insecure
+      // origin: getUserMedia is only allowed on HTTPS or localhost, so
+      // http://<lan-ip>:8080 silently refuses the camera.
+      if (mounted) {
+        setState(() {
+          _isCameraActive = false;
+          _isDecoding = false;
+          _statusMessage = _cameraStartError(e);
+        });
+      }
+      return;
+    }
 
     _camera!.onFrame((frame) {
       _processCameraFrame(frame);
     });
+  }
+
+  /// Explain why the camera could not start, with the insecure-origin case
+  /// called out explicitly because it is by far the most common on phones.
+  String _cameraStartError(Object e) {
+    if (kIsWeb) {
+      final scheme = Uri.base.scheme.toLowerCase();
+      final host = Uri.base.host.toLowerCase();
+      final isLocalhost = host == 'localhost' || host == '127.0.0.1';
+      if (scheme != 'https' && !isLocalhost) {
+        return '浏览器拒绝了摄像头：当前页面来源不安全'
+            '（$scheme://$host）。\n'
+            'getUserMedia（摄像头）仅在 HTTPS 或 localhost 下可用，'
+            '用 http://$host 访问时会被静默拒绝。\n'
+            '解决办法（任选一）：\n'
+            '  1) USB 连电脑执行 adb reverse tcp:8080 tcp:8080，'
+            '然后手机访问 http://localhost:8080\n'
+            '  2) 改用 HTTPS 访问';
+      }
+    }
+    return '摄像头启动失败：$e';
   }
 
   Future<void> _stopCamera() async {
@@ -292,6 +329,11 @@ class _DecoderPageState extends State<DecoderPage> {
       _isDecoding = false;
       _statusMessage = '摄像头已停止。';
     });
+    // A scan just ended: if we are linked to the example client, ship the
+    // diagnostic report right away. That data is the whole point of the
+    // link, so it must not depend on the operator remembering to press a
+    // button (the manual 上传画面 button has been removed).
+    unawaited(_autoUploadReport());
   }
 
   int _debugFrameCount = 0;
@@ -299,6 +341,10 @@ class _DecoderPageState extends State<DecoderPage> {
   Future<void> _processCameraFrame(CameraFrame frame) async {
     if (!_isDecoding || _decoder == null) return;
     _lastFrame = frame;
+    // Rebuild now so the frame-dependent UI (screenshot / upload, and the
+    // diagnostic report's "last camera frame") reflects this frame even if
+    // the decode below throws and skips the setState at the end.
+    if (mounted) setState(() {});
 
     try {
       final imageFormat = switch (frame.format) {
@@ -352,6 +398,9 @@ class _DecoderPageState extends State<DecoderPage> {
       debugPrint('Frame decode stack:\n$stack');
       debugPrint('Frame info: ${frame.width}x${frame.height}, '
           'format=${frame.format}, data=${frame.data.length} bytes');
+      // Keep the UI in sync: the frame exists, so surface that it failed
+      // instead of leaving the status and controls stale.
+      if (mounted) setState(() => _statusMessage = '帧解码异常：$e');
     }
   }
 
@@ -393,11 +442,23 @@ class _DecoderPageState extends State<DecoderPage> {
     return byteData?.buffer.asUint8List();
   }
 
-  /// Save camera frame as PNG for debugging
+  /// Save camera frame as PNG for debugging.
+  ///
+  /// Stores the frame locally (download on web / file on desktop) AND pushes
+  /// both versions to the example (encoder) client for analysis:
+  ///  * the PROCESSED frame — exactly what was handed to the decoder
+  ///    (cropped, scaled, converted), saved as `*_remote_capture.png`
+  ///  * the RAW camera photo — straight off the sensor with no cropping,
+  ///    scaling or format conversion, saved as `*_raw_capture.png`
+  ///
+  /// Having both is what tells a framing/scale problem (raw looks fine but
+  /// the crop lost the anchors) apart from a genuine decode problem (the
+  /// raw shot itself is blurry, too small or badly lit).
   Future<void> _screenshotFrame() async {
     final frame = _lastFrame;
     if (frame == null) {
-      _statusMessage = '还没有捕获到画面帧。';
+      _statusMessage = '还没有捕获到画面帧 — 请先点「启动摄像头」，'
+          '等采到第一帧后再截图。';
       setState(() {});
       return;
     }
@@ -409,6 +470,7 @@ class _DecoderPageState extends State<DecoderPage> {
         // On web, trigger download via JS
         _downloadBytesWeb(pngBytes,
             '${_timestampPrefix()}_cimbar_frame_${frame.width}x${frame.height}.png');
+        _statusMessage = '加工后的帧已下载。';
       } else {
         final dir = await getApplicationDocumentsDirectory();
         final path =
@@ -417,9 +479,76 @@ class _DecoderPageState extends State<DecoderPage> {
         _statusMessage = '画面帧已保存：$path';
       }
       setState(() {});
+
+      // Push both versions to the example client for analysis.
+      await _uploadProcessedAndRaw(pngBytes);
     } catch (e) {
       _statusMessage = '截图出错：$e';
       setState(() {});
+    }
+  }
+
+  /// Upload the processed frame and the RAW camera photo to the example
+  /// client so both end up side by side in `libcimbar_screenshots`.
+  Future<void> _uploadProcessedAndRaw(Uint8List processedPng) async {
+    if (_debugBaseUrl.isEmpty) {
+      setState(() => _statusMessage =
+          '$_statusMessage\n未填编码器地址，未上传（加工帧 + 原始帧）。');
+      return;
+    }
+
+    final uploaded = <String>[];
+    final failed = <String>[];
+
+    // 1) Processed frame — what the decoder actually consumed.
+    try {
+      final r = await http
+          .post(Uri.parse('$_debugBaseUrl/captured'),
+              headers: {'Content-Type': 'application/octet-stream'},
+              body: processedPng)
+          .timeout(const Duration(seconds: 10));
+      if (r.statusCode == 200) {
+        uploaded.add('加工帧');
+      } else {
+        failed.add('加工帧(HTTP ${r.statusCode})');
+      }
+    } catch (e) {
+      failed.add('加工帧($e)');
+    }
+
+    // 2) RAW camera photo — unprocessed ground truth.
+    try {
+      final rawPng =
+          await (_camera as dynamic).captureRawFramePng() as Uint8List?;
+      if (rawPng == null) {
+        failed.add('原始帧(无法获取)');
+      } else {
+        final r = await http
+            .post(Uri.parse('$_debugBaseUrl/raw'),
+                headers: {'Content-Type': 'application/octet-stream'},
+                body: rawPng)
+            .timeout(const Duration(seconds: 30));
+        if (r.statusCode == 200) {
+          uploaded.add('原始帧');
+        } else {
+          failed.add('原始帧(HTTP ${r.statusCode})');
+        }
+      }
+    } catch (e) {
+      failed.add('原始帧($e)');
+    }
+
+    if (mounted) {
+      setState(() {
+        final buf = StringBuffer(_statusMessage);
+        if (uploaded.isNotEmpty) {
+          buf.write('\n已上传：${uploaded.join('、')}');
+        }
+        if (failed.isNotEmpty) {
+          buf.write('\n上传失败：${failed.join('、')}');
+        }
+        _statusMessage = buf.toString();
+      });
     }
   }
 
@@ -624,38 +753,45 @@ class _DecoderPageState extends State<DecoderPage> {
     }
   }
 
-  /// Push our camera view (PNG) + diagnostic report to the encoder machine,
-  /// where they are saved date-prefixed for side-by-side comparison.
-  Future<void> _uploadToEncoder() async {
-    if (_debugBaseUrl.isEmpty) {
-      setState(() => _statusMessage = '请填写编码器调试服务器地址。');
-      return;
-    }
+  /// Push the diagnostic report to the example (encoder) client without any
+  /// user interaction.
+  ///
+  /// Called automatically when a scan stops. The report is the whole point
+  /// of the debug link — it carries the anchor counts, stream progress and
+  /// brightness stats that explain why the phone could or could not decode —
+  /// so it must not depend on the operator remembering to press a button.
+  ///
+  /// No-ops when no encoder address is configured, or when the client is
+  /// not actually reachable (so stopping a scan offline stays silent rather
+  /// than showing a spurious upload error).
+  Future<void> _autoUploadReport() async {
+    if (_debugBaseUrl.isEmpty) return;
+
     try {
-      var uploaded = 0;
-      // Refresh encoder status so the uploaded report covers both ends.
-      await _syncWithEncoder();
-      final png = await _lastFramePng();
-      if (png != null) {
-        final r = await http
-            .post(Uri.parse('$_debugBaseUrl/captured'),
-                headers: {'Content-Type': 'application/octet-stream'},
-                body: png)
-            .timeout(const Duration(seconds: 5));
-        if (r.statusCode == 200) uploaded++;
-      }
-      final r2 = await http
+      // Only ship it when the client is really there: a quick /status probe.
+      final st = await _fetchEncoderStatus();
+      if (st == null) return; // not linked — nothing to do
+
+      final r = await http
           .post(Uri.parse('$_debugBaseUrl/report'),
               headers: {'Content-Type': 'text/plain; charset=utf-8'},
               body: utf8.encode(_buildDiagnosticReport()))
-          .timeout(const Duration(seconds: 5));
-      if (r2.statusCode == 200) uploaded++;
-      _statusMessage = '已上传 $uploaded 项到编码器'
-          '（摄像头画面 + 报告，保存在 libcimbar_screenshots）。';
+          .timeout(const Duration(seconds: 10));
+
+      if (mounted) {
+        setState(() {
+          _statusMessage = r.statusCode == 200
+              ? '$_statusMessage\n报告已自动上传到 example 客户端。'
+              : '$_statusMessage\n报告自动上传失败'
+                  '（HTTP ${r.statusCode}）。';
+        });
+      }
     } catch (e) {
-      _statusMessage = '上传失败：$e';
+      if (mounted) {
+        setState(
+            () => _statusMessage = '$_statusMessage\n报告自动上传失败：$e');
+      }
     }
-    setState(() {});
   }
 
   // ─── Diagnostic report ────────────────────────────────────────
@@ -1183,7 +1319,10 @@ class _DecoderPageState extends State<DecoderPage> {
             children: [
               Expanded(
                 child: FilledButton.tonalIcon(
-                  onPressed: _lastFrame != null ? _screenshotFrame : null,
+                  // Always enabled: a disabled (grey) button gave no clue
+                  // why it could not be pressed. With no frame yet the
+                  // handler tells the user what to do instead.
+                  onPressed: _screenshotFrame,
                   icon: const Icon(Icons.camera_alt),
                   label: const Text('截图'),
                 ),
@@ -1231,6 +1370,9 @@ class _DecoderPageState extends State<DecoderPage> {
             ],
           ),
           const SizedBox(height: 8),
+          // The 上传画面 button was removed: the report now ships itself
+          // automatically when a scan stops (see [_autoUploadReport]), and
+          // camera frames are pushed by 截图 (processed + raw).
           Row(
             children: [
               Expanded(
@@ -1239,14 +1381,6 @@ class _DecoderPageState extends State<DecoderPage> {
                   icon:
                       Icon(_remotePolling ? Icons.stop : Icons.cloud_download),
                   label: Text(_remotePolling ? '停止' : '拉取解码'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _lastFrame != null ? _uploadToEncoder : null,
-                  icon: const Icon(Icons.cloud_upload),
-                  label: const Text('上传画面'),
                 ),
               ),
             ],
@@ -1342,7 +1476,10 @@ class _DecoderPageState extends State<DecoderPage> {
           children: [
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: _lastFrame != null ? _screenshotFrame : null,
+                // Always enabled, same as the panel 截图 button: a greyed
+                // button gives no clue why it cannot be pressed. With no
+                // frame captured yet the handler explains what to do.
+                onPressed: _screenshotFrame,
                 icon: const Icon(Icons.camera_alt),
                 label: const Text('截图'),
               ),

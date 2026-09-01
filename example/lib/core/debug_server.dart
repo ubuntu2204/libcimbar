@@ -9,8 +9,12 @@
 //   GET  /frame.png   -> the CURRENTLY DISPLAYED cimbar frame, lossless PNG.
 //                        The decoder can decode these pristine frames to
 //                        verify the whole WASM pipeline without any camera.
-//   POST /captured    -> decoder uploads its captured camera frame (PNG);
-//                        saved date-prefixed for side-by-side comparison.
+//   POST /captured    -> decoder uploads the PROCESSED frame it handed to
+//                        the decoder engine (cropped/scaled/RGB).
+//   POST /raw         -> decoder uploads the RAW camera photo straight off
+//                        the sensor (no crop/scale/conversion). Comparing
+//                        /captured against /raw tells a framing problem
+//                        from a genuine decode problem.
 //   POST /report      -> decoder uploads its diagnostic report (text).
 //   POST /encode-test -> encode the deterministic test payload (async).
 //   POST /decode-test -> run the screenshot decode self-test; the response
@@ -65,6 +69,13 @@ class DebugServer {
   /// Receives the saved file path.
   void Function(String savedPath)? onCaptureReceived;
 
+  /// Called when the decoder uploads its RAW camera photo (POST /raw) — the
+  /// unprocessed frame straight off the sensor, before any cropping, scaling
+  /// or pixel-format conversion. Kept alongside the processed capture so the
+  /// two can be compared: it is the only way to tell "the camera never saw
+  /// the barcode properly" apart from "the decoder mangled a good frame".
+  void Function(String savedPath)? onRawCaptureReceived;
+
   // PNG cache: polls are usually faster than the display frame rate, so
   // avoid re-encoding the same frame over and over.
   int _cachedIndex = -1;
@@ -81,22 +92,41 @@ class DebugServer {
   /// failure (e.g. port already in use).
   Future<String?> start({int port = 8765}) async {
     if (_server != null) return describeEndpoints();
-    try {
-      _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
-      _server!.listen(_handle,
-          onError: (Object e) => debugPrint('[DebugServer] listen error: $e'));
-      final eps = await describeEndpoints();
-      debugPrint('[DebugServer] listening on $eps');
-      return eps;
-    } catch (e) {
-      debugPrint('[DebugServer] bind failed: $e');
-      return null;
+    // Retry briefly: after a hot restart the previous instance's close()
+    // may not have released the port yet, and a failed bind would leave
+    // the phone with no debug server at all.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
+        _server!.listen(_handle,
+            onError: (Object e) => debugPrint('[DebugServer] listen error: $e'));
+        final eps = await describeEndpoints();
+        debugPrint('[DebugServer] listening on $eps');
+        return eps;
+      } catch (e) {
+        if (attempt == 2) {
+          debugPrint('[DebugServer] bind failed: $e');
+          return null;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
     }
+    return null;
   }
 
+  /// Stop listening and release the port.
+  ///
+  /// Safe to call repeatedly (e.g. from dispose during a hot restart) and
+  /// swallows errors, so a failed close can never abort the widget teardown.
   Future<void> stop() async {
-    await _server?.close(force: true);
+    final srv = _server;
     _server = null;
+    if (srv == null) return;
+    try {
+      await srv.close(force: true);
+    } catch (e) {
+      debugPrint('[DebugServer] close error: $e');
+    }
   }
 
   /// URL(s) the decoder can reach, e.g. `http://192.168.1.5:8765`.
@@ -156,6 +186,14 @@ class DebugServer {
           // Surface it in the encoder UI: the engineer can then see at a
           // glance what the phone's camera is actually pointed at.
           onCaptureReceived?.call(path);
+        }
+      } else if (req.method == 'POST' && req.uri.path == '/raw') {
+        final bytes = await _readBody(req);
+        final path = await _saveUpload('_raw_capture.png', bytes);
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode({'saved': path}));
+        if (path != null) {
+          onRawCaptureReceived?.call(path);
         }
       } else if (req.method == 'POST' && req.uri.path == '/report') {
         final body = await _readBody(req);
