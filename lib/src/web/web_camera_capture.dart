@@ -365,28 +365,13 @@ class WebCameraCapture implements ICameraCapture {
       dy = (targetSize - dh) ~/ 2;
     }
 
-    // Keep a copy of the raw frame (untouched, at native resolution) so 截图
-    // can still ship the original photo after the camera has been stopped.
-    // drawImage is cheap here — the expensive part is the PNG encode, which
-    // only happens when the user actually asks for the raw capture.
-    //
-    // Wrapped in its own try/catch: a raw-blit failure must NEVER abort the
-    // processed-frame pipeline below — that one is what feeds the decoder,
-    // and losing frames silently because of a raw-canvas glitch used to
-    // cause "截图 后解码停了" with no console trace.
-    final rawCtx = _rawCtx;
-    final rawCanvas = _rawCanvas;
-    if (rawCtx != null && rawCanvas != null) {
-      try {
-        final rawDraw = _reflectGet(rawCtx, 'drawImage'.toJS) as JSFunction?;
-        if (rawDraw != null) {
-          _reflectApply(
-              rawDraw, rawCtx, [video, 0.toJS, 0.toJS, vw.toJS, vh.toJS].toJS);
-        }
-      } catch (e) {
-        debugPrint('[Camera] raw blit failed: $e');
-      }
-    }
+    // NOTE: the raw (untouched, native-resolution) frame is NOT blitted here
+    // on every tick. Doing so meant a full 2176x3840 (8.3 Mpx) drawImage per
+    // captured frame, which on a phone drove memory/CPU hard enough to crash
+    // the tab — most visibly when tapping 停止扫描. It is now grabbed once,
+    // on demand: from the live video in [captureRawFramePng], or right before
+    // the video element is released in [stop], so the untouched photo is
+    // still available after the scan ends.
 
     // Clear the canvas to solid black so letterbox borders are well-defined
     // (a uniform fill won't be mistaken for cimbar anchor patterns).
@@ -641,10 +626,38 @@ class WebCameraCapture implements ICameraCapture {
   /// (the raw shot itself is blurry / too small / badly lit).
   ///
   /// Returns PNG bytes, or null if the video is not ready.
+  /// Copy the current video frame into the raw canvas at native resolution.
+  ///
+  /// Runs at most once per grab — on demand here while the camera is live, or
+  /// just before the video element is released in [stop]. Deliberately NOT
+  /// per captured frame: a 2176x3840 (8.3 Mpx) drawImage on every tick drove
+  /// phone memory/CPU hard enough to crash the tab.
+  void _blitRawFrame(JSObject video) {
+    final rawCtx = _rawCtx;
+    if (rawCtx == null || _rawCanvas == null) return;
+    try {
+      final vw = _getIntProp(video, 'videoWidth') ?? _videoWidth;
+      final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
+      if (vw <= 0 || vh <= 0) return;
+      final rawDraw = _reflectGet(rawCtx, 'drawImage'.toJS) as JSFunction?;
+      if (rawDraw == null) return;
+      _reflectApply(
+          rawDraw, rawCtx, [video, 0.toJS, 0.toJS, vw.toJS, vh.toJS].toJS);
+    } catch (e) {
+      debugPrint('[Camera] raw blit failed: $e');
+    }
+  }
+
   Future<Uint8List?> captureRawFramePng() async {
-    // Encode from the persistent raw canvas rather than from [_video]: the
-    // video element is released on stop, so reading from it meant the raw
-    // capture was silently missing whenever 截图 ran after a scan ended.
+    // If the camera is still live, refresh the raw canvas from the video
+    // first. Otherwise reuse the copy taken by [stop] — the video element is
+    // gone by then, which is why the raw capture used to be missing entirely
+    // whenever 截图 was pressed after a scan ended.
+    final video = _video;
+    if (video != null) {
+      _blitRawFrame(video);
+    }
+
     final canvas = _rawCanvas;
     if (canvas == null) {
       debugPrint('[Camera] captureRawFramePng: _rawCanvas is null '
@@ -692,10 +705,15 @@ class WebCameraCapture implements ICameraCapture {
     _frameTimer?.cancel();
     _frameTimer = null;
 
-    if (_video != null) {
-      final pauseFn = _reflectGet(_video!, 'pause'.toJS) as JSFunction?;
-      pauseFn?.callAsFunction(_video!);
-      _setProp(_video!, 'srcObject', null);
+    // Snapshot the untouched frame BEFORE the video element is torn down, so
+    // 截图 can still ship the raw photo after the scan has stopped. This is
+    // the only raw-canvas blit during a scan — it is not done per frame.
+    final video = _video;
+    if (video != null) {
+      _blitRawFrame(video);
+      final pauseFn = _reflectGet(video, 'pause'.toJS) as JSFunction?;
+      pauseFn?.callAsFunction(video);
+      _setProp(video, 'srcObject', null);
     }
 
     if (_stream != null) {

@@ -231,6 +231,11 @@ class DebugServer {
         } catch (_) {
           text = '';
         }
+        // Also append to the running session log so the whole scan history
+        // can be read in order from one file, instead of opening dozens of
+        // timestamped one-offs. This is the primary artifact for
+        // post-mortem debugging on the encoder machine.
+        await _appendToSessionLog(text, req, path);
         onReportReceived?.call(text);
       } else if (req.method == 'POST' && req.uri.path == '/encode-test') {
         final hook = onEncodeTest;
@@ -316,6 +321,53 @@ class DebugServer {
       return path;
     } catch (e) {
       debugPrint('[DebugServer] saveUpload failed: $e');
+      return null;
+    }
+  }
+
+  /// Append a decoder report to the running session log.
+  ///
+  /// Each report is stored on its own as a timestamped file (see
+  /// [_saveUpload]), but reading a debugging session that way means opening
+  /// dozens of one-off files in the right order. This keeps one append-only
+  /// log so the whole scan history — including the failures between the
+  /// successes — can be reviewed in chronological order from a single file.
+  ///
+  /// Returns the log path, or null on failure.
+  Future<String?> _appendToSessionLog(
+      String text, HttpRequest req, String? savedPath) async {
+    if (text.isEmpty) return null;
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final dir = '${appDir.path}/libcimbar_screenshots';
+      await Directory(dir).create(recursive: true);
+      final logPath = '$dir/decode_session.log';
+
+      final n = DateTime.now();
+      String two(int v) => v.toString().padLeft(2, '0');
+      final stamp = '${n.year}-${two(n.month)}-${two(n.day)} '
+          '${two(n.hour)}:${two(n.minute)}:${two(n.second)}';
+      final peer =
+          req.connectionInfo?.remoteAddress.address ?? 'unknown';
+
+      final buf = StringBuffer()
+        ..writeln()
+        ..writeln('=' * 72)
+        ..writeln('$stamp  from $peer')
+        ..writeln('saved  : ${savedPath ?? '(none)'}')
+        ..writeln('-' * 72)
+        ..writeln(text.trimRight())
+        ..writeln();
+
+      await File(logPath).writeAsString(
+        buf.toString(),
+        mode: FileMode.append,
+        flush: true,
+      );
+      debugPrint('[DebugServer] appended report to $logPath');
+      return logPath;
+    } catch (e) {
+      debugPrint('[DebugServer] appendToSessionLog failed: $e');
       return null;
     }
   }
