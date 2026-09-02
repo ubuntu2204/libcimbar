@@ -1165,10 +1165,18 @@ class _EncoderPageState extends State<EncoderPage>
                     // Extra top inset so the window control buttons (fullscreen
                     // / minimize / close) sit a little lower and easy to reach.
                     padding: const EdgeInsets.fromLTRB(10, 32, 10, 10),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Window controls (fullscreen toggle, minimize, close)
+                    child: SingleChildScrollView(
+                      // Scrollable: the panel is a fixed 200px-wide column
+                      // bounded by the window height, and its content is not
+                      // fixed — the phone report card and the capture
+                      // previews appear/disappear independently, so on a
+                      // short window (or once both captures are present) the
+                      // content can exceed the available height and a plain
+                      // Column overflows with the yellow/black stripes.
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Window controls (fullscreen toggle, minimize, close)
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
@@ -1361,7 +1369,10 @@ class _EncoderPageState extends State<EncoderPage>
                           const SizedBox(height: 6),
                           _infoRow('帧数', '${_frames.length}'),
                         ],
-                        const Spacer(),
+                        // Fixed gap instead of Spacer: inside a SingleChildScrollView the
+                        // height constraints are unbounded, so a Spacer (flex
+                        // child) is invalid and would throw a render error.
+                        const SizedBox(height: 20),
                         if (_frames.isNotEmpty)
                           Text(
                             '第 ${_currentFrameIndex + 1} / ${_frames.length} 帧',
@@ -1371,6 +1382,7 @@ class _EncoderPageState extends State<EncoderPage>
                       ],
                     ),
                   ),
+                ),
                 ],
               ),
             ),

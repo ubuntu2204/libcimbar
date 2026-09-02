@@ -11,13 +11,24 @@
 enum WebCaptureMode {
   /// Fit the *entire* video frame into the target square, preserving aspect
   /// ratio (letterboxed). Nothing is cropped, so all four cimbar anchors stay
-  /// in view even when the barcode is off-center — the safe default when the
-  /// phone is hand-held and the monitor is rarely centered.
+  /// in view even when the barcode is off-center.
+  ///
+  /// Costs a lot of detail: a portrait phone frame is squeezed into the
+  /// square, so on a 4K capture (2176x3840) the barcode lands at ~940px
+  /// inside the 2048 input versus ~1650px under [centerCrop] — and the
+  /// 0.53x downscale aliases cimbar's fine cell grid. Reach for this when
+  /// the phone is hand-held and the barcode may drift off-center.
   fit,
 
-  /// Crop the largest centered square from the video frame. Yields a larger
-  /// barcode when it is well-centered, but drops content (and anchors) that
-  /// fall outside the center square.
+  /// Crop the largest centered square from the video frame and scale it to
+  /// fill the decoder input.
+  ///
+  /// DEFAULT. Roughly doubles the barcode's pixel size versus [fit] on a
+  /// portrait 4K frame (~1650px vs ~940px in a 2048 input) and shrinks by
+  /// only ~0.94x instead of ~0.53x, so the cell grid survives resampling.
+  /// Downside: content outside the centre square is dropped, so a badly
+  /// off-center barcode can lose anchors — that is what [fit] and
+  /// [alternate] are for.
   centerCrop,
 
   /// Alternate between [centerCrop] and [fit] on successive frames: the

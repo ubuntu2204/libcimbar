@@ -95,7 +95,18 @@ class _DecoderPageState extends State<DecoderPage> {
   // Selected capture framing. Persists across the session so a user who
   // switches to centerCrop (for a larger barcode) can toggle back without
   // re-picking the mode every capture cycle.
-  String _captureModeName = 'fit'; // default: fit (all 4 anchors always in view)
+  // Default: centerCrop — on a portrait phone frame it keeps the barcode at
+  // ~1650px inside the 2048 decoder input versus fit's ~940px, and shrinks by
+  // only ~0.94x instead of ~0.53x, so the cell grid survives resampling.
+  // Switch to 'fit' in the dropdown when hand-held and the subject may drift
+  // off-centre (centerCrop drops anything outside the centre square).
+  String _captureModeName = 'centerCrop';
+
+  /// Trim the wasted background (black bars, wall, desk) around the barcode
+  /// before decoding. Preserves the aspect ratio — the crop is only scaled up
+  /// and centred, never stretched. Turn off if the scene contains other
+  /// strongly coloured objects that confuse the bounding-box scan.
+  bool _autoCropEnabled = true;
 
   // Last camera frame for screenshot
   CameraFrame? _lastFrame;
@@ -269,6 +280,7 @@ class _DecoderPageState extends State<DecoderPage> {
     try {
       (_camera as dynamic).maxTargetSize = maxTarget;
       (_camera as dynamic).captureMode = _captureModeForName(_captureModeName);
+      (_camera as dynamic).autoCropEnabled = _autoCropEnabled;
     } catch (_) {}
 
     try {
@@ -862,7 +874,7 @@ class _DecoderPageState extends State<DecoderPage> {
     for (final m in WebCaptureMode.values) {
       if (m.name == name) return m;
     }
-    return WebCaptureMode.fit; // safe default
+    return WebCaptureMode.centerCrop; // matches the UI default
   }
 
   /// How much of the frame the barcode must cover to still reach its native
@@ -1299,13 +1311,13 @@ class _DecoderPageState extends State<DecoderPage> {
                   value: _captureModeName,
                   items: const [
                     DropdownMenuItem<String>(
-                      value: 'fit',
-                      child: Text('Fit（整帧入框，最稳）',
+                      value: 'centerCrop',
+                      child: Text('Center crop（默认，条码最大需居中）',
                           style: TextStyle(fontSize: 13)),
                     ),
                     DropdownMenuItem<String>(
-                      value: 'centerCrop',
-                      child: Text('Center crop（条码大，需居中）',
+                      value: 'fit',
+                      child: Text('Fit（整帧入框，不裁切）',
                           style: TextStyle(fontSize: 13)),
                     ),
                     DropdownMenuItem<String>(
@@ -1324,6 +1336,38 @@ class _DecoderPageState extends State<DecoderPage> {
                     } catch (_) {}
                   },
                 ),
+              ),
+            ],
+          ),
+
+          // Auto-crop toggle: trims wasted background around the barcode.
+          // Off = keep the raw framing exactly as the camera delivered it.
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Text('自动裁剪',
+                        style: Theme.of(context).textTheme.labelSmall),
+                    const SizedBox(width: 4),
+                    Tooltip(
+                      message: '裁掉条码周围的黑边/无用背景后等比放大（不变形）。'
+                          '若画面有其他鲜艳物体干扰检测，可关闭。',
+                      child: Icon(Icons.info_outline,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.outline),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _autoCropEnabled,
+                onChanged: (v) {
+                  setState(() => _autoCropEnabled = v);
+                  try {
+                    (_camera as dynamic).autoCropEnabled = v;
+                  } catch (_) {}
+                },
               ),
             ],
           ),

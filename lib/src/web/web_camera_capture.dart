@@ -115,15 +115,31 @@ class WebCameraCapture implements ICameraCapture {
 
   /// How the video frame is mapped into the square decoder input.
   ///
-  /// Defaults to [WebCaptureMode.fit]: the entire camera frame is letterboxed
-  /// into the decoder input, so all four corner anchors are ALWAYS in view
-  /// regardless of where the monitor/barcode sits in the camera view. This is
-  /// the safe choice when the phone is hand-held — the monitor rarely ends up
-  /// centered in the frame, and a center crop will cut the top or bottom of
-  /// the barcode (losing two anchors and breaking the scan). `alternate` and
-  /// `centerCrop` are kept available for setups where the subject is reliably
-  /// centered and every extra pixel matters.
-  WebCaptureMode captureMode = WebCaptureMode.fit;
+  /// Defaults to [WebCaptureMode.centerCrop]: the largest centred square is
+  /// scaled to fill the decoder input. On a portrait 4K phone frame
+  /// (2176x3840) that keeps the barcode at ~1650px inside the 2048 input,
+  /// versus ~940px under [fit] — and it shrinks by only ~0.94x instead of
+  /// ~0.53x, which is the difference between cimbar's cell grid surviving
+  /// resampling and being aliased into mush. Offline measurements with the
+  /// native decoder put centerCrop clearly ahead, so it is the default.
+  ///
+  /// The trade-off is that anything outside the centre square is dropped, so
+  /// a badly off-centre barcode can lose corner anchors. Switch to [fit]
+  /// (whole frame letterboxed, nothing cropped) or [alternate] (flip between
+  /// the two so whichever framing satisfies the 4-anchor scan first wins)
+  /// when the phone is hand-held and the subject may drift off-centre.
+  WebCaptureMode captureMode = WebCaptureMode.centerCrop;
+
+  /// Whether to trim the wasted background around the barcode before
+  /// handing the frame to the decoder.
+  ///
+  /// On by default (it removes the large black bars / wall / desk that
+  /// otherwise fill the decoder input), but it depends on locating the
+  /// coloured barcode region, so it can be switched off when a scene has
+  /// other strongly coloured objects that confuse the bounding-box scan.
+  /// The crop always preserves the aspect ratio — it is only ever scaled up
+  /// and centred, never stretched.
+  bool autoCropEnabled = true;
 
   /// Upper bound for the square decoder input, in pixels.
   ///
@@ -435,7 +451,15 @@ class WebCameraCapture implements ICameraCapture {
     // decoder — a thrown exception used to silently kill every capture.
     try {
       const int stride = 16;
-      const int satThresh = 50;
+      // Tightened from 50 to 100: the previous threshold caught the wood
+      // desk too (RGB ~ (150, 100, 70) -> max-min ~ 80, just over 50),
+      // dragging the bbox all the way down to the desk surface and pulling
+      // the monitor stand + book into the "cimbar" crop. Cimbar's cells all
+      // have max-min >= 150, so 100 keeps every cimbar pixel and excludes
+      // wood — the bbox now hugs the cimbar pattern instead of the entire
+      // scene below it. The decoder then sees the cimbar filling most of
+      // the input instead of fighting a 50%-wood crop.
+      const int satThresh = 100;
       int minX = targetSize, minY = targetSize, maxX = -1, maxY = -1;
       for (int y = 0; y < targetSize; y += stride) {
         final rowBase = y * targetSize * 4;
@@ -459,21 +483,45 @@ class WebCameraCapture implements ICameraCapture {
         }
       }
       if (maxX >= minX && maxY >= minY) {
-        // Pad the bbox by one stride in each direction so the upscaled
-        // crop preserves a few pixels of dark margin around the barcode
-        // (helps the Otsu threshold near the edges).
-        minX = (minX - stride).clamp(0, targetSize - 1);
-        minY = (minY - stride).clamp(0, targetSize - 1);
-        maxX = (maxX + stride).clamp(0, targetSize - 1);
-        maxY = (maxY + stride).clamp(0, targetSize - 1);
+        // Pad the bbox generously, and scale the pad with the bbox.
+        //
+        // The saturated-pixel scan finds the cimbar *cells*, but cimbar's
+        // dark border — which carries the four corner ANCHORS the decoder
+        // needs — is low-saturation and sits outside that box. A tight crop
+        // therefore slices the anchors off and the scan reports
+        // "found 0 anchor(s) (need 4)".
+        //
+        // Measured offline (tool/pipeline_pad_sweep.dart) against a real
+        // 4K phone capture: with a 944px bbox in a 2048 canvas, padding of
+        // 16px (the old value, one stride) loses the anchors, while >= 32px
+        // keeps all four. 5% of the bbox tracks the barcode's own border as
+        // it scales, with a floor of 32px for small/barcodes-far captures.
+        final rawW = maxX - minX + 1;
+        final rawH = maxY - minY + 1;
+        final pad = math.min(256, math.max(32, (math.max(rawW, rawH) * 0.05).round()));
+        minX = (minX - pad).clamp(0, targetSize - 1);
+        minY = (minY - pad).clamp(0, targetSize - 1);
+        maxX = (maxX + pad).clamp(0, targetSize - 1);
+        maxY = (maxY + pad).clamp(0, targetSize - 1);
         final bboxW = maxX - minX + 1;
         final bboxH = maxY - minY + 1;
         final bboxArea = bboxW * bboxH;
         final canvasArea = targetSize * targetSize;
+        // Throttled log (1 in 50 frames is plenty) — the bbox dimensions are
+        // the single most useful number when diagnosing "decoder can't find
+        // anchors" or "auto-crop kept too much": if bboxW/H is much bigger
+        // than the visible cimbar, the detector is picking up background
+        // (wood, book, monitor edges) and the sat threshold needs to go up.
+        if (_frameCounter % 50 == 1) {
+          final pct = canvasArea == 0 ? 0 : (bboxArea * 100 ~/ canvasArea);
+          debugPrint('[Camera] auto-crop bbox: $bboxW x $bboxH '
+              '($pct% of canvas, origin=($minX,$minY))');
+        }
         // Only crop when the bbox is meaningfully smaller than the canvas —
         // for a tightly framed capture the bbox spans most of the canvas
         // and cropping would lose no overhead.
-        if (bboxArea < canvasArea * 7 ~/ 10 &&
+        if (autoCropEnabled &&
+            bboxArea < canvasArea * 7 ~/ 10 &&
             _canvas != null &&
             drawImage != null) {
           // Redraw the cropped + upscaled region back into the canvas,
