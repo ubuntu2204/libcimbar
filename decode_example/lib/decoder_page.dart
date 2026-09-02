@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:convert' show jsonDecode, utf8;
+import 'dart:convert' show jsonDecode, jsonEncode, utf8;
 import 'dart:io' show File;
 import 'dart:typed_data';
 
@@ -517,12 +517,49 @@ class _DecoderPageState extends State<DecoderPage> {
     }
 
     // 2) RAW camera photo — unprocessed ground truth.
+    //
+    // Always posted (and a /raw-debug diagnostic too) so the linux side can
+    // see whether [captureRawFramePng] was actually called and what it
+    // returned. Without this, a silent null/throw is indistinguishable from
+    // "phone never reached this line" — and that ambiguity was the whole
+    // reason raw uploads looked like they never happened.
+    Uint8List? rawPng;
+    String? rawError;
     try {
-      final rawPng =
-          await (_camera as dynamic).captureRawFramePng() as Uint8List?;
-      if (rawPng == null) {
-        failed.add('原始帧(无法获取)');
-      } else {
+      rawPng = await (_camera as dynamic).captureRawFramePng() as Uint8List?;
+    } catch (e) {
+      rawError = e.toString();
+    }
+
+    // Diagnostic ping: independent of the actual upload. Headers carry the
+    // summary, body is a JSON snapshot for archival.
+    try {
+      await http
+          .post(
+            Uri.parse('$_debugBaseUrl/raw-debug'),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Raw-Bytes': '${rawPng?.length ?? 0}',
+              if (rawError != null) 'X-Raw-Error': rawError,
+            },
+            body: jsonEncode({
+              'timestamp': DateTime.now().toIso8601String(),
+              'bytes': rawPng?.length ?? 0,
+              'error': rawError,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+    } catch (e) {
+      // Diagnostic upload is best-effort — never block the actual capture.
+      debugPrint('[Decoder] raw-debug POST failed: $e');
+    }
+
+    if (rawPng == null) {
+      failed.add(rawError != null
+          ? '原始帧($rawError)'
+          : '原始帧(无法获取)');
+    } else {
+      try {
         final r = await http
             .post(Uri.parse('$_debugBaseUrl/raw'),
                 headers: {'Content-Type': 'application/octet-stream'},
@@ -533,9 +570,9 @@ class _DecoderPageState extends State<DecoderPage> {
         } else {
           failed.add('原始帧(HTTP ${r.statusCode})');
         }
+      } catch (e) {
+        failed.add('原始帧($e)');
       }
-    } catch (e) {
-      failed.add('原始帧($e)');
     }
 
     if (mounted) {

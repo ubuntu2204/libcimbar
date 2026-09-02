@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show File, Platform;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -124,6 +124,10 @@ class _EncoderPageState extends State<EncoderPage>
   // Last RAW camera photo the decoder uploaded (POST /raw) — the
   // unprocessed frame straight off the sensor, before crop/scale.
   String? _lastRawCapturePath;
+
+  // Timestamp of the most recent capture (either processed or raw) so the
+  // captures card can show when the last photo came in.
+  DateTime? _lastCaptureAt;
 
   @override
   void initState() {
@@ -264,14 +268,24 @@ class _EncoderPageState extends State<EncoderPage>
           _announceReport(info);
         }
         ..onCaptureReceived = (path) {
-          if (mounted) setState(() => _lastRemoteCapturePath = path);
+          if (mounted) {
+            setState(() {
+              _lastRemoteCapturePath = path;
+              _lastCaptureAt = DateTime.now();
+            });
+          }
         }
         ..onRawCaptureReceived = (path) {
           // Raw camera photo: unprocessed ground truth of what the phone's
           // sensor actually saw (before cropping/scaling). Compare it with
           // the processed capture to separate a framing problem from a
           // real decode problem.
-          if (mounted) setState(() => _lastRawCapturePath = path);
+          if (mounted) {
+            setState(() {
+              _lastRawCapturePath = path;
+              _lastCaptureAt = DateTime.now();
+            });
+          }
         };
       final debugUrl = await DebugServer.instance.start();
 
@@ -508,23 +522,130 @@ class _EncoderPageState extends State<EncoderPage>
             info.detail,
             style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.55)),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Card showing the latest captures pushed by the phone (POST /captured
+  /// + POST /raw). Always rendered when at least one capture has arrived,
+  /// so the engineer can see what the camera saw even before the phone has
+  /// pushed a fresh diagnostic report.
+  ///
+  /// Rendering the raw (unprocessed) photo alongside the processed capture
+  /// is what makes framing problems visible — e.g. the barcode covers < 50%
+  /// of the frame, the monitor is washed out by glare, or the user pointed
+  /// the camera at the wrong region entirely. All of these are obvious in
+  /// the raw photo but invisible in the 2048x2048 processed frame.
+  Widget _capturesCard() {
+    final cs = Theme.of(context).colorScheme;
+    final ts = _lastCaptureAt;
+    final time = ts == null
+        ? ''
+        : '${ts.hour.toString().padLeft(2, '0')}:'
+            '${ts.minute.toString().padLeft(2, '0')}:'
+            '${ts.second.toString().padLeft(2, '0')}';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.photo_camera, size: 14, color: Colors.blueGrey),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  '手机截图${time.isEmpty ? '' : ' · $time'}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
           if (_lastRemoteCapturePath != null) ...[
-            const SizedBox(height: 3),
+            const SizedBox(height: 6),
             Text(
-              '加工帧（喂解码器）：${_lastRemoteCapturePath!.split(RegExp(r'[\\/]')).last}',
-              style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
+              '加工帧（喂解码器）',
+              style: TextStyle(
+                  fontSize: 9,
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 2),
+            _capturePreview(_lastRemoteCapturePath!),
+            const SizedBox(height: 2),
+            Text(
+              _lastRemoteCapturePath!.split(RegExp(r'[\\/]')).last,
+              style: TextStyle(
+                  fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
               overflow: TextOverflow.ellipsis,
             ),
           ],
           if (_lastRawCapturePath != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '原始帧（未加工，手机原始拍摄）',
+              style: TextStyle(
+                  fontSize: 9,
+                  color: cs.onSurface.withValues(alpha: 0.6),
+                  fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 2),
+            _capturePreview(_lastRawCapturePath!),
             const SizedBox(height: 2),
             Text(
-              '原始帧（未加工）：${_lastRawCapturePath!.split(RegExp(r'[\\/]')).last}',
-              style: TextStyle(fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
+              _lastRawCapturePath!.split(RegExp(r'[\\/]')).last,
+              style: TextStyle(
+                  fontSize: 9, color: cs.onSurface.withValues(alpha: 0.45)),
               overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  /// Render a capture PNG with a fixed thumbnail height.
+  ///
+  /// Uses [cacheWidth] to downsample during decode — a raw capture can be
+  /// ~33 MB decoded at full resolution, which would blow up the GPU; a
+  /// 480-wide preview is more than enough to read framing, glare and focus.
+  /// A [ValueKey] tied to the path forces a reload when the file is replaced
+  /// (otherwise Flutter reuses the cached decoder output for the same URL).
+  Widget _capturePreview(String path) {
+    final cs = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Container(
+        width: double.infinity,
+        color: Colors.black,
+        child: Image.file(
+          File(path),
+          key: ValueKey(path),
+          height: 160,
+          fit: BoxFit.contain,
+          cacheWidth: 480,
+          gaplessPlayback: false,
+          errorBuilder: (_, e, __) => Container(
+            height: 60,
+            alignment: Alignment.center,
+            child: Text(
+              '图片加载失败：$e',
+              style: TextStyle(fontSize: 9, color: cs.error),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1136,6 +1257,14 @@ class _EncoderPageState extends State<EncoderPage>
                         if (_lastReport != null) ...[
                           const SizedBox(height: 8),
                           _reportCard(_lastReport!),
+                        ],
+                        // Latest captures (processed + raw) — always shown
+                        // when at least one has arrived, regardless of
+                        // whether a fresh report was pushed alongside it.
+                        if (_lastRemoteCapturePath != null ||
+                            _lastRawCapturePath != null) ...[
+                          const SizedBox(height: 8),
+                          _capturesCard(),
                         ],
                         const SizedBox(height: 6),
                         Row(

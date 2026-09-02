@@ -195,6 +195,29 @@ class DebugServer {
         if (path != null) {
           onRawCaptureReceived?.call(path);
         }
+      } else if (req.method == 'POST' && req.uri.path == '/raw-debug') {
+        // Diagnostic ping from the decoder: tells us whether
+        // [captureRawFramePng] was actually called, and what it returned
+        // (byte count or error message). Posted UNCONDITIONALLY by the
+        // phone — even if the capture itself failed — so a missing
+        // `_raw_capture.png` no longer means "silent failure, no idea why".
+        // Headers carry the structured fields; the body is a JSON snapshot
+        // for archival.
+        final rawBytesHeader =
+            req.headers.value('X-Raw-Bytes') ?? '?';
+        final rawError =
+            req.headers.value('X-Raw-Error');
+        final body = await _readBody(req);
+        final path = await _saveUpload('_raw_capture_debug.json', body);
+        if (rawError != null) {
+          debugPrint('[DebugServer] raw-debug: $rawBytesHeader bytes, '
+              'error: $rawError');
+        } else {
+          debugPrint('[DebugServer] raw-debug: $rawBytesHeader bytes, '
+              'saved: $path');
+        }
+        res.headers.contentType = ContentType.json;
+        res.write(jsonEncode({'logged': true, 'saved': path}));
       } else if (req.method == 'POST' && req.uri.path == '/report') {
         final body = await _readBody(req);
         final path = await _saveUpload('_remote_decode_report.txt', body);

@@ -70,6 +70,15 @@ class WebCameraCapture implements ICameraCapture {
   /// image elements), never a 2D context.
   JSObject? _canvas;
   JSObject? _stream;
+
+  /// Persistent canvas holding the RAW camera frame at native resolution.
+  ///
+  /// Frames are blitted here on every capture, so the unprocessed image is
+  /// still available AFTER the camera is stopped ([_video] is nulled on
+  /// stop, which is exactly why the raw capture used to be missing from the
+  /// encoder side whenever 截图 was pressed after stopping a scan).
+  JSObject? _rawCanvas;
+  JSObject? _rawCtx;
   Timer? _frameTimer;
   CameraFrameCallback? _callback;
   bool _streaming = false;
@@ -215,6 +224,16 @@ class WebCameraCapture implements ICameraCapture {
     _ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
     _canvas = canvas;
 
+    // Persistent raw canvas at the camera's native resolution (e.g.
+    // 2176x3840). Each frame is blitted here so the untouched image stays
+    // available for 截图 even after the camera has been stopped.
+    final rawCanvas = _createElement('canvas');
+    _setProp(rawCanvas, 'width', _videoWidth.toJS);
+    _setProp(rawCanvas, 'height', _videoHeight.toJS);
+    final rawGetCtx = _reflectGet(rawCanvas, 'getContext'.toJS) as JSFunction?;
+    _rawCanvas = rawCanvas;
+    _rawCtx = rawGetCtx?.callAsFunction(rawCanvas, '2d'.toJS) as JSObject?;
+
     // Register video element as a Flutter platform view
     _viewType = 'libcimbar-camera-${DateTime.now().millisecondsSinceEpoch}';
     ui_web.platformViewRegistry.registerViewFactory(
@@ -330,6 +349,29 @@ class WebCameraCapture implements ICameraCapture {
       dy = (targetSize - dh) ~/ 2;
     }
 
+    // Keep a copy of the raw frame (untouched, at native resolution) so 截图
+    // can still ship the original photo after the camera has been stopped.
+    // drawImage is cheap here — the expensive part is the PNG encode, which
+    // only happens when the user actually asks for the raw capture.
+    //
+    // Wrapped in its own try/catch: a raw-blit failure must NEVER abort the
+    // processed-frame pipeline below — that one is what feeds the decoder,
+    // and losing frames silently because of a raw-canvas glitch used to
+    // cause "截图 后解码停了" with no console trace.
+    final rawCtx = _rawCtx;
+    final rawCanvas = _rawCanvas;
+    if (rawCtx != null && rawCanvas != null) {
+      try {
+        final rawDraw = _reflectGet(rawCtx, 'drawImage'.toJS) as JSFunction?;
+        if (rawDraw != null) {
+          _reflectApply(
+              rawDraw, rawCtx, [video, 0.toJS, 0.toJS, vw.toJS, vh.toJS].toJS);
+        }
+      } catch (e) {
+        debugPrint('[Camera] raw blit failed: $e');
+      }
+    }
+
     // Clear the canvas to solid black so letterbox borders are well-defined
     // (a uniform fill won't be mistaken for cimbar anchor patterns).
     final fillRect = _reflectGet(ctx, 'fillRect'.toJS) as JSFunction?;
@@ -434,19 +476,66 @@ class WebCameraCapture implements ICameraCapture {
         if (bboxArea < canvasArea * 7 ~/ 10 &&
             _canvas != null &&
             drawImage != null) {
-          // Redraw the cropped + upscaled region back into the canvas.
+          // Redraw the cropped + upscaled region back into the canvas,
+          // PRESERVING THE ASPECT RATIO.
           //
-          // The first argument must be an *image source* (here the canvas
-          // element itself) — passing the 2D context instead makes the
+          // Stretching the crop to fill the square (the previous behaviour)
+          // deformed the barcode — a 612x787 portrait region became a
+          // 2048x2048 square — which is strictly worse than leaving it
+          // letterboxed, because the anchor pattern itself gets squashed.
+          // Instead we scale by the longer side and centre the result, so
+          // the crop only ever gets *bigger*, never distorted.
+          //
+          // The first drawImage argument must be an *image source* (here
+          // the canvas element itself) — passing the 2D context makes the
           // browser throw a TypeError, which used to abort the whole
-          // capture so no frame ever reached the decoder (the camera
-          // preview still showed a picture, so it looked like it worked).
+          // capture so no frame ever reached the decoder (the preview still
+          // showed a picture, so it looked like it worked).
+          final scale = targetSize / math.max(bboxW, bboxH);
+          final cw = math.min(targetSize, math.max(1, (bboxW * scale).round()));
+          final ch = math.min(targetSize, math.max(1, (bboxH * scale).round()));
+          final cx = (targetSize - cw) ~/ 2;
+          final cy = (targetSize - ch) ~/ 2;
+
           final drawArgs = [
             _canvas!,
             minX.toJS, minY.toJS, bboxW.toJS, bboxH.toJS,
-            0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS,
+            cx.toJS, cy.toJS, cw.toJS, ch.toJS,
           ].toJS;
           _reflectApply(drawImage, ctx, drawArgs);
+
+          // Paint the letterbox bars AFTER the crop, never before.
+          //
+          // Source and destination are the SAME canvas here, so clearing
+          // first would wipe the very pixels the crop still has to read —
+          // the browser would then scale an all-black rectangle and every
+          // auto-cropped frame would come out blank. Instead we fill only
+          // the four bands around the freshly drawn crop, so the padding
+          // is blank and the barcode is left untouched.
+          final fillRect = _reflectGet(ctx, 'fillRect'.toJS) as JSFunction?;
+          if (fillRect != null) {
+            _setProp(ctx, 'fillStyle', '#000000'.toJS);
+            if (cy > 0) {
+              _reflectApply(fillRect, ctx,
+                  [0.toJS, 0.toJS, targetSize.toJS, cy.toJS].toJS);
+            }
+            final bottom = cy + ch;
+            if (bottom < targetSize) {
+              _reflectApply(fillRect, ctx,
+                  [0.toJS, bottom.toJS, targetSize.toJS,
+                   (targetSize - bottom).toJS].toJS);
+            }
+            if (cx > 0) {
+              _reflectApply(fillRect, ctx,
+                  [0.toJS, cy.toJS, cx.toJS, ch.toJS].toJS);
+            }
+            final right = cx + cw;
+            if (right < targetSize) {
+              _reflectApply(fillRect, ctx,
+                  [right.toJS, cy.toJS, (targetSize - right).toJS, ch.toJS]
+                      .toJS);
+            }
+          }
           // Re-read the canvas.
           final imageData2 = getImageData?.callAsFunction(
               ctx, 0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS)
@@ -505,33 +594,44 @@ class WebCameraCapture implements ICameraCapture {
   ///
   /// Returns PNG bytes, or null if the video is not ready.
   Future<Uint8List?> captureRawFramePng() async {
-    final video = _video;
-    if (video == null) return null;
-    final vw = _getIntProp(video, 'videoWidth') ?? _videoWidth;
-    final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
-    if (vw <= 0 || vh <= 0) return null;
-
-    // Canvas at the camera's native resolution (e.g. 2176x3840).
-    final canvas = _createElement('canvas');
-    _setProp(canvas, 'width', vw.toJS);
-    _setProp(canvas, 'height', vh.toJS);
-    final getCtx = _reflectGet(canvas, 'getContext'.toJS) as JSFunction?;
-    final ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
-    if (ctx == null) return null;
-
-    final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
-    if (drawImage == null) return null;
-    _reflectApply(
-        drawImage, ctx, [video, 0.toJS, 0.toJS, vw.toJS, vh.toJS].toJS);
+    // Encode from the persistent raw canvas rather than from [_video]: the
+    // video element is released on stop, so reading from it meant the raw
+    // capture was silently missing whenever 截图 ran after a scan ended.
+    final canvas = _rawCanvas;
+    if (canvas == null) {
+      debugPrint('[Camera] captureRawFramePng: _rawCanvas is null '
+          '(camera never started or already disposed)');
+      return null;
+    }
+    if (_videoWidth <= 0 || _videoHeight <= 0) {
+      debugPrint('[Camera] captureRawFramePng: video dims are '
+          '$_videoWidth x $_videoHeight');
+      return null;
+    }
 
     final toDataURL = _reflectGet(canvas, 'toDataURL'.toJS) as JSFunction?;
-    if (toDataURL == null) return null;
-    final url = toDataURL.callAsFunction(canvas, 'image/png'.toJS) as JSString?;
-    if (url == null) return null;
-    final dataUrl = url.toDart;
-    final comma = dataUrl.indexOf(',');
-    if (comma < 0) return null;
-    return base64Decode(dataUrl.substring(comma + 1));
+    if (toDataURL == null) {
+      debugPrint('[Camera] captureRawFramePng: toDataURL missing');
+      return null;
+    }
+    try {
+      final url =
+          toDataURL.callAsFunction(canvas, 'image/png'.toJS) as JSString?;
+      if (url == null) {
+        debugPrint('[Camera] captureRawFramePng: toDataURL returned null');
+        return null;
+      }
+      final dataUrl = url.toDart;
+      final comma = dataUrl.indexOf(',');
+      if (comma < 0) return null;
+      final bytes = base64Decode(dataUrl.substring(comma + 1));
+      debugPrint('[Camera] captureRawFramePng: ${bytes.length} bytes from '
+          '${_videoWidth}x$_videoHeight} canvas');
+      return bytes;
+    } catch (e) {
+      debugPrint('[Camera] captureRawFramePng failed: $e');
+      return null;
+    }
   }
 
   @override
@@ -574,11 +674,16 @@ class WebCameraCapture implements ICameraCapture {
     _canvas = null;
     _viewType = null;
     _streaming = false;
+    // NOTE: _rawCanvas / _rawCtx are deliberately kept. They hold the last
+    // untouched camera frame so 截图 can still upload the raw photo after
+    // the scan has stopped. They are released in [dispose].
   }
 
   @override
   Future<void> dispose() async {
     _callback = null;
     await stop();
+    _rawCanvas = null;
+    _rawCtx = null;
   }
 }
