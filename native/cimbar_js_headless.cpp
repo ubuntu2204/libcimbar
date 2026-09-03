@@ -10,6 +10,7 @@
 #include "cimb_translator/Config.h"
 #include "compression/zstd_compressor.h"
 #include "encoder/Encoder.h"
+#include "extractor/Scanner.h"
 #include "fountain/FountainInit.h"
 #include "fountain/fountain_encoder_stream.h"
 #include "util/byte_istream.h"
@@ -178,6 +179,28 @@ int cimbare_get_frame_buff(unsigned char** buff)
 
     *buff = _next->data;
     return _next->cols * _next->rows * _next->channels();
+}
+
+// Whether the frame most recently produced by cimbare_next_frame() would
+// survive the decoder's anchor scan.
+//
+// Upstream's EncoderPlus::encode_fountain() does this and skips the frame,
+// with the comment: "some % of generated frames (for the current 8x8 impl)
+// will produce random patterns that falsely match as corner anchors and fail
+// to extract." The cimbar_js C API has no equivalent, so an app using it
+// happily emits frames the decoder can never locate. Measured on a 200-frame
+// run: ~1.5% of frames fail this check.
+//
+// We test the frame still held in `_next` rather than a caller-supplied
+// buffer — the caller already has that pointer, and rebuilding a cv::Mat
+// from it just to throw it away is pointless.
+//
+// Returns 1 = scans fine, 0 = would fail to extract, -1 = no frame.
+int cimbare_will_it_scan()
+{
+    if (!_next)
+        return -1;
+    return Scanner::will_it_scan(*_next) ? 1 : 0;
 }
 
 // Window functions - stub for headless mode

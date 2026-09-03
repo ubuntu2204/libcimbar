@@ -11,6 +11,7 @@ import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:libcimbar/libcimbar.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'core/barcode_shake.dart';
 import 'core/debug_server.dart';
 import 'core/screenshot_capture.dart';
 import 'core/window_display.dart';
@@ -55,8 +56,9 @@ class EncoderPage extends StatefulWidget {
   State<EncoderPage> createState() => _EncoderPageState();
 }
 
-class _EncoderPageState extends State<EncoderPage>
-    with TickerProviderStateMixin, WindowListener {
+// TickerProviderStateMixin was dropped: frame playback is driven by a Timer
+// (see [_frameTimer]), so nothing here needs a ticker any more.
+class _EncoderPageState extends State<EncoderPage> with WindowListener {
   final CimbarPlatform _platform = CimbarPlatform.instance;
 
   ICimbarEncoder? _encoder;
@@ -83,7 +85,17 @@ class _EncoderPageState extends State<EncoderPage>
   // Frame animation
   List<CimbarFrame> _frames = [];
   int _currentFrameIndex = 0;
-  AnimationController? _frameAnimationController;
+  /// Drives frame playback at [CimbarConfig.fps].
+  ///
+  /// A Timer rather than an AnimationController, deliberately: an
+  /// AnimationController's listener fires on every vsync (~60Hz) no matter
+  /// what its `duration` is, so advancing the frame index from that listener
+  /// made the real rate the display refresh rate — the FPS setting had no
+  /// effect, and the upstream-style display nudge ran ~4x too fast.
+  Timer? _frameTimer;
+
+  /// Index into [BarcodeShake.offsets], advanced once per displayed frame.
+  int _shakeStep = 0;
 
   // Capture result
   int _capturedWidth = 0;
@@ -814,9 +826,9 @@ class _EncoderPageState extends State<EncoderPage>
     }
 
     _isDecodeTesting = true;
-    final wasAnimating = _frameAnimationController != null &&
-        _frameAnimationController!.isAnimating;
-    _frameAnimationController?.stop();
+    // Freeze playback while the test seeks frames itself.
+    final wasPlaying = _frameTimer != null;
+    _frameTimer?.cancel();
 
     final report = StringBuffer()
       ..writeln('libcimbar encoder - screenshot decode self-test')
@@ -974,10 +986,12 @@ class _EncoderPageState extends State<EncoderPage>
       if (mounted) {
         setState(() => _statusMessage = summary);
       }
-      if (wasAnimating && _frameAnimationController != null) {
-        _frameAnimationController!.forward();
-      }
+      // Clear the flag before resuming: _startFrameTimer() is a no-op while
+      // a decode test is marked in progress.
       _isDecodeTesting = false;
+      if (wasPlaying) {
+        _startFrameTimer();
+      }
     }
     return summary;
   }
@@ -1044,25 +1058,7 @@ class _EncoderPageState extends State<EncoderPage>
       }
 
       _currentFrameIndex = 0;
-      _frameAnimationController?.dispose();
-      _frameAnimationController = AnimationController(
-        vsync: this,
-        duration: Duration(milliseconds: 1000 ~/ _config.fps),
-      )..addStatusListener((status) {
-          if (status == AnimationStatus.completed) {
-            _frameAnimationController?.repeat();
-          }
-        });
-
-      _frameAnimationController!.addListener(() {
-        if (mounted && _frames.isNotEmpty) {
-          setState(() {
-            _currentFrameIndex = (_currentFrameIndex + 1) % _frames.length;
-          });
-        }
-      });
-
-      _frameAnimationController!.forward();
+      _startFrameTimer();
     } catch (e) {
       _statusMessage = '编码出错：$e';
     }
@@ -1070,10 +1066,25 @@ class _EncoderPageState extends State<EncoderPage>
     if (mounted) setState(() => _isEncoding = false);
   }
 
+  /// (Re)starts playback at the configured FPS. No-op with no frames.
+  void _startFrameTimer() {
+    _frameTimer?.cancel();
+    if (_frames.isEmpty) return;
+    _frameTimer =
+        Timer.periodic(Duration(milliseconds: 1000 ~/ _config.fps), (_) {
+      if (!mounted || _frames.isEmpty) return;
+      setState(() {
+        _currentFrameIndex = (_currentFrameIndex + 1) % _frames.length;
+        // Advance the display shake in lockstep with the data frame,
+        // matching upstream, which nudges once per rendered frame.
+        _shakeStep = (_shakeStep + 1) % BarcodeShake.offsets.length;
+      });
+    });
+  }
+
   void _stopEncoding() {
-    _frameAnimationController?.stop();
-    _frameAnimationController?.dispose();
-    _frameAnimationController = null;
+    _frameTimer?.cancel();
+    _frameTimer = null;
     for (final img in _decodedFrames) {
       img.dispose();
     }
@@ -1092,13 +1103,9 @@ class _EncoderPageState extends State<EncoderPage>
     setState(() {
       _config = _config.copyWith(fps: clamped);
     });
-    // Restart the controller with the new period.
-    final controller = _frameAnimationController;
-    if (controller != null && _frames.isNotEmpty) {
-      controller
-        ..stop()
-        ..duration = Duration(milliseconds: 1000 ~/ clamped)
-        ..forward();
+    // Re-arm the timer so the new period takes effect immediately.
+    if (_frames.isNotEmpty) {
+      _startFrameTimer();
     }
   }
 
@@ -1118,7 +1125,8 @@ class _EncoderPageState extends State<EncoderPage>
       color: Colors.black,
       child: Stack(
         children: [
-          // Right side: cimbar panel centered in the right area (1024x1024, no stretch)
+          // Right side: cimbar panel centered in the right area. The box is
+          // the 1024 barcode plus the shake gutter, so it is never stretched.
           Positioned(
             left: 200,
             top: 0,
@@ -1129,12 +1137,13 @@ class _EncoderPageState extends State<EncoderPage>
               child: Center(
                 child: SizedBox(
                   key: _displayKey,
-                  width: 1024,
-                  height: 1024,
+                  // Barcode (1024) plus the shake gutter on each side.
+                  width: BarcodeShake.boxDim,
+                  height: BarcodeShake.boxDim,
                   child: RepaintBoundary(
                     key: _displayBoundaryKey,
                     child: _frames.isNotEmpty
-                        ? _buildFrameDisplay()
+                        ? _buildShakenFrameDisplay()
                         : _buildPlaceholder(),
                   ),
                 ),
@@ -1392,6 +1401,20 @@ class _EncoderPageState extends State<EncoderPage>
     );
   }
 
+  /// Wraps the frame in the per-frame nudge from [BarcodeShake].
+  ///
+  /// Applied INSIDE the RepaintBoundary on purpose: the screenshot self-test
+  /// captures this boundary, so it sees the same nudged image the phone's
+  /// camera sees. Keeping the display and the self-test honest matters more
+  /// than a marginally more convenient test.
+  Widget _buildShakenFrameDisplay() {
+    final d = BarcodeShake.offsets[_shakeStep % BarcodeShake.offsets.length];
+    return ShakenBarcode(
+      offset: d,
+      child: _buildFrameDisplay(),
+    );
+  }
+
   Widget _buildFrameDisplay() {
     if (_decodedFrames.isEmpty || _currentFrameIndex >= _decodedFrames.length) {
       return const SizedBox.shrink();
@@ -1493,7 +1516,8 @@ class _EncoderPageState extends State<EncoderPage>
       ..onReportReceived = null
       ..onCaptureReceived = null
       ..onRawCaptureReceived = null;
-    _frameAnimationController?.dispose();
+    _frameTimer?.cancel();
+    _frameTimer = null;
     for (final img in _decodedFrames) {
       img.dispose();
     }

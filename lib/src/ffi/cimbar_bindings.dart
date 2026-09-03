@@ -26,6 +26,7 @@ class CimbarNative {
   late final int Function(Pointer<Uint8> buffer, int size) _encode;
   late final int Function(bool colorBalance) _nextFrame;
   late final int Function(Pointer<Pointer<Uint8>> buff) _getFrameBuff;
+  late final int Function() _willItScan;
   late final int Function() _render;
   late final int Function(int width, int height) _initWindow;
   late final int Function(bool rotate) _rotateWindow;
@@ -100,6 +101,18 @@ class CimbarNative {
     _getFrameBuff = _lib
         .lookup<NativeFunction<_GetFrameBuffT>>('cimbare_get_frame_buff')
         .asFunction();
+    // Optional symbol. It only exists in native builds that expose the
+    // anchor self-check; a library compiled before that (or for another
+    // platform) does not export it. Looking it up unconditionally would make
+    // the whole encoder unusable against such a library, so degrade to a
+    // stub that reports "unknown" and let callers keep every frame.
+    try {
+      _willItScan = _lib
+          .lookup<NativeFunction<_WillItScanT>>('cimbare_will_it_scan')
+          .asFunction();
+    } catch (_) {
+      _willItScan = () => -1;
+    }
     _render =
         _lib.lookup<NativeFunction<_RenderT>>('cimbare_render').asFunction();
     _initWindow = _lib
@@ -196,6 +209,13 @@ class CimbarNative {
     }
   }
 
+  /// Whether the frame just produced by [nextFrame] would survive the
+  /// decoder's anchor scan.
+  ///
+  /// Returns 1 = scans fine, 0 = would fail to extract, or -1 if the check
+  /// is unavailable (library predates the symbol) / no frame is pending.
+  int willItScan() => _willItScan();
+
   /// Render the current frame to the GLFW window.
   int render() => _render();
 
@@ -290,6 +310,7 @@ typedef _EncodeBufsizeT = Int32 Function();
 typedef _EncodeT = Int32 Function(Pointer<Uint8> buffer, Uint32 size);
 typedef _NextFrameT = Int32 Function(Bool colorBalance);
 typedef _GetFrameBuffT = Int32 Function(Pointer<Pointer<Uint8>> buff);
+typedef _WillItScanT = Int32 Function();
 typedef _RenderT = Int32 Function();
 typedef _InitWindowT = Int32 Function(Int32 width, Int32 height);
 typedef _RotateWindowT = Int32 Function(Bool rotate);

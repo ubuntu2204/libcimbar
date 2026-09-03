@@ -129,3 +129,5 @@
 4283	8812	1788417061444662047	CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/Common.cpp.o	ab258c5f95a27f3e
 6085	9325	1788417061956664395	CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimbar_js/cimbar_recv_js.cpp.o	d1a8569aef7c693a
 9325	9506	1788417062135665217	libcimbar.so	8e309074eb5fbc0c
+3	2562	1788418543234379004	CMakeFiles/cimbar.dir/cimbar_js_headless.cpp.o	9b3ca5c40570333f
+2562	2738	1788418543408379789	libcimbar.so	8e309074eb5fbc0c

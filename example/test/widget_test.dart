@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:libcimbar_example/main.dart';
@@ -24,8 +25,14 @@ void main() {
       await tester.pumpWidget(const LibcimbarExampleApp());
       await tester.pumpAndSettle();
 
-      // Should contain text related to the app
-      expect(find.text('libcimbar Example'), findsWidgets);
+      // MaterialApp.title names the app to the OS (task switcher / window
+      // title). It is NOT rendered as a Text widget, so find.text() can never
+      // match it — assert the property itself instead.
+      //
+      // (Note this is deliberately different from the desktop window title,
+      // which main.dart sets to 'libcimbar' via WindowOptions.)
+      final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+      expect(app.title, 'libcimbar Example');
     });
   });
 }

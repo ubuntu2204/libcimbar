@@ -84,12 +84,42 @@ class CimbarEncoderFfi implements ICimbarEncoder {
     }
 
     // Step 3: Extract all generated frames
+    //
+    // Frames that cannot pass the decoder's own anchor scan are dropped, the
+    // same thing upstream's EncoderPlus::encode_fountain() does. A small
+    // share of generated frames contain patterns that falsely match as
+    // corner anchors — the decoder then deskews against bogus points and the
+    // frame is worthless. Measured ~1.5% of frames.
     int frameIndex = 0;
+    int consecutiveBad = 0;
+    int skipped = 0;
+    int attempts = 0;
     debugPrint('[cimbar-ffi] Collecting frames...');
     while (true) {
+      // Bound total work, not just accepted frames: a skipped frame does not
+      // advance frameIndex, so an attempt counter is what actually guarantees
+      // this loop terminates.
+      if (++attempts > 1000) {
+        debugPrint('[cimbar-ffi] attempt limit reached, stopping collection');
+        break;
+      }
       final frameCount = _native.nextFrame();
       debugPrint('[cimbar-ffi] nextFrame returned: $frameCount');
       if (frameCount <= 0) break;
+
+      final scanCheck = _native.willItScan();
+      if (scanCheck == 0) {
+        // Upstream tolerates at most 4 in a row before deciding something is
+        // wrong and letting frames through anyway; more than that almost
+        // certainly means the check itself is broken, not the frames.
+        if (++consecutiveBad < 5) {
+          ++skipped;
+          continue;
+        }
+        debugPrint('[cimbar-ffi] $consecutiveBad unscannable frames in a row '
+            '- emitting anyway');
+      }
+      consecutiveBad = 0;
 
       final result = _native.getFrameBuffer();
       final size = result.size;
@@ -118,7 +148,8 @@ class CimbarEncoderFfi implements ICimbarEncoder {
       // Safety: don't loop forever
       if (frameIndex > 500) break;
     }
-    debugPrint('[cimbar-ffi] Done: ${frames.length} frames collected');
+    debugPrint('[cimbar-ffi] Done: ${frames.length} frames collected'
+        '${skipped > 0 ? ' ($skipped dropped as unscannable)' : ''}');
 
     return frames;
   }
