@@ -49,205 +49,205 @@ cmake_ninja_workdir = /home/ubuntu/project/libcimbar/native/build_linux/
 
 build cmake_object_order_depends_target_zstd_static: phony || CMakeFiles/zstd_static.dir
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/debug.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/debug.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/debug.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/debug.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/debug.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/debug.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/entropy_common.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/entropy_common.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/entropy_common.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/entropy_common.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/entropy_common.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/entropy_common.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/error_private.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/error_private.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/error_private.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/error_private.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/error_private.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/error_private.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/fse_decompress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/fse_decompress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/fse_decompress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/fse_decompress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/fse_decompress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/fse_decompress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/pool.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/pool.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/pool.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/pool.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/pool.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/pool.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/threading.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/threading.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/threading.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/threading.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/threading.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/threading.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/xxhash.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/xxhash.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/xxhash.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/xxhash.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/xxhash.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/xxhash.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/zstd_common.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/zstd_common.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/zstd_common.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/zstd_common.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/zstd_common.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/zstd_common.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/fse_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/fse_compress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/fse_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/fse_compress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/fse_compress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/fse_compress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/hist.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/hist.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/hist.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/hist.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/hist.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/hist.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/huf_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/huf_compress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/huf_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/huf_compress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/huf_compress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/huf_compress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_literals.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_literals.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_literals.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_literals.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_literals.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_literals.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_sequences.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_sequences.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_sequences.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_sequences.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_sequences.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_sequences.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_superblock.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_superblock.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_superblock.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_superblock.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_superblock.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_superblock.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_double_fast.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_double_fast.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_double_fast.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_double_fast.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_double_fast.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_double_fast.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_fast.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_fast.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_fast.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_fast.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_fast.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_fast.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_lazy.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_lazy.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_lazy.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_lazy.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_lazy.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_lazy.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_ldm.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_ldm.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_ldm.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_ldm.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_ldm.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_ldm.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_opt.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_opt.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_opt.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_opt.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_opt.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_opt.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstdmt_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstdmt_compress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstdmt_compress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstdmt_compress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstdmt_compress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstdmt_compress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/huf_decompress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/huf_decompress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/huf_decompress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/huf_decompress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/huf_decompress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/huf_decompress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_ddict.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_ddict.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_ddict.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_ddict.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_ddict.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_ddict.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress
 
-build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress_block.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress_block.c || cmake_object_order_depends_target_zstd_static
+build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress_block.c.o: C_COMPILER__zstd_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress_block.c || cmake_object_order_depends_target_zstd_static
   DEFINES = -DZSTD_DISABLE_ASM
-  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress_block.c.o.d
+  DEP_FILE = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress_block.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd
   OBJECT_DIR = CMakeFiles/zstd_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress
+  OBJECT_FILE_DIR = CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress
 
 
 # =============================================================================
@@ -257,7 +257,7 @@ build CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libci
 #############################################
 # Link the static library libzstd.a
 
-build libzstd.a: C_STATIC_LIBRARY_LINKER__zstd_static_Release CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/debug.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/entropy_common.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/error_private.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/fse_decompress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/pool.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/threading.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/xxhash.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/common/zstd_common.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/fse_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/hist.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/huf_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_literals.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_sequences.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_compress_superblock.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_double_fast.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_fast.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_lazy.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_ldm.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstd_opt.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/compress/zstdmt_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/huf_decompress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_ddict.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd/decompress/zstd_decompress_block.c.o
+build libzstd.a: C_STATIC_LIBRARY_LINKER__zstd_static_Release CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/debug.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/entropy_common.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/error_private.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/fse_decompress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/pool.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/threading.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/xxhash.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/zstd_common.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/fse_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/hist.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/huf_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_literals.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_sequences.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_superblock.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_double_fast.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_fast.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_lazy.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_ldm.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_opt.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstdmt_compress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/huf_decompress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_ddict.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress.c.o CMakeFiles/zstd_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress_block.c.o
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles/zstd_static.dir
   POST_BUILD = :
@@ -274,33 +274,33 @@ build libzstd.a: C_STATIC_LIBRARY_LINKER__zstd_static_Release CMakeFiles/zstd_st
 
 build cmake_object_order_depends_target_wirehair_static: phony || CMakeFiles/wirehair_static.dir
 
-build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairCodec.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairCodec.cpp || cmake_object_order_depends_target_wirehair_static
-  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairCodec.cpp.o.d
+build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairCodec.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairCodec.cpp || cmake_object_order_depends_target_wirehair_static
+  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairCodec.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair
   OBJECT_DIR = CMakeFiles/wirehair_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair
 
-build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairTools.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairTools.cpp || cmake_object_order_depends_target_wirehair_static
-  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairTools.cpp.o.d
+build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairTools.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairTools.cpp || cmake_object_order_depends_target_wirehair_static
+  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairTools.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair
   OBJECT_DIR = CMakeFiles/wirehair_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair
 
-build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/gf256.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/gf256.cpp || cmake_object_order_depends_target_wirehair_static
-  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/gf256.cpp.o.d
+build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/gf256.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/gf256.cpp || cmake_object_order_depends_target_wirehair_static
+  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/gf256.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair
   OBJECT_DIR = CMakeFiles/wirehair_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair
 
-build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/wirehair.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/wirehair.cpp || cmake_object_order_depends_target_wirehair_static
-  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/wirehair.cpp.o.d
+build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/wirehair.cpp.o: CXX_COMPILER__wirehair_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/wirehair.cpp || cmake_object_order_depends_target_wirehair_static
+  DEP_FILE = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/wirehair.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair
   OBJECT_DIR = CMakeFiles/wirehair_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair
+  OBJECT_FILE_DIR = CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair
 
 
 # =============================================================================
@@ -310,7 +310,7 @@ build CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/l
 #############################################
 # Link the static library libwirehair_static.a
 
-build libwirehair_static.a: CXX_STATIC_LIBRARY_LINKER__wirehair_static_Release CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairCodec.cpp.o CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/WirehairTools.cpp.o CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/gf256.cpp.o CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/wirehair.cpp.o
+build libwirehair_static.a: CXX_STATIC_LIBRARY_LINKER__wirehair_static_Release CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairCodec.cpp.o CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/WirehairTools.cpp.o CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/gf256.cpp.o CMakeFiles/wirehair_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/wirehair/wirehair.cpp.o
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles/wirehair_static.dir
   POST_BUILD = :
@@ -327,124 +327,124 @@ build libwirehair_static.a: CXX_STATIC_LIBRARY_LINKER__wirehair_static_Release C
 
 build cmake_object_order_depends_target_correct_static: phony || CMakeFiles/correct_static.dir
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/bit.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/bit.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/bit.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/bit.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/bit.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/bit.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/convolutional.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/convolutional.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/convolutional.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/convolutional.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/convolutional.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/convolutional.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/decode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/decode.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/decode.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/decode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/decode.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/decode.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/encode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/encode.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/encode.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/encode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/encode.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/encode.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/lookup.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/lookup.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/lookup.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/lookup.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/lookup.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/lookup.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/metric.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/metric.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/metric.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/metric.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/metric.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/metric.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/fec_shim.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/fec_shim.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/fec_shim.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/fec_shim.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/fec_shim.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/fec_shim.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/decode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/decode.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/decode.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/decode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/decode.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/decode.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/encode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/encode.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/encode.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/encode.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/encode.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/encode.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon
 
-build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c || cmake_object_order_depends_target_correct_static
-  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c.o.d
+build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c.o: C_COMPILER__correct_static_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c || cmake_object_order_depends_target_correct_static
+  DEP_FILE = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c.o.d
   FLAGS = -O3 -DNDEBUG -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include
   OBJECT_DIR = CMakeFiles/correct_static.dir
-  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon
+  OBJECT_FILE_DIR = CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon
 
 
 # =============================================================================
@@ -454,7 +454,7 @@ build CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/li
 #############################################
 # Link the static library libcorrect_static.a
 
-build libcorrect_static.a: C_STATIC_LIBRARY_LINKER__correct_static_Release CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/bit.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/convolutional.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/decode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/encode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/lookup.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/metric.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/fec_shim.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/decode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/encode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c.o
+build libcorrect_static.a: C_STATIC_LIBRARY_LINKER__correct_static_Release CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/bit.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/convolutional.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/decode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/encode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/error_buffer.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/history_buffer.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/lookup.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/metric.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/convolutional.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/decode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/encode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/convolutional/sse/lookup.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/fec_shim.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/decode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/encode.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/polynomial.c.o CMakeFiles/correct_static.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/libcorrect/src/reed-solomon/reed-solomon.c.o
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   OBJECT_DIR = CMakeFiles/correct_static.dir
   POST_BUILD = :
@@ -471,125 +471,125 @@ build libcorrect_static.a: C_STATIC_LIBRARY_LINKER__correct_static_Release CMake
 
 build cmake_object_order_depends_target_cimbar: phony || cmake_object_order_depends_target_correct_static cmake_object_order_depends_target_wirehair_static cmake_object_order_depends_target_zstd_static
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/AdjacentCellFinder.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/AdjacentCellFinder.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/AdjacentCellFinder.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/AdjacentCellFinder.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/AdjacentCellFinder.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/AdjacentCellFinder.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellDrift.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellDrift.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellDrift.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellDrift.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellDrift.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellDrift.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellPositions.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellPositions.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellPositions.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellPositions.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellPositions.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellPositions.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbDecoder.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbDecoder.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbDecoder.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbDecoder.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbDecoder.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbDecoder.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbEncoder.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbEncoder.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbEncoder.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbEncoder.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbEncoder.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbEncoder.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbReader.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbReader.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbReader.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbReader.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbReader.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbReader.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbWriter.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbWriter.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbWriter.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbWriter.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbWriter.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbWriter.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/Common.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/Common.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/Common.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/Common.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/Common.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/Common.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/FloodDecodePositions.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/FloodDecodePositions.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/FloodDecodePositions.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/FloodDecodePositions.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/FloodDecodePositions.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/FloodDecodePositions.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Deskewer.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Deskewer.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Deskewer.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Deskewer.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Deskewer.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Deskewer.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Extractor.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Extractor.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Extractor.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Extractor.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Extractor.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Extractor.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Scanner.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Scanner.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Scanner.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Scanner.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Scanner.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Scanner.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/SimpleCameraCalibration.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/SimpleCameraCalibration.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/SimpleCameraCalibration.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/SimpleCameraCalibration.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/SimpleCameraCalibration.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/SimpleCameraCalibration.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor
 
 build CMakeFiles/cimbar.dir/cimbar_js_headless.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/native/cimbar_js_headless.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
   DEP_FILE = CMakeFiles/cimbar.dir/cimbar_js_headless.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
   OBJECT_FILE_DIR = CMakeFiles/cimbar.dir
 
-build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js/cimbar_recv_js.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js/cimbar_recv_js.cpp || cmake_object_order_depends_target_cimbar
+build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimbar_js/cimbar_recv_js.cpp.o: CXX_COMPILER__cimbar_unscanned_Release /home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimbar_js/cimbar_recv_js.cpp || cmake_object_order_depends_target_cimbar
   DEFINES = -DBUILD_SHARED=1 -DCIMBAR_EXPORT=1 -DHAS_GLFW=0 -DZSTD_STATIC_LINKING_ONLY -Dcimbar_EXPORTS
-  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js/cimbar_recv_js.cpp.o.d
+  DEP_FILE = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimbar_js/cimbar_recv_js.cpp.o.d
   FLAGS = -O3 -DNDEBUG -std=gnu++17 -fPIC -msse4.1
-  INCLUDES = -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
+  INCLUDES = -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/lib/cimbar_js -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/zstd -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libcorrect/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/cxxopts/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/intx/include -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/base91 -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/libpopcnt -I/home/ubuntu/project/libcimbar/native/../third_party/libcimbar/src/third_party_lib/wirehair -isystem /home/ubuntu/project/opencv/install_linux_min/include/opencv4
   OBJECT_DIR = CMakeFiles/cimbar.dir
-  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js
+  OBJECT_FILE_DIR = CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimbar_js
 
 
 # =============================================================================
@@ -599,7 +599,7 @@ build CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_
 #############################################
 # Link the shared library libcimbar.so
 
-build libcimbar.so: CXX_SHARED_LIBRARY_LINKER__cimbar_Release CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/AdjacentCellFinder.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellDrift.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CellPositions.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbDecoder.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbEncoder.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbReader.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/CimbWriter.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/Common.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimb_translator/FloodDecodePositions.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Deskewer.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Extractor.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/Scanner.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/extractor/SimpleCameraCalibration.cpp.o CMakeFiles/cimbar.dir/cimbar_js_headless.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp/src/lib/cimbar_js/cimbar_recv_js.cpp.o | libzstd.a libwirehair_static.a libcorrect_static.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_core.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgproc.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgcodecs.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgproc.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_core.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/libittnotify.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/liblibjpeg-turbo.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/liblibpng.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/libzlib.a || libcorrect_static.a libwirehair_static.a libzstd.a
+build libcimbar.so: CXX_SHARED_LIBRARY_LINKER__cimbar_Release CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/AdjacentCellFinder.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellDrift.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CellPositions.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbDecoder.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbEncoder.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbReader.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/CimbWriter.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/Common.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimb_translator/FloodDecodePositions.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Deskewer.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Extractor.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/Scanner.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/extractor/SimpleCameraCalibration.cpp.o CMakeFiles/cimbar.dir/cimbar_js_headless.cpp.o CMakeFiles/cimbar.dir/home/ubuntu/project/libcimbar/third_party/libcimbar/src/lib/cimbar_js/cimbar_recv_js.cpp.o | libzstd.a libwirehair_static.a libcorrect_static.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_core.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgproc.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgcodecs.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgproc.a /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_core.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/libittnotify.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/liblibjpeg-turbo.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/liblibpng.a /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/libzlib.a || libcorrect_static.a libwirehair_static.a libzstd.a
   LANGUAGE_COMPILE_FLAGS = -O3 -DNDEBUG
   LINK_LIBRARIES = libzstd.a  libwirehair_static.a  libcorrect_static.a  /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_core.a  /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgproc.a  /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgcodecs.a  /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_imgproc.a  /home/ubuntu/project/opencv/install_linux_min/lib/libopencv_core.a  /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/libittnotify.a  -ldl  -lm  -lpthread  -lrt  /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/liblibjpeg-turbo.a  /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/liblibpng.a  /home/ubuntu/project/opencv/install_linux_min/lib/opencv4/3rdparty/libzlib.a
   OBJECT_DIR = CMakeFiles/cimbar.dir

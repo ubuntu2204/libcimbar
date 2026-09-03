@@ -58,13 +58,43 @@ endif()
 # ─── Configuration ────────────────────────────────────────────────
 
 # Path to the libcimbar source tree.
-if(NOT DEFINED LIBCIMBAR_SRC)
-    # Default: vendored C++ core inside the plugin repo
-    set(LIBCIMBAR_SRC "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libcimbar_cpp")
+#
+# The vendored directory has been renamed upstream (libcimbar_cpp -> libcimbar).
+# Accept either spelling so a rename cannot silently break the build; an
+# explicit -DLIBCIMBAR_SRC=<path> always wins.
+# A stale CMakeCache.txt can pin LIBCIMBAR_SRC to a path that no longer exists
+# (the directory was renamed). Validate any pre-set value and fall back to
+# probing instead of failing on a leftover.
+if(DEFINED LIBCIMBAR_SRC AND NOT EXISTS "${LIBCIMBAR_SRC}/src/lib/encoder/Encoder.h")
+    message(WARNING
+        "LIBCIMBAR_SRC is set but does not look like a libcimbar tree: "
+        "${LIBCIMBAR_SRC} — falling back to the vendored defaults.")
+    # CACHE is required: a plain unset() would leave the cache entry in place
+    # and DEFINED would keep reporting true.
+    unset(LIBCIMBAR_SRC CACHE)
+    unset(LIBCIMBAR_SRC)
 endif()
 
-if(NOT EXISTS "${LIBCIMBAR_SRC}/src/lib/encoder/Encoder.h")
-    message(FATAL_ERROR "libcimbar source not found at: ${LIBCIMBAR_SRC}")
+if(NOT DEFINED LIBCIMBAR_SRC)
+    set(_CIMBAR_CANDIDATES
+        "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libcimbar"
+        "${CMAKE_CURRENT_SOURCE_DIR}/../third_party/libcimbar_cpp"
+    )
+    foreach(_candidate ${_CIMBAR_CANDIDATES})
+        if(EXISTS "${_candidate}/src/lib/encoder/Encoder.h")
+            set(LIBCIMBAR_SRC "${_candidate}")
+            break()
+        endif()
+    endforeach()
+    unset(_CIMBAR_CANDIDATES)
+    unset(_candidate)
+endif()
+
+if(NOT DEFINED LIBCIMBAR_SRC OR NOT EXISTS "${LIBCIMBAR_SRC}/src/lib/encoder/Encoder.h")
+    message(FATAL_ERROR
+        "libcimbar source not found. Looked in ../third_party/libcimbar and "
+        "../third_party/libcimbar_cpp. Pass -DLIBCIMBAR_SRC=<path> to point "
+        "at the C++ core.")
 endif()
 
 message(STATUS "libcimbar source: ${LIBCIMBAR_SRC}")

@@ -213,10 +213,10 @@ CMAKE_TAPI:FILEPATH=CMAKE_TAPI-NOTFOUND
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
 //No help, variable specified on the command line.
-LIBCIMBAR_SRC:UNINITIALIZED=/home/ubuntu/project/libcimbar/third_party/libcimbar_cpp
+OPENCV_DIR:UNINITIALIZED=/home/ubuntu/project/opencv/install_linux_min/lib/cmake/opencv4
 
 //No help, variable specified on the command line.
-OPENCV_DIR:UNINITIALIZED=/home/ubuntu/project/opencv/install_linux_min/lib/cmake/opencv4
+OpenCV_DIR:UNINITIALIZED=/home/ubuntu/project/opencv/install_linux_min/lib/cmake/opencv4
 
 //The directory containing a CMake configuration file for glfw3.
 glfw3_DIR:PATH=glfw3_DIR-NOTFOUND
