@@ -97,6 +97,11 @@ assets/wasm/*.js
 !assets/wasm/.gitkeep
 
 # ====================
+# WASM regression test scratch (test/wasm/run.sh compiles dump_frames here)
+# ====================
+test/wasm/.build/
+
+# ====================
 # Example app
 # ====================
 example/build/
