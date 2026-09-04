@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 
 import '../interfaces/camera_capture_interface.dart';
+import 'yuv420_to_i420.dart';
 
 /// Camera capture for Android (and iOS), backed by the `camera` plugin.
 ///
@@ -96,6 +97,16 @@ class AndroidCameraCapture implements ICameraCapture {
     _controller = controller;
 
     await controller.initialize();
+
+    // The official decoder asks for FOCUS_MODE_CONTINUOUS_VIDEO. The plugin
+    // only exposes auto/locked, and `auto` is its default — set it
+    // explicitly so we don't inherit a locked focus from elsewhere.
+    try {
+      await controller.setFocusMode(FocusMode.auto);
+    } catch (_) {
+      // Not all devices/backends support changing focus mode.
+    }
+
     await controller.startImageStream(_onCameraImage);
     _streaming = true;
   }
@@ -163,12 +174,19 @@ class AndroidCameraCapture implements ICameraCapture {
   // ─── Internals ─────────────────────────────────────────────────
 
   /// Map a requested capture size onto the nearest plugin preset.
+  ///
+  /// The official android decoder (cfc, `OpencvCameraView.bestCameraFrameSize`)
+  /// only accepts preview sizes whose **short** side is 960..1080, and falls
+  /// back to a plain "best fit" otherwise. 1080p is the ceiling here for the
+  /// same reason: the decoder only needs the barcode to span enough pixels
+  /// (~512 already decodes), while a 4K frame costs several times as much to
+  /// move across the JNI boundary and scan, for no decoding benefit.
   ResolutionPreset _presetFor(int width, int height) {
-    final longSide = width > height ? width : height;
-    if (longSide >= 3000) return ResolutionPreset.ultraHigh;
-    if (longSide >= 1900) return ResolutionPreset.veryHigh;
-    if (longSide >= 1200) return ResolutionPreset.high;
-    return ResolutionPreset.medium;
+    final shortSide = width < height ? width : height;
+    if (shortSide >= 1000) return ResolutionPreset.veryHigh; // 1080p
+    if (shortSide >= 700) return ResolutionPreset.high; // 720p
+    if (shortSide >= 400) return ResolutionPreset.medium; // 480p
+    return ResolutionPreset.low;
   }
 
   void _onCameraImage(CameraImage image) {
@@ -182,120 +200,29 @@ class AndroidCameraCapture implements ICameraCapture {
     }
     _lastDelivered = now;
 
-    final converted = _toI420(image, cropToSquare: _autoCropEnabled);
+    final converted = yuv420ToI420(
+      image.width,
+      image.height,
+      [
+        for (final p in image.planes)
+          YuvPlane(
+            bytes: p.bytes,
+            rowStride: p.bytesPerRow,
+            pixelStride: p.bytesPerPixel ?? 1,
+          ),
+      ],
+      cropToSquare: _autoCropEnabled,
+    );
     if (converted == null) return;
-    final bytes = converted.$1;
-    final w = converted.$2;
-    final h = converted.$3;
 
     callback(CameraFrame(
-      data: bytes,
-      width: w,
-      height: h,
+      data: converted.bytes,
+      width: converted.width,
+      height: converted.height,
       // CimbarImageFormat.yuv420 -> native cv::COLOR_YUV420p2RGB
       format: 'yuv420',
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
-  }
-
-  /// Normalise a `CameraImage` to tightly-packed I420, optionally cropping
-  /// to a centred square.
-  ///
-  /// Returns (bytes, width, height) or null when the image cannot be used.
-  (Uint8List, int, int)? _toI420(
-    CameraImage image, {
-    required bool cropToSquare,
-  }) {
-    final planes = image.planes;
-    if (planes.length < 3) return null;
-
-    final fullW = image.width;
-    final fullH = image.height;
-    if (fullW <= 0 || fullH <= 0) return null;
-
-    // Crop region (in luma pixels), kept even so the chroma planes stay
-    // whole — an odd offset would sample the wrong UV pair.
-    int cropX = 0, cropY = 0, cropW = fullW, cropH = fullH;
-    if (cropToSquare && fullW != fullH) {
-      final side = (fullW < fullH ? fullW : fullH) & ~1;
-      cropW = side;
-      cropH = side;
-      cropX = ((fullW - side) ~/ 2) & ~1;
-      cropY = ((fullH - side) ~/ 2) & ~1;
-    }
-    // Chroma is subsampled 2:1 in both directions.
-    final chromaW = cropW ~/ 2;
-    final chromaH = cropH ~/ 2;
-    if (chromaW <= 0 || chromaH <= 0) return null;
-
-    final out = Uint8List(cropW * cropH + chromaW * chromaH * 2);
-
-    _copyPlane(
-      planes[0],
-      out,
-      dstOffset: 0,
-      dstRowStride: cropW,
-      srcX: cropX,
-      srcY: cropY,
-      width: cropW,
-      height: cropH,
-    );
-    _copyPlane(
-      planes[1],
-      out,
-      dstOffset: cropW * cropH,
-      dstRowStride: chromaW,
-      srcX: cropX ~/ 2,
-      srcY: cropY ~/ 2,
-      width: chromaW,
-      height: chromaH,
-    );
-    _copyPlane(
-      planes[2],
-      out,
-      dstOffset: cropW * cropH + chromaW * chromaH,
-      dstRowStride: chromaW,
-      srcX: cropX ~/ 2,
-      srcY: cropY ~/ 2,
-      width: chromaW,
-      height: chromaH,
-    );
-
-    return (out, cropW, cropH);
-  }
-
-  /// Copy a [plane] region into [dst], handling both row padding
-  /// (`bytesPerRow`) and interleaved chroma (`bytesPerPixel` > 1).
-  ///
-  /// For semi-planar input (NV21), planes[1] and planes[2] describe the same
-  /// interleaved buffer at different phases, so sampling every
-  /// `bytesPerPixel`-th byte is what separates U from V.
-  void _copyPlane(
-    Plane plane,
-    Uint8List dst, {
-    required int dstOffset,
-    required int dstRowStride,
-    required int srcX,
-    required int srcY,
-    required int width,
-    required int height,
-  }) {
-    final src = plane.bytes;
-    final rowStride = plane.bytesPerRow;
-    final pixelStride = plane.bytesPerPixel ?? 1;
-    if (rowStride <= 0) return;
-
-    var o = dstOffset;
-    for (var y = 0; y < height; y++) {
-      final rowStart = (srcY + y) * rowStride;
-      for (var x = 0; x < width; x++) {
-        final srcIndex = rowStart + (srcX + x) * pixelStride;
-        if (srcIndex < src.length) {
-          dst[o + x] = src[srcIndex];
-        }
-      }
-      o += dstRowStride;
-    }
   }
 }
 
