@@ -59,24 +59,45 @@ Future<JSAny?> _jsAwait(JSPromise<JSAny?> promise) {
 // ─── WebCameraCapture implementation ─────────────────────────────
 
 /// Web camera capture using getUserMedia API.
+///
+/// The pipeline mirrors the official Android decoder (sz3/cfc,
+/// `OpencvCameraView` + `MultiThreadedDecoder`) as closely as the browser
+/// allows:
+///
+///  1. **1080p-class capture.** cfc's `bestCameraFrameSize` only accepts
+///     preview sizes whose short edge is in [960, 1080]. We request
+///     1920x1080 (`ideal`) and, if the camera delivers more, downscale the
+///     frame ONCE so the short edge is [maxTargetSize] (default 1080).
+///     A camera that delivers less is used as-is — upscaling adds no
+///     information and the interpolation blur is what used to destroy the
+///     corner anchors.
+///  2. **Full frame, zero cropping.** cfc hands the entire upright RGBA
+///     frame to the decoder; the Scanner searches the whole frame for the
+///     4 corner anchors and the Deskewer's homography normalises the
+///     barcode to its fixed size (rotation, perspective AND scale). There
+///     is no center-crop and no auto-crop — both could slice anchors off
+///     an off-centre barcode, and every extra resampling step blurred the
+///     cell grid. Verified offline against the WASM build: a 1024px
+///     barcode anywhere in a 1920x1080 frame decodes, and an 800px
+///     barcode still decodes (the deskew upscale handles it); ~700px is
+///     the practical anchor-detection floor at 1080p.
+///  3. **RGB pixels to the decoder.** The frame is read back with
+///     getImageData and the alpha channel stripped in Dart — the WASM
+///     build's own RGBA->RGB conversion (getUMat + cvtColor) is
+///     unreliable on Emscripten, so format 3 (RGB) is the proven input.
+///
+/// What you see in the preview is exactly what the decoder receives.
 class WebCameraCapture implements ICameraCapture {
   JSObject? _video;
   JSObject? _ctx;
-
-  /// The offscreen canvas itself (not just its context).
-  ///
-  /// Needed as the *source* when re-drawing a cropped region back into the
-  /// canvas: `ctx.drawImage(...)` accepts only image sources (canvas/video/
-  /// image elements), never a 2D context.
-  JSObject? _canvas;
   JSObject? _stream;
 
   /// Persistent canvas holding the RAW camera frame at native resolution.
   ///
-  /// Frames are blitted here on every capture, so the unprocessed image is
-  /// still available AFTER the camera is stopped ([_video] is nulled on
-  /// stop, which is exactly why the raw capture used to be missing from the
-  /// encoder side whenever 截图 was pressed after stopping a scan).
+  /// Frames are blitted here on demand (see [captureRawFramePng]), so the
+  /// unprocessed image is still available AFTER the camera is stopped
+  /// ([_video] is nulled on stop, which is exactly why the raw capture
+  /// used to be missing whenever 截图 was pressed after stopping a scan).
   JSObject? _rawCanvas;
   JSObject? _rawCtx;
   Timer? _frameTimer;
@@ -87,69 +108,39 @@ class WebCameraCapture implements ICameraCapture {
   int _videoWidth = 0;
   int _videoHeight = 0;
 
+  /// Decode-canvas dimensions (after the optional single downscale).
+  int _canvasWidth = 0;
+  int _canvasHeight = 0;
+
   /// Default capture cadence (~5 fps). Can be overridden via [start].
   static const int _defaultFrameIntervalMs = 200; // ~5 fps
 
-  /// Square size used before the camera resolution is known.
-  static const int _fallbackTargetSize = 1024;
-
-  /// Upper bound for the square decoder input, to cap per-frame CPU/memory.
-  ///
-  /// Raised from 1600: a barcode photographed from across the room only fills
-  /// a fraction of the view, so shrinking the frame to 1600 left it below the
-  /// ~1024 px needed per barcode and the anchor scan failed. 2048 keeps the
-  /// barcode above that threshold while bounding per-frame cost (~12.6 MB
-  /// RGBA per frame at 5 fps).
-  static const int _maxTargetSize = 2048;
-
-  /// Side length (px) of the square frame handed to the decoder.
-  ///
-  /// Chosen once the camera resolution is known (see [_computeTargetSize]):
-  /// for [WebCaptureMode.centerCrop] it tracks the cropped square (the shorter
-  /// video side) so the barcode keeps its native detail instead of being
-  /// downscaled to a fixed 1024. Capped by [_maxTargetSize].
-  int _targetSize = _fallbackTargetSize;
+  /// Short-edge cap for the decode input, matching cfc's camera
+  /// resolution policy (preview short edge must be within [960, 1080]).
+  static const int _defaultMaxShortEdge = 1080;
 
   /// Current capture cadence in milliseconds (driven by [start]).
   int _frameIntervalMs = _defaultFrameIntervalMs;
 
-  /// How the video frame is mapped into the square decoder input.
+  /// Short-edge cap (px) for the frame handed to the decoder.
   ///
-  /// Defaults to [WebCaptureMode.centerCrop]: the largest centred square is
-  /// scaled to fill the decoder input. On a portrait 4K phone frame
-  /// (2176x3840) that keeps the barcode at ~1650px inside the 2048 input,
-  /// versus ~940px under [fit] — and it shrinks by only ~0.94x instead of
-  /// ~0.53x, which is the difference between cimbar's cell grid surviving
-  /// resampling and being aliased into mush. Offline measurements with the
-  /// native decoder put centerCrop clearly ahead, so it is the default.
-  ///
-  /// The trade-off is that anything outside the centre square is dropped, so
-  /// a badly off-centre barcode can lose corner anchors. Switch to [fit]
-  /// (whole frame letterboxed, nothing cropped) or [alternate] (flip between
-  /// the two so whichever framing satisfies the 4-anchor scan first wins)
-  /// when the phone is hand-held and the subject may drift off-centre.
+  /// Frames whose short edge exceeds this are downscaled once so the
+  /// short edge equals the cap; smaller frames pass through at native
+  /// resolution (never upscaled). Defaults to 1080, matching the official
+  /// Android decoder. Raise it only if the scanner cannot keep up — a
+  /// bigger frame costs CPU without adding decodable detail.
+  int maxTargetSize = _defaultMaxShortEdge;
+
+  /// Ignored: the web pipeline now always scans the full frame, like the
+  /// official Android decoder. Kept only so existing callers (the shared
+  /// decoder page writes this via `as dynamic`) do not break.
+  @Deprecated('Full-frame scanning is always on (cfc-style); this is a no-op.')
   WebCaptureMode captureMode = WebCaptureMode.centerCrop;
 
-  /// Whether to trim the wasted background around the barcode before
-  /// handing the frame to the decoder.
-  ///
-  /// On by default (it removes the large black bars / wall / desk that
-  /// otherwise fill the decoder input), but it depends on locating the
-  /// coloured barcode region, so it can be switched off when a scene has
-  /// other strongly coloured objects that confuse the bounding-box scan.
-  /// The crop always preserves the aspect ratio — it is only ever scaled up
-  /// and centred, never stretched.
+  /// Ignored: the web pipeline no longer crops at all — the Scanner finds
+  /// the barcode anywhere in the full frame. See [captureMode].
+  @Deprecated('Full-frame scanning is always on (cfc-style); this is a no-op.')
   bool autoCropEnabled = true;
-
-  /// Upper bound for the square decoder input, in pixels.
-  ///
-  /// Higher keeps more of the barcode's detail (better anchoring when the
-  /// barcode is small in frame) at the cost of per-frame CPU/memory. Lower it
-  /// on devices where the scan step cannot keep up with the capture cadence.
-  int maxTargetSize = _maxTargetSize;
-
-  /// Counts delivered frames; drives the [WebCaptureMode.alternate] flip.
-  int _frameCounter = 0;
 
   @override
   bool get isSupported => true;
@@ -166,13 +157,20 @@ class WebCameraCapture implements ICameraCapture {
   int get videoWidth => _videoWidth;
   int get videoHeight => _videoHeight;
 
-  /// Side length (px) of the square frame handed to the decoder.
-  int get decoderInputSize => _targetSize;
+  /// Dimensions of the frame handed to the decoder (after the optional
+  /// single downscale to [maxTargetSize] short edge).
+  int get decoderInputWidth => _canvasWidth;
+  int get decoderInputHeight => _canvasHeight;
+
+  /// Long-edge size of the decoder input. Kept for callers that predate
+  /// the full-frame pipeline (the decoder input used to be square).
+  @Deprecated('Use decoderInputWidth/decoderInputHeight instead.')
+  int get decoderInputSize => math.max(_canvasWidth, _canvasHeight);
 
   @override
   Future<void> start({
-    int preferredWidth = 1024,
-    int preferredHeight = 1024,
+    int preferredWidth = 1920,
+    int preferredHeight = 1080,
     int frameIntervalMs = _defaultFrameIntervalMs,
   }) async {
     if (_streaming) return;
@@ -194,9 +192,9 @@ class WebCameraCapture implements ICameraCapture {
     _setProp(video, 'playsInline', true.toJS);
     _setProp(video, 'srcObject', stream);
     // Style the video element to fill its container. `contain` (not `cover`)
-    // so the preview shows the ENTIRE camera frame — what you see is what the
-    // decoder receives; `cover` would hide the edges and let the barcode
-    // drift out of the captured frame unnoticed.
+    // so the preview shows the ENTIRE camera frame — what you see is what
+    // the decoder receives; `cover` would hide the edges and let the
+    // barcode drift out of the captured frame unnoticed.
     _setProp(video, 'style',
         'width:100%;height:100%;object-fit:contain;background:#000;'.toJS);
     _video = video;
@@ -226,22 +224,31 @@ class WebCameraCapture implements ICameraCapture {
     _videoWidth = _getIntProp(video, 'videoWidth') ?? preferredWidth;
     _videoHeight = _getIntProp(video, 'videoHeight') ?? preferredHeight;
 
-    // Size the square decoder input from the actual camera resolution so we
-    // don't throw away detail by hard-scaling every frame down to 1024.
-    _targetSize = _computeTargetSize(_videoWidth, _videoHeight);
+    // Size the decode canvas: full frame at native resolution, downscaled
+    // ONCE if the short edge exceeds the cap (cfc caps its preview at
+    // 1080p — more pixels only slow the scanner down). Never upscaled.
+    final cap = maxTargetSize > 0 ? maxTargetSize : _defaultMaxShortEdge;
+    final shortEdge = math.min(_videoWidth, _videoHeight);
+    if (shortEdge > cap) {
+      final scale = cap / shortEdge;
+      _canvasWidth = math.max(1, (_videoWidth * scale).round());
+      _canvasHeight = math.max(1, (_videoHeight * scale).round());
+    } else {
+      _canvasWidth = _videoWidth;
+      _canvasHeight = _videoHeight;
+    }
     debugPrint('[Camera] video ${_videoWidth}x$_videoHeight, '
-        'mode=${captureMode.name}, decoder input ${_targetSize}x$_targetSize');
+        'decoder input ${_canvasWidth}x$_canvasHeight (full frame)');
 
-    // Create the offscreen canvas at the chosen target size.
+    // Create the offscreen canvas at the chosen size.
     final canvas = _createElement('canvas');
-    _setProp(canvas, 'width', _targetSize.toJS);
-    _setProp(canvas, 'height', _targetSize.toJS);
+    _setProp(canvas, 'width', _canvasWidth.toJS);
+    _setProp(canvas, 'height', _canvasHeight.toJS);
     final getCtx = _reflectGet(canvas, 'getContext'.toJS) as JSFunction?;
     _ctx = getCtx?.callAsFunction(canvas, '2d'.toJS) as JSObject?;
-    _canvas = canvas;
 
     // Persistent raw canvas at the camera's native resolution (e.g.
-    // 2176x3840). Each frame is blitted here so the untouched image stays
+    // 2176x3840). Blitted on demand so the untouched image stays
     // available for 截图 even after the camera has been stopped.
     final rawCanvas = _createElement('canvas');
     _setProp(rawCanvas, 'width', _videoWidth.toJS);
@@ -282,18 +289,6 @@ class WebCameraCapture implements ICameraCapture {
     return obj;
   }
 
-  /// Pick the square decoder-input size from the camera resolution.
-  ///
-  /// centerCrop/alternate use the largest centered square (the shorter side);
-  /// pure fit maps the whole frame in, so we key off the longer side. Clamped
-  /// to [_fallbackTargetSize] .. [_maxTargetSize].
-  int _computeTargetSize(int vw, int vh) {
-    if (vw <= 0 || vh <= 0) return _fallbackTargetSize;
-    final base =
-        captureMode == WebCaptureMode.fit ? math.max(vw, vh) : math.min(vw, vh);
-    return base.clamp(_fallbackTargetSize, maxTargetSize);
-  }
-
   void _setProp(JSObject obj, String key, JSAny? value) {
     _reflectSet(obj, key.toJS, value);
   }
@@ -321,89 +316,24 @@ class WebCameraCapture implements ICameraCapture {
     final vh = _getIntProp(video, 'videoHeight') ?? _videoHeight;
     if (vw <= 0 || vh <= 0) return;
 
-    // Square decoder input size (chosen from camera resolution in start()).
-    final targetSize = _targetSize;
+    final cw = _canvasWidth;
+    final ch = _canvasHeight;
+    if (cw <= 0 || ch <= 0) return;
 
-    // Resolve the effective mapping for THIS frame. In alternate mode we flip
-    // between centerCrop (big barcode, may chop off-center anchors) and fit
-    // (whole frame visible, smaller barcode) so at least one framing can
-    // satisfy the 4-anchor scan.
-    var mode = captureMode;
-    if (mode == WebCaptureMode.alternate) {
-      mode =
-          _frameCounter.isEven ? WebCaptureMode.centerCrop : WebCaptureMode.fit;
-    }
-    _frameCounter++;
-    if (_frameCounter % 50 == 1) {
-      debugPrint('[Camera] frame #$_frameCounter mode=${mode.name} '
-          '(configured=${captureMode.name}, video ${vw}x$vh -> '
-          '${targetSize}x$targetSize)');
-    }
-
-    // Source rect (region of the video) and dest rect (region of the canvas).
-    int sx, sy, sw, sh; // source
-    int dx, dy, dw, dh; // destination
-    if (mode == WebCaptureMode.centerCrop) {
-      // Largest centered square, scaled to fill the whole canvas.
-      final cropSize = vw < vh ? vw : vh;
-      sx = (vw - cropSize) ~/ 2;
-      sy = (vh - cropSize) ~/ 2;
-      sw = sh = cropSize;
-      dx = dy = 0;
-      dw = dh = targetSize;
-    } else {
-      // Fit the ENTIRE frame into the square, preserving aspect ratio.
-      // The whole barcode (and all four anchors) stays visible even when it
-      // is not perfectly centered in the camera view.
-      sx = sy = 0;
-      sw = vw;
-      sh = vh;
-      // Never upscale. If the camera is delivering fewer pixels than the
-      // target, enlarging them only interpolates — the barcode gains no real
-      // detail and the softening is what loses the corner anchors (same
-      // failure mode as the auto-crop upscale below). Fit instead: the frame
-      // lands centred at native resolution with black letterbox borders.
-      final srcLong = math.max(vw, vh);
-      final dstLong = math.min(targetSize, srcLong);
-      final scale = dstLong / srcLong;
-      dw = (vw * scale).round().clamp(1, targetSize);
-      dh = (vh * scale).round().clamp(1, targetSize);
-      dx = (targetSize - dw) ~/ 2;
-      dy = (targetSize - dh) ~/ 2;
-    }
-
-    // NOTE: the raw (untouched, native-resolution) frame is NOT blitted here
-    // on every tick. Doing so meant a full 2176x3840 (8.3 Mpx) drawImage per
-    // captured frame, which on a phone drove memory/CPU hard enough to crash
-    // the tab — most visibly when tapping 停止扫描. It is now grabbed once,
-    // on demand: from the live video in [captureRawFramePng], or right before
-    // the video element is released in [stop], so the untouched photo is
-    // still available after the scan ends.
-
-    // Clear the canvas to solid black so letterbox borders are well-defined
-    // (a uniform fill won't be mistaken for cimbar anchor patterns).
-    final fillRect = _reflectGet(ctx, 'fillRect'.toJS) as JSFunction?;
-    if (fillRect != null) {
-      _setProp(ctx, 'fillStyle', '#000000'.toJS);
-      _reflectApply(fillRect, ctx,
-          [0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS].toJS);
-    }
-
-    // Draw the (cropped or fitted) region — do NOT resize canvas here.
+    // Draw the FULL frame — no crop, no letterbox, aspect preserved.
+    // When the canvas matches the video this is a 1:1 blit (no resampling
+    // at all, exactly like cfc handing the camera Mat to its decoder);
+    // otherwise it is the single downscale to the 1080p-class cap.
     final drawImage = _reflectGet(ctx, 'drawImage'.toJS) as JSFunction?;
     if (drawImage != null) {
-      final args = [
-        video,
-        sx.toJS, sy.toJS, sw.toJS, sh.toJS, // source rect
-        dx.toJS, dy.toJS, dw.toJS, dh.toJS, // dest rect
-      ].toJS;
-      _reflectApply(drawImage, ctx, args);
+      _reflectApply(drawImage, ctx,
+          [video, 0.toJS, 0.toJS, cw.toJS, ch.toJS].toJS);
     }
 
-    // Get cropped pixel data
+    // Get pixel data
     final getImageData = _reflectGet(ctx, 'getImageData'.toJS) as JSFunction?;
     final imageData = getImageData?.callAsFunction(
-        ctx, 0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS) as JSObject?;
+        ctx, 0.toJS, 0.toJS, cw.toJS, ch.toJS) as JSObject?;
     if (imageData == null) {
       // Without this the frame is dropped in silence and the UI just says
       // "no frame captured yet" while the preview looks perfectly fine.
@@ -418,197 +348,7 @@ class WebCameraCapture implements ICameraCapture {
     }
 
     final clampedArray = jsData as JSUint8ClampedArray;
-    final rgbaPixels = Uint8List.fromList(clampedArray.toDart);
-
-    // ----- Auto-crop to the cimbar region -----
-    //
-    // The raw camera frame often has a lot of wasted background (e.g. a
-    // portrait phone photographing a monitor on a desk: large black bars
-    // on the sides, the wall above, the desk below). Without cropping, all
-    // that space gets upscaled into the 2048x2048 decoder input — the
-    // cimbar ends up at ~30% of the frame and the scanner's anchor search
-    // window has to traverse thousands of useless black pixels.
-    //
-    // A quick stride scan for saturated/colored pixels (the cimbar's
-    // bright cells) finds the actual barcode bounding box. If that box is
-    // much smaller than the canvas, we redraw only the cropped + upscaled
-    // content into the canvas, then proceed as before.
-    //
-    // At stride=16, a 2048x2048 canvas samples ~16K pixels — well under
-    // a frame budget.
-    Uint8List rgbaForDecoder = rgbaPixels;
-    int frameW = targetSize, frameH = targetSize;
-    // The whole auto-crop step is best-effort. It is only an optimisation,
-    // so any failure here must never stop the frame from reaching the
-    // decoder — a thrown exception used to silently kill every capture.
-    try {
-      const int stride = 16;
-      // Tightened from 50 to 100: the previous threshold caught the wood
-      // desk too (RGB ~ (150, 100, 70) -> max-min ~ 80, just over 50),
-      // dragging the bbox all the way down to the desk surface and pulling
-      // the monitor stand + book into the "cimbar" crop. Cimbar's cells all
-      // have max-min >= 150, so 100 keeps every cimbar pixel and excludes
-      // wood — the bbox now hugs the cimbar pattern instead of the entire
-      // scene below it. The decoder then sees the cimbar filling most of
-      // the input instead of fighting a 50%-wood crop.
-      const int satThresh = 100;
-      int minX = targetSize, minY = targetSize, maxX = -1, maxY = -1;
-      for (int y = 0; y < targetSize; y += stride) {
-        final rowBase = y * targetSize * 4;
-        for (int x = 0; x < targetSize; x += stride) {
-          final i = rowBase + x * 4;
-          final r = rgbaPixels[i];
-          final g = rgbaPixels[i + 1];
-          final b = rgbaPixels[i + 2];
-          final int mn = r < g
-              ? (r < b ? r : b)
-              : (g < b ? g : b);
-          final int mx = r > g
-              ? (r > b ? r : b)
-              : (g > b ? g : b);
-          if (mx - mn >= satThresh) {
-            if (x < minX) minX = x;
-            if (y < minY) minY = y;
-            if (x > maxX) maxX = x;
-            if (y > maxY) maxY = y;
-          }
-        }
-      }
-      if (maxX >= minX && maxY >= minY) {
-        // Pad the bbox generously, and scale the pad with the bbox.
-        //
-        // The saturated-pixel scan finds the cimbar *cells*, but cimbar's
-        // dark border — which carries the four corner ANCHORS the decoder
-        // needs — is low-saturation and sits outside that box. A tight crop
-        // therefore slices the anchors off and the scan reports
-        // "found 0 anchor(s) (need 4)".
-        //
-        // Measured offline (tool/pipeline_pad_sweep.dart) against a real
-        // 4K phone capture: with a 944px bbox in a 2048 canvas, padding of
-        // 16px (the old value, one stride) loses the anchors, while >= 32px
-        // keeps all four. 5% of the bbox tracks the barcode's own border as
-        // it scales, with a floor of 32px for small/barcodes-far captures.
-        final rawW = maxX - minX + 1;
-        final rawH = maxY - minY + 1;
-        final pad = math.min(256, math.max(32, (math.max(rawW, rawH) * 0.05).round()));
-        minX = (minX - pad).clamp(0, targetSize - 1);
-        minY = (minY - pad).clamp(0, targetSize - 1);
-        maxX = (maxX + pad).clamp(0, targetSize - 1);
-        maxY = (maxY + pad).clamp(0, targetSize - 1);
-        final bboxW = maxX - minX + 1;
-        final bboxH = maxY - minY + 1;
-        final bboxArea = bboxW * bboxH;
-        final canvasArea = targetSize * targetSize;
-        // Throttled log (1 in 50 frames is plenty) — the bbox dimensions are
-        // the single most useful number when diagnosing "decoder can't find
-        // anchors" or "auto-crop kept too much": if bboxW/H is much bigger
-        // than the visible cimbar, the detector is picking up background
-        // (wood, book, monitor edges) and the sat threshold needs to go up.
-        if (_frameCounter % 50 == 1) {
-          final pct = canvasArea == 0 ? 0 : (bboxArea * 100 ~/ canvasArea);
-          debugPrint('[Camera] auto-crop bbox: $bboxW x $bboxH '
-              '($pct% of canvas, origin=($minX,$minY))');
-        }
-        // Only crop when the bbox is meaningfully smaller than the canvas —
-        // for a tightly framed capture the bbox spans most of the canvas
-        // and cropping would lose no overhead.
-        if (autoCropEnabled &&
-            bboxArea < canvasArea * 7 ~/ 10 &&
-            _canvas != null &&
-            drawImage != null) {
-          // Redraw the cropped + upscaled region back into the canvas,
-          // PRESERVING THE ASPECT RATIO.
-          //
-          // Stretching the crop to fill the square (the previous behaviour)
-          // deformed the barcode — a 612x787 portrait region became a
-          // 2048x2048 square — which is strictly worse than leaving it
-          // letterboxed, because the anchor pattern itself gets squashed.
-          // Instead we scale by the longer side and centre the result, so
-          // the crop only ever gets *bigger*, never distorted.
-          //
-          // The first drawImage argument must be an *image source* (here
-          // the canvas element itself) — passing the 2D context makes the
-          // browser throw a TypeError, which used to abort the whole
-          // capture so no frame ever reached the decoder (the preview still
-          // showed a picture, so it looked like it worked).
-          final scale = targetSize / math.max(bboxW, bboxH);
-          final cw = math.min(targetSize, math.max(1, (bboxW * scale).round()));
-          final ch = math.min(targetSize, math.max(1, (bboxH * scale).round()));
-          final cx = (targetSize - cw) ~/ 2;
-          final cy = (targetSize - ch) ~/ 2;
-
-          // Nearest-neighbour scaling, NOT the default smooth interpolation.
-          //
-          // This crop UPSCALES (a ~944px barcode into a 2048 canvas, ~2.2x).
-          // Smooth interpolation softens every cell edge, and the anchor
-          // scanner then cannot resolve the four corner markers at all —
-          // measured offline, the upscaled frame keeps only ~5% of the
-          // original sharpness and `scan_extract_decode` fails with -3
-          // ("found < 4 anchors") on frames that decode fine unscaled.
-          //
-          // Upscaling adds no information either way, so the blur buys
-          // nothing; nearest-neighbour keeps the cell edges hard and the
-          // frame stays decodable (verified: 8/8 frames decode).
-          _setProp(ctx, 'imageSmoothingEnabled', false.toJS);
-          final drawArgs = [
-            _canvas!,
-            minX.toJS, minY.toJS, bboxW.toJS, bboxH.toJS,
-            cx.toJS, cy.toJS, cw.toJS, ch.toJS,
-          ].toJS;
-          _reflectApply(drawImage, ctx, drawArgs);
-
-          // Paint the letterbox bars AFTER the crop, never before.
-          //
-          // Source and destination are the SAME canvas here, so clearing
-          // first would wipe the very pixels the crop still has to read —
-          // the browser would then scale an all-black rectangle and every
-          // auto-cropped frame would come out blank. Instead we fill only
-          // the four bands around the freshly drawn crop, so the padding
-          // is blank and the barcode is left untouched.
-          final fillRect = _reflectGet(ctx, 'fillRect'.toJS) as JSFunction?;
-          if (fillRect != null) {
-            _setProp(ctx, 'fillStyle', '#000000'.toJS);
-            if (cy > 0) {
-              _reflectApply(fillRect, ctx,
-                  [0.toJS, 0.toJS, targetSize.toJS, cy.toJS].toJS);
-            }
-            final bottom = cy + ch;
-            if (bottom < targetSize) {
-              _reflectApply(fillRect, ctx,
-                  [0.toJS, bottom.toJS, targetSize.toJS,
-                   (targetSize - bottom).toJS].toJS);
-            }
-            if (cx > 0) {
-              _reflectApply(fillRect, ctx,
-                  [0.toJS, cy.toJS, cx.toJS, ch.toJS].toJS);
-            }
-            final right = cx + cw;
-            if (right < targetSize) {
-              _reflectApply(fillRect, ctx,
-                  [right.toJS, cy.toJS, (targetSize - right).toJS, ch.toJS]
-                      .toJS);
-            }
-          }
-          // Re-read the canvas.
-          final imageData2 = getImageData?.callAsFunction(
-              ctx, 0.toJS, 0.toJS, targetSize.toJS, targetSize.toJS)
-              as JSObject?;
-          if (imageData2 != null) {
-            final jsData2 = _reflectGet(imageData2, 'data'.toJS);
-            if (jsData2 != null) {
-              rgbaForDecoder = Uint8List.fromList(
-                  (jsData2 as JSUint8ClampedArray).toDart);
-            }
-          }
-        }
-      }
-    } catch (e) {
-      // Auto-crop is purely an optimisation — never let it stop a frame
-      // from reaching the decoder. Fall back to the uncropped pixels so
-      // capture keeps working even if this path breaks.
-      debugPrint('[Camera] auto-crop failed, using full frame: $e');
-      rgbaForDecoder = rgbaPixels;
-    }
+    final rgbaPixels = clampedArray.toDart;
 
     // Strip the alpha channel here and hand the decoder RGB (format 3).
     //
@@ -617,41 +357,43 @@ class WebCameraCapture implements ICameraCapture {
     // falls back to a Mat path that mangles 4-channel data, and the anchor
     // scanner then reports 0 anchors on frames that decode perfectly when
     // the same data is fed to the native FFI. The Dart loop below is the
-    // only reliable way to hand RGB to WASM; at 2048x2048 it costs ~50-80 ms
-    // per frame, which is acceptable at the 5 fps default capture rate.
-    final pixelCount = frameW * frameH;
+    // only reliable way to hand RGB to WASM; at 1920x1080 it costs
+    // ~30-60 ms per frame, which is acceptable at the 5 fps default
+    // capture rate.
+    final pixelCount = cw * ch;
     final rgbPixels = Uint8List(pixelCount * 3);
     for (int i = 0; i < pixelCount; i++) {
-      rgbPixels[i * 3] = rgbaForDecoder[i * 4];
-      rgbPixels[i * 3 + 1] = rgbaForDecoder[i * 4 + 1];
-      rgbPixels[i * 3 + 2] = rgbaForDecoder[i * 4 + 2];
+      rgbPixels[i * 3] = rgbaPixels[i * 4];
+      rgbPixels[i * 3 + 1] = rgbaPixels[i * 4 + 1];
+      rgbPixels[i * 3 + 2] = rgbaPixels[i * 4 + 2];
     }
 
     _callback!(CameraFrame(
       data: rgbPixels,
-      width: frameW,
-      height: frameH,
+      width: cw,
+      height: ch,
       format: 'rgb',
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
   }
 
   /// Grab the RAW camera frame exactly as the sensor delivered it — no
-  /// cropping, no scaling, no RGBA→RGB conversion, no auto-crop.
+  /// cropping, no scaling, no RGBA→RGB conversion.
   ///
   /// This is the ground truth for "what did the camera actually see".
-  /// Comparing it against the processed frame handed to the decoder is what
-  /// tells you whether a failure is a framing/scale problem (the raw shot
-  /// looks fine but the crop cut the anchors) or a genuine decode problem
-  /// (the raw shot itself is blurry / too small / badly lit).
+  /// Comparing it against the processed frame handed to the decoder is
+  /// what tells you whether a failure is a framing/scale problem (the raw
+  /// shot looks fine but the processed frame lost the anchors) or a
+  /// genuine decode problem (the raw shot itself is blurry / too small /
+  /// badly lit).
   ///
   /// Returns PNG bytes, or null if the video is not ready.
   /// Copy the current video frame into the raw canvas at native resolution.
   ///
-  /// Runs at most once per grab — on demand here while the camera is live, or
-  /// just before the video element is released in [stop]. Deliberately NOT
-  /// per captured frame: a 2176x3840 (8.3 Mpx) drawImage on every tick drove
-  /// phone memory/CPU hard enough to crash the tab.
+  /// Runs at most once per grab — on demand here while the camera is live,
+  /// or just before the video element is released in [stop]. Deliberately
+  /// NOT per captured frame: a 2176x3840 (8.3 Mpx) drawImage on every tick
+  /// drove phone memory/CPU hard enough to crash the tab.
   void _blitRawFrame(JSObject video) {
     final rawCtx = _rawCtx;
     if (rawCtx == null || _rawCanvas == null) return;
@@ -670,9 +412,9 @@ class WebCameraCapture implements ICameraCapture {
 
   Future<Uint8List?> captureRawFramePng() async {
     // If the camera is still live, refresh the raw canvas from the video
-    // first. Otherwise reuse the copy taken by [stop] — the video element is
-    // gone by then, which is why the raw capture used to be missing entirely
-    // whenever 截图 was pressed after a scan ended.
+    // first. Otherwise reuse the copy taken by [stop] — the video element
+    // is gone by then, which is why the raw capture used to be missing
+    // entirely whenever 截图 was pressed after a scan ended.
     final video = _video;
     if (video != null) {
       _blitRawFrame(video);
@@ -725,9 +467,8 @@ class WebCameraCapture implements ICameraCapture {
     _frameTimer?.cancel();
     _frameTimer = null;
 
-    // Snapshot the untouched frame BEFORE the video element is torn down, so
-    // 截图 can still ship the raw photo after the scan has stopped. This is
-    // the only raw-canvas blit during a scan — it is not done per frame.
+    // Snapshot the untouched frame BEFORE the video element is torn down,
+    // so 截图 can still ship the raw photo after the scan has stopped.
     final video = _video;
     if (video != null) {
       _blitRawFrame(video);
@@ -757,12 +498,11 @@ class WebCameraCapture implements ICameraCapture {
 
     _video = null;
     _ctx = null;
-    _canvas = null;
     _viewType = null;
     _streaming = false;
-    // NOTE: _rawCanvas / _rawCtx are deliberately kept. They hold the last
-    // untouched camera frame so 截图 can still upload the raw photo after
-    // the scan has stopped. They are released in [dispose].
+    // NOTE: _rawCanvas / _rawCtx are deliberately kept. They hold the
+    // last untouched camera frame so 截图 can still upload the raw photo
+    // after the scan has stopped. They are released in [dispose].
   }
 
   @override
@@ -776,8 +516,8 @@ class WebCameraCapture implements ICameraCapture {
 
 /// The single spelling `cimbar_platform.dart` instantiates.
 ///
-/// That file is compiled once per target, so it can only name ONE type. The
-/// conditional import decides what this resolves to — getUserMedia on web,
-/// the `camera`-plugin implementation on native — and both sides export it
-/// under this alias so every target compiles.
+/// That file is compiled once per target, so it can only name ONE type.
+/// The conditional import decides what this resolves to — getUserMedia on
+/// web, the `camera`-plugin implementation on native — and both sides
+/// export it under this alias so every target compiles.
 typedef PlatformCameraCapture = WebCameraCapture;

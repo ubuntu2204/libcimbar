@@ -21,27 +21,15 @@ import 'package:path_provider/path_provider.dart';
 
 import 'dart:ui' as ui;
 
-/// A camera resolution preset requested from getUserMedia (`ideal`).
-///
-/// The browser picks the closest supported mode, so asking for the highest
-/// value is safe — it simply falls back to whatever the device offers.
-class _ResolutionPreset {
-  final String label;
-  final int width;
-  final int height;
-  const _ResolutionPreset(this.label, this.width, this.height);
-
-  @override
-  String toString() => '$label ($width×$height)';
-}
-
-/// Camera resolution presets, lowest to highest.
-const List<_ResolutionPreset> _resolutions = [
-  _ResolutionPreset('1080p', 1920, 1080),
-  _ResolutionPreset('2K', 2560, 1440),
-  _ResolutionPreset('4K', 3840, 2160),
-  _ResolutionPreset('Max 4K+', 4096, 3072),
-];
+/// Camera resolution requested on startup, following the official Android
+/// decoder (cfc): its `bestCameraFrameSize` only accepts preview sizes
+/// whose short edge is in [960, 1080], because the decoder needs no more
+/// than ~1080p — the Scanner searches the full frame for anchors and the
+/// Deskewer's homography normalises the barcode to its fixed size. Both
+/// the web capture (getUserMedia `ideal`) and the Android capture
+/// (ResolutionPreset mapping) treat this as a request, not a guarantee.
+const int kPreferredCameraWidth = 1920;
+const int kPreferredCameraHeight = 1080;
 
 /// Decoder page — receive cimbar barcodes via camera and decode them.
 ///
@@ -86,28 +74,6 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // Capture frame rate (frames per second) for the web camera.
   int _captureFps = 5;
-
-  // Requested camera resolution. A barcode photographed from across the room
-  // only fills a fraction of the view, so the raw camera frame must be much
-  // larger than the barcode's native 1024 px — otherwise the anchor scan
-  // cannot resolve it (it reports 2-3 of 4 anchors).
-  int _resolutionIndex = 3; // default: Max (4K+)
-
-  // Selected capture framing. Persists across the session so a user who
-  // switches to centerCrop (for a larger barcode) can toggle back without
-  // re-picking the mode every capture cycle.
-  // Default: centerCrop — on a portrait phone frame it keeps the barcode at
-  // ~1650px inside the 2048 decoder input versus fit's ~940px, and shrinks by
-  // only ~0.94x instead of ~0.53x, so the cell grid survives resampling.
-  // Switch to 'fit' in the dropdown when hand-held and the subject may drift
-  // off-centre (centerCrop drops anything outside the centre square).
-  String _captureModeName = 'centerCrop';
-
-  /// Trim the wasted background (black bars, wall, desk) around the barcode
-  /// before decoding. Preserves the aspect ratio — the crop is only scaled up
-  /// and centred, never stretched. Turn off if the scene contains other
-  /// strongly coloured objects that confuse the bounding-box scan.
-  bool _autoCropEnabled = true;
 
   // Last camera frame for screenshot
   CameraFrame? _lastFrame;
@@ -310,24 +276,15 @@ class _DecoderPageState extends State<DecoderPage> {
       await (_decoder as dynamic).resetStreams();
     } catch (_) {}
 
-    // Request the chosen camera resolution. Higher raw resolution is what
-    // gives the barcode enough pixels to anchor — but it only pays off if the
-    // decoder input is allowed to stay large, so raise the input cap for
-    // 4K-class captures (otherwise the extra detail is scaled straight back
-    // down and the scan still fails).
-    final res = _resolutions[_resolutionIndex];
-    final maxTarget =
-        (res.width >= 3840 || res.height >= 2160) ? 2048 : 1600;
-    try {
-      (_camera as dynamic).maxTargetSize = maxTarget;
-      (_camera as dynamic).captureMode = _captureModeForName(_captureModeName);
-      (_camera as dynamic).autoCropEnabled = _autoCropEnabled;
-    } catch (_) {}
-
+    // Fixed 1080p-class request, per the official Android decoder (cfc):
+    // the full frame goes to the decoder at (at most) 1080p short edge —
+    // no cropping, no mode-dependent framing. The Scanner searches the
+    // whole frame for the 4 corner anchors and the Deskewer normalises
+    // whatever it finds, so a bigger/cropped input buys nothing.
     try {
       await _camera!.start(
-        preferredWidth: res.width,
-        preferredHeight: res.height,
+        preferredWidth: kPreferredCameraWidth,
+        preferredHeight: kPreferredCameraHeight,
         frameIntervalMs: (1000 / _captureFps).round(),
       );
     } catch (e) {
@@ -906,50 +863,13 @@ class _DecoderPageState extends State<DecoderPage> {
     }
   }
 
-  /// Map the user-visible capture mode name to the underlying enum value.
-  ///
-  /// `WebCaptureMode` is exported from `package:libcimbar/libcimbar.dart` so
-  /// the page can convert its string-backed dropdown state to the actual
-  /// enum the capture expects.
-  WebCaptureMode _captureModeForName(String name) {
-    for (final m in WebCaptureMode.values) {
-      if (m.name == name) return m;
-    }
-    return WebCaptureMode.centerCrop; // matches the UI default
-  }
-
-  /// How much of the frame the barcode must cover to still reach its native
-  /// 1024 px, given the decoder input size.
-  ///
-  /// The barcode is only part of the view (it shrinks as the phone moves
-  /// away), so a larger decoder input buys real headroom: at 1080 px input
-  /// the barcode has to fill ~95% of the frame, at 2048 px only ~50%.
-  String _barcodeHeadroom(int? vw, int? vh, int? input) {
-    if (input == null || input <= 0) return 'unknown (camera not started)';
-    const native = 1024;
-    final pctForNative = (100 * native / input).round();
-    if (pctForNative <= 40) {
-      return 'GOOD — barcode reaches $native px while covering only '
-          '$pctForNative% of the frame';
-    }
-    if (pctForNative <= 70) {
-      return 'TIGHT — barcode must cover >= $pctForNative% of the frame to '
-          'reach $native px; move closer or raise resolution';
-    }
-    return 'LOW — barcode must fill >= $pctForNative% of the frame; '
-        'raise the camera resolution';
-  }
-
   /// Build a plain-text diagnostic report of the whole decode pipeline —
   /// camera resolution included — for troubleshooting "cannot decode" cases.
   String _buildDiagnosticReport() {
     final vw = _cameraProp<int>((c) => c.videoWidth as int?);
     final vh = _cameraProp<int>((c) => c.videoHeight as int?);
-    final input = _cameraProp<int>((c) => c.decoderInputSize as int?);
-    final capMode = _cameraProp<String>(
-        // Enum .name is an extension getter and cannot be invoked on a
-        // dynamic receiver -> use toString() and strip the type prefix.
-        (c) => c.captureMode?.toString().split('.').last);
+    final inW = _cameraProp<int>((c) => c.decoderInputWidth as int?);
+    final inH = _cameraProp<int>((c) => c.decoderInputHeight as int?);
     final frame = _lastFrame;
 
     final b = StringBuffer()
@@ -981,12 +901,6 @@ class _DecoderPageState extends State<DecoderPage> {
       ..writeln()
       ..writeln('[Negotiation]')
       ..writeln('  Mode sync        : $_lastSyncResult');
-    if (enc != null && input != null) {
-      final nw = (enc['nativeWidth'] as num?)?.toInt() ?? 0;
-      b.writeln('  Size check       : native barcode $nw px vs decoder '
-          'input $input px -> '
-          '${nw > 0 && input >= nw ? 'OK (input can hold the barcode 1:1)' : 'input SMALLER than native barcode (must not happen)'}');
-    }
     b
       ..writeln()
       ..writeln('[Ground truth (Pull+Decode, camera-free)]')
@@ -1017,14 +931,13 @@ class _DecoderPageState extends State<DecoderPage> {
     b
       ..writeln()
       ..writeln('[Camera]')
-      ..writeln('  Requested        : ${_resolutions[_resolutionIndex].width} x '
-          '${_resolutions[_resolutionIndex].height} '
-          '(${_resolutions[_resolutionIndex].label})')
+      ..writeln('  Pipeline         : full frame -> decoder (cfc-style: '
+          'no crop, no rescale beyond the 1080p short-edge cap)')
+      ..writeln('  Requested        : $kPreferredCameraWidth x '
+          '$kPreferredCameraHeight (fixed)')
       ..writeln('  Video resolution : ${vw ?? '?'} x ${vh ?? '?'} '
           '(actual from getUserMedia)')
-      ..writeln('  Capture mode     : ${capMode ?? '?'}')
-      ..writeln('  Decoder input    : ${input ?? '?'} x ${input ?? '?'} px')
-      ..writeln('  Barcode headroom : ${_barcodeHeadroom(vw, vh, input)}')
+      ..writeln('  Decoder input    : ${inW ?? '?'} x ${inH ?? '?'} px')
       ..writeln('  Camera active    : $_isCameraActive')
       ..writeln()
       ..writeln('[Decode session]')
@@ -1048,9 +961,9 @@ class _DecoderPageState extends State<DecoderPage> {
       ..writeln('[Hints]')
       ..writeln('  found 0 anchors   -> barcode too small/blurry in view: '
           'move closer, fill the frame, check focus/glare')
-      ..writeln('  found 1-3 anchors -> barcode partially cropped, '
-          'off-center, or too few pixels: center it, keep all 4 corners in '
-          'view, and raise 摄像头分辨率 (needs >= ~1024 px of barcode)')
+      ..writeln('  found 1-3 anchors -> barcode partially out of view or '
+          'too few pixels: keep all 4 corners visible and move closer '
+          '(needs >= ~800 px of barcode in the 1080p frame)')
       ..writeln('  accum > 1.0       -> stream poisoned by corrupt chunks '
           '(typically camera frames of the same barcode); Pull+Decode now '
           'auto-stops the camera and resets streams first')
@@ -1305,115 +1218,6 @@ class _DecoderPageState extends State<DecoderPage> {
               ),
             ],
           ),
-
-          // Camera resolution: the barcode must occupy >= ~1024 px in the
-          // raw frame, so request the highest mode the device offers.
-          Row(
-            children: [
-              Text('摄像头分辨率',
-                  style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButton<int>(
-                  isDense: true,
-                  isExpanded: true,
-                  value: _resolutionIndex,
-                  items: [
-                    for (int i = 0; i < _resolutions.length; i++)
-                      DropdownMenuItem<int>(
-                        value: i,
-                        child: Text(
-                          '${_resolutions[i].label} '
-                          '(${_resolutions[i].width}×${_resolutions[i].height})',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ),
-                  ],
-                  onChanged: (v) =>
-                      setState(() => _resolutionIndex = v ?? _resolutionIndex),
-                ),
-              ),
-            ],
-          ),
-
-          // Capture framing: how the camera frame maps into the square
-          // decoder input. `fit` is the safe default (always keeps all 4
-          // anchors in view); `centerCrop` gives a bigger barcode when the
-          // subject is reliably centered; `alternate` mixes both.
-          Row(
-            children: [
-              Text('取景模式',
-                  style: Theme.of(context).textTheme.labelSmall),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButton<String>(
-                  isDense: true,
-                  isExpanded: true,
-                  value: _captureModeName,
-                  items: const [
-                    DropdownMenuItem<String>(
-                      value: 'centerCrop',
-                      child: Text('Center crop（默认，条码最大需居中）',
-                          style: TextStyle(fontSize: 13)),
-                    ),
-                    DropdownMenuItem<String>(
-                      value: 'fit',
-                      child: Text('Fit（整帧入框，不裁切）',
-                          style: TextStyle(fontSize: 13)),
-                    ),
-                    DropdownMenuItem<String>(
-                      value: 'alternate',
-                      child: Text('Alternate（交替）',
-                          style: TextStyle(fontSize: 13)),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    if (v == null) return;
-                    setState(() => _captureModeName = v);
-                    // Apply immediately so the next captured frame uses
-                    // the new framing.
-                    try {
-                      (_camera as dynamic).captureMode = _captureModeForName(v);
-                    } catch (_) {}
-                  },
-                ),
-              ),
-            ],
-          ),
-
-          // Auto-crop toggle: trims wasted background around the barcode.
-          // Off = keep the raw framing exactly as the camera delivered it.
-          Row(
-            children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    Text('自动裁剪',
-                        style: Theme.of(context).textTheme.labelSmall),
-                    const SizedBox(width: 4),
-                    Tooltip(
-                      message: '裁掉条码周围的黑边/无用背景后等比放大（不变形）。'
-                          '若画面有其他鲜艳物体干扰检测，可关闭。',
-                      child: Icon(Icons.info_outline,
-                          size: 14,
-                          color: Theme.of(context).colorScheme.outline),
-                    ),
-                  ],
-                ),
-              ),
-              Switch(
-                value: _autoCropEnabled,
-                onChanged: (v) {
-                  setState(() => _autoCropEnabled = v);
-                  try {
-                    (_camera as dynamic).autoCropEnabled = v;
-                  } catch (_) {}
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
 
           // Camera controls: 2x2 grid of buttons — a single row of four
           // does not fit narrow phone screens.
@@ -1750,9 +1554,11 @@ class _DecoderPageState extends State<DecoderPage> {
       builder: (context, constraints) {
         final size = constraints.biggest;
         // Square guide frame: 92% of the shorter dimension, no hard cap.
-        // This mirrors the centered square the decoder actually captures
-        // (centerCrop) — the old 500px cap made users hold the barcode far
-        // too small in the camera view to ever resolve the 4 anchors.
+        // The decoder scans the FULL frame (cfc-style), so this is purely
+        // a sizing hint: a barcode roughly filling the guide lands at
+        // ~800+ px in the 1080p decode input, comfortably above the
+        // anchor-detection floor. The old 500px cap made users hold the
+        // barcode far too small to ever resolve the 4 anchors.
         final frameSize = (size.shortestSide * 0.92).clamp(150.0, 4096.0);
         final frameLeft = (size.width - frameSize) / 2;
         final frameTop = (size.height - frameSize) / 2;
