@@ -72,9 +72,23 @@ class AndroidCameraCapture implements ICameraCapture {
       }
     }
 
+    // Honour the UI's target cap: asking for more pixels than we intend to
+    // decode just wastes capture time and memory.
+    var width = preferredWidth;
+    var height = preferredHeight;
+    final cap = _maxTargetSize;
+    if (cap != null) {
+      final longSide = width > height ? width : height;
+      if (longSide > cap) {
+        final scale = cap / longSide;
+        width = (width * scale).round();
+        height = (height * scale).round();
+      }
+    }
+
     final controller = CameraController(
       selected,
-      _presetFor(preferredWidth, preferredHeight),
+      _presetFor(width, height),
       enableAudio: false,
       // yuv420 keeps the plugin from doing its own (slower) conversions.
       imageFormatGroup: ImageFormatGroup.yuv420,
@@ -109,6 +123,41 @@ class AndroidCameraCapture implements ICameraCapture {
     await _controller?.dispose();
     _controller = null;
     _onFrame = null;
+  }
+
+  // ─── Tuning, set dynamically by the decoder UI ─────────────────
+  //
+  // The UI assigns these through `as dynamic` (they are web-side concepts
+  // that the shared decoder page writes unconditionally), so they have to
+  // exist here or the writes silently no-op.
+
+  int? _maxTargetSize;
+
+  /// Upper bound for the decoded frame's long side, applied on next start.
+  set maxTargetSize(int? v) => _maxTargetSize = v;
+
+  /// Enable/disable the centred square crop.
+  set autoCropEnabled(bool v) => _autoCropEnabled = v;
+
+  /// Accepts the web-side `WebCaptureMode` enum without importing it (that
+  /// type only exists in the web build). "fit" keeps the whole frame;
+  /// anything else crops to a centred square.
+  set captureMode(dynamic mode) {
+    final name = mode?.toString().toLowerCase() ?? '';
+    _autoCropEnabled = name.contains('fit') ? false : true;
+  }
+
+  /// Grab a still picture for diagnostics (the counterpart of the web
+  /// implementation's raw-frame dump).
+  Future<Uint8List?> captureRawFramePng() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return null;
+    try {
+      final file = await controller.takePicture();
+      return await file.readAsBytes();
+    } catch (_) {
+      return null;
+    }
   }
 
   // ─── Internals ─────────────────────────────────────────────────
@@ -249,3 +298,11 @@ class AndroidCameraCapture implements ICameraCapture {
     }
   }
 }
+
+/// The single spelling `cimbar_platform.dart` instantiates.
+///
+/// That file is compiled once per target, so it can only name ONE type. The
+/// conditional import decides what this resolves to — the `camera`-plugin
+/// implementation on native, the getUserMedia one on web — and both sides
+/// export it under this alias so every target compiles.
+typedef PlatformCameraCapture = AndroidCameraCapture;

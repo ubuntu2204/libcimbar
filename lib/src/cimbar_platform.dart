@@ -116,11 +116,13 @@ class CimbarPlatform {
 
   /// Create a camera capture implementation (Web and Android only).
   Future<ICameraCapture> createCameraCapture() async {
+    // PlatformCameraCapture is a typedef that the conditional import resolves
+    // per target — web: getUserMedia, native: the `camera` plugin.
     if (kIsWeb) {
-      return WebCameraCapture();
+      return PlatformCameraCapture();
     }
     if (Platform.isAndroid || Platform.isIOS) {
-      return AndroidCameraCapture();
+      return PlatformCameraCapture();
     }
     throw UnsupportedError(
       'Camera capture is only supported on Web, Android and iOS.',

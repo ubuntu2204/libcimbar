@@ -753,3 +753,11 @@ class WebCameraCapture implements ICameraCapture {
     _rawCtx = null;
   }
 }
+
+/// The single spelling `cimbar_platform.dart` instantiates.
+///
+/// That file is compiled once per target, so it can only name ONE type. The
+/// conditional import decides what this resolves to — getUserMedia on web,
+/// the `camera`-plugin implementation on native — and both sides export it
+/// under this alias so every target compiles.
+typedef PlatformCameraCapture = WebCameraCapture;
