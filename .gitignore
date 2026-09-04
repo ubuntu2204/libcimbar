@@ -84,6 +84,10 @@ android/src/main/cpp/build/
 *.keystore
 android/src/main/cpp/.externalNativeBuild/
 android/src/main/cpp/.cxx/
+# AGP puts the CMake build cache at the MODULE root, not under src/main/cpp.
+# The rule above misses it — which is how 93 build-cache files got committed.
+android/.cxx/
+android/.externalNativeBuild/
 
 # ====================
 # Web / WASM assets (built separately, not source)
