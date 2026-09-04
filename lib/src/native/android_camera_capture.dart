@@ -50,6 +50,13 @@ class AndroidCameraCapture implements ICameraCapture {
   @override
   bool get isStreaming => _streaming;
 
+  /// The underlying controller, for apps that render a preview.
+  ///
+  /// A caller that only consumes frames never needs this, but the decoder UI
+  /// does: without rendering it the user is scanning blind, with no way to
+  /// aim the camera at the barcode. Returns null before [start].
+  CameraController? get controller => _controller;
+
   @override
   Future<void> start({
     int preferredWidth = 1920,

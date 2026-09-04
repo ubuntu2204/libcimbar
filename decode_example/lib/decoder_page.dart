@@ -3,6 +3,7 @@ import 'dart:convert' show jsonDecode, jsonEncode, utf8;
 import 'dart:io' show File, Platform;
 import 'dart:typed_data';
 
+import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
@@ -240,6 +241,21 @@ class _DecoderPageState extends State<DecoderPage> {
     }
   }
 
+  /// Byte count a decoded frame should have, per its pixel format.
+  ///
+  /// The old formula assumed RGB/RGBA (`w*h*3` or `w*h*4`) for everything, so
+  /// a correct I420 frame (`w*h*1.5`) was reported as massively short, which
+  /// sends you hunting for a bug in the camera path when the frame is fine.
+  int _expectedFrameBytes(CameraFrame frame, CimbarImageFormat fmt) {
+    final pixels = frame.width * frame.height;
+    return switch (fmt) {
+      CimbarImageFormat.rgb => pixels * 3,
+      CimbarImageFormat.rgba => pixels * 4,
+      // YUV 4:2:0 — 12 bits per pixel, whether planar (I420) or NV12.
+      CimbarImageFormat.nv12 || CimbarImageFormat.yuv420 => pixels * 3 ~/ 2,
+    };
+  }
+
   /// Diagnostics for whichever backend this platform actually uses:
   /// WASM on web, the native shared library everywhere else.
   String _getDiagnostics() {
@@ -398,7 +414,7 @@ class _DecoderPageState extends State<DecoderPage> {
             '${frame.width}x${frame.height}, '
             'format=${frame.format}(code=${imageFormat.value}), '
             'data=${frame.data.length} bytes '
-            '(expected=${frame.width * frame.height * (imageFormat.value > 4 ? 4 : 3)})');
+            '(expected=${_expectedFrameBytes(frame, imageFormat)})');
       }
 
       final result = await _decoder!.decodeFrame(
@@ -1620,6 +1636,19 @@ class _DecoderPageState extends State<DecoderPage> {
     return null;
   }
 
+  /// The `camera` plugin controller behind the capture (Android/iOS only).
+  ///
+  /// Returns null on web, where the preview is an HtmlElementView instead.
+  CameraController? get _cameraController {
+    try {
+      final cam = _camera;
+      if (cam != null) {
+        return (cam as dynamic).controller as CameraController?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// [fullBleed] renders the preview edge-to-edge (scanning layout);
   /// [overlayBottomInset] lifts the hint text above the floating control bar.
   Widget _buildCameraPreview(
@@ -1633,6 +1662,25 @@ class _DecoderPageState extends State<DecoderPage> {
           // Camera video stream
           HtmlElementView(viewType: vType),
           // Scanning frame overlay
+          _buildScanningOverlay(bottomInset: overlayBottomInset),
+        ],
+      );
+      if (fullBleed) return stack;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: stack,
+      );
+    }
+
+    // Android/iOS: the `camera` plugin preview. Without this the user is
+    // scanning blind — the stream runs and frames decode, but nothing on
+    // screen shows where the camera is pointing.
+    final ctrl = _cameraController;
+    if (_isCameraActive && ctrl != null && ctrl.value.isInitialized) {
+      final stack = Stack(
+        fit: StackFit.expand,
+        children: [
+          CameraPreview(ctrl),
           _buildScanningOverlay(bottomInset: overlayBottomInset),
         ],
       );
