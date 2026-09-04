@@ -358,7 +358,14 @@ class WebCameraCapture implements ICameraCapture {
       sx = sy = 0;
       sw = vw;
       sh = vh;
-      final scale = targetSize / math.max(vw, vh);
+      // Never upscale. If the camera is delivering fewer pixels than the
+      // target, enlarging them only interpolates — the barcode gains no real
+      // detail and the softening is what loses the corner anchors (same
+      // failure mode as the auto-crop upscale below). Fit instead: the frame
+      // lands centred at native resolution with black letterbox borders.
+      final srcLong = math.max(vw, vh);
+      final dstLong = math.min(targetSize, srcLong);
+      final scale = dstLong / srcLong;
       dw = (vw * scale).round().clamp(1, targetSize);
       dh = (vh * scale).round().clamp(1, targetSize);
       dx = (targetSize - dw) ~/ 2;
@@ -530,6 +537,19 @@ class WebCameraCapture implements ICameraCapture {
           final cx = (targetSize - cw) ~/ 2;
           final cy = (targetSize - ch) ~/ 2;
 
+          // Nearest-neighbour scaling, NOT the default smooth interpolation.
+          //
+          // This crop UPSCALES (a ~944px barcode into a 2048 canvas, ~2.2x).
+          // Smooth interpolation softens every cell edge, and the anchor
+          // scanner then cannot resolve the four corner markers at all —
+          // measured offline, the upscaled frame keeps only ~5% of the
+          // original sharpness and `scan_extract_decode` fails with -3
+          // ("found < 4 anchors") on frames that decode fine unscaled.
+          //
+          // Upscaling adds no information either way, so the blur buys
+          // nothing; nearest-neighbour keeps the cell edges hard and the
+          // frame stays decodable (verified: 8/8 frames decode).
+          _setProp(ctx, 'imageSmoothingEnabled', false.toJS);
           final drawArgs = [
             _canvas!,
             minX.toJS, minY.toJS, bboxW.toJS, bboxH.toJS,

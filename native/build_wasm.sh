@@ -38,10 +38,28 @@ fi
 echo "[1/4] Emscripten: $(emcc --version | head -1)"
 
 # Source path
+#
+# The vendored directory was renamed upstream (libcimbar_cpp -> libcimbar),
+# so probe both spellings instead of hardcoding one — a hardcoded name means
+# a rename silently leaves you shipping a stale binary.
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIBCIMBAR_SRC="${1:-${SCRIPT_DIR}/../third_party/libcimbar_cpp}"
+if [ -n "$1" ]; then
+    LIBCIMBAR_SRC="$1"
+else
+    LIBCIMBAR_SRC=""
+    for _candidate in \
+        "${SCRIPT_DIR}/../third_party/libcimbar" \
+        "${SCRIPT_DIR}/../third_party/libcimbar_cpp"; do
+        if [ -f "$_candidate/src/lib/encoder/Encoder.h" ]; then
+            LIBCIMBAR_SRC="$_candidate"
+            break
+        fi
+    done
+fi
 if [ ! -f "$LIBCIMBAR_SRC/src/lib/encoder/Encoder.h" ]; then
-    echo "ERROR: Cannot find libcimbar source at $LIBCIMBAR_SRC"
+    echo "ERROR: Cannot find libcimbar source. Looked in"
+    echo "  ../third_party/libcimbar and ../third_party/libcimbar_cpp"
+    echo "Usage: $0 [path-to-libcimbar-source]"
     exit 1
 fi
 echo "[2/4] Source: $LIBCIMBAR_SRC"
