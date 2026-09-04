@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- CAMERA: the decoder scans barcodes from the live camera feed.
+         INTERNET: the decoder talks to the encoder's LAN debug server
+         (pulls /frame.png, posts diagnostics back via POST /report). -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:label="decode_example"
         android:name="${applicationName}"

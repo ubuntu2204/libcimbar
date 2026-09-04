@@ -15,7 +15,7 @@ import 'interfaces/image_compressor_interface.dart';
 import 'impl/avif_compressor.dart';
 import 'impl/windows_screen_capture.dart'
     if (dart.library.js_interop) 'web/screen_capture_stub.dart';
-import 'native/camera_capture_stub.dart'
+import 'native/android_camera_capture.dart'
     if (dart.library.js_interop) 'web/web_camera_capture.dart';
 
 // Conditional imports — resolved at compile time:
@@ -119,11 +119,11 @@ class CimbarPlatform {
     if (kIsWeb) {
       return WebCameraCapture();
     }
-    if (Platform.isAndroid) {
-      return _AndroidCameraCapture();
+    if (Platform.isAndroid || Platform.isIOS) {
+      return AndroidCameraCapture();
     }
     throw UnsupportedError(
-      'Camera capture is only supported on Web and Android.',
+      'Camera capture is only supported on Web, Android and iOS.',
     );
   }
 
@@ -142,33 +142,6 @@ class CimbarPlatform {
 // Camera capture stubs (Web + Android)
 // =================================================================
 
-class _AndroidCameraCapture implements ICameraCapture {
-  @override
-  bool get isSupported => true;
-
-  @override
-  bool get isStreaming => false;
-
-  @override
-  Future<void> start({
-    int preferredWidth = 1920,
-    int preferredHeight = 1080,
-    int frameIntervalMs = 200,
-  }) async {
-    throw UnimplementedError(
-      'Android camera uses the camera plugin. '
-      'See example/lib/decoder_page.dart.',
-    );
-  }
-
-  @override
-  void onFrame(CameraFrameCallback callback) {
-    throw UnimplementedError('Android camera not yet wired up.');
-  }
-
-  @override
-  Future<void> stop() async {}
-
-  @override
-  Future<void> dispose() async {}
-}
+// (The former `_AndroidCameraCapture` stub is gone — Android/iOS now use
+// [AndroidCameraCapture], which is a real implementation on top of the
+// `camera` plugin.)
