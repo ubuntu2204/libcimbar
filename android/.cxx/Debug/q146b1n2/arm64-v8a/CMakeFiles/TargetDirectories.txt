@@ -1,0 +1,6 @@
+/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/CMakeFiles/zstd.dir
+/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/CMakeFiles/wirehair.dir
+/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/CMakeFiles/correct.dir
+/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/CMakeFiles/cimbar_jni.dir
+/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/CMakeFiles/edit_cache.dir
+/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/CMakeFiles/rebuild_cache.dir

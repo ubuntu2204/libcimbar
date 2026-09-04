@@ -3,6 +3,33 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// ─── Machine-local build inputs ──────────────────────────────────
+//
+// The OpenCV Android SDK is a ~300MB download and lives wherever you
+// unpacked it, so its path must NOT be hardcoded here (this file is version
+// controlled, and the plugin is consumed by other apps). Read it from
+// local.properties (git-ignored, Android's standard place for this) with the
+// OPENCV_ANDROID_SDK env var as a fallback.
+//
+// Put this in the app's android/local.properties:
+//     opencv.sdk.dir=/path/to/OpenCV-android-sdk
+def localProps = new Properties()
+[
+    rootProject.file('local.properties'),
+    project.file('local.properties'),
+].findAll { it.exists() }.each {
+    it.withInputStream { localProps.load(it) }
+}
+def opencvSdkDir = localProps.getProperty('opencv.sdk.dir') ?:
+        System.getenv('OPENCV_ANDROID_SDK')
+
+if (!opencvSdkDir) {
+    logger.warn(
+        'libcimbar: opencv.sdk.dir is not set (android/local.properties) and ' +
+        'OPENCV_ANDROID_SDK is unset — the native build will likely fail to ' +
+        'find OpenCV. Download the OpenCV Android SDK and point at it.')
+}
+
 android {
     namespace 'com.libcimbar.plugin'
     compileSdk 34
@@ -17,7 +44,17 @@ android {
 
         externalNativeBuild {
             cmake {
-                arguments '-DANDROID_STL=c++_shared'
+                def cmakeArgs = ['-DANDROID_STL=c++_shared']
+                // LIBCIMBAR_SRC_PATH is left unset on purpose: the CMakeLists
+                // probes third_party/libcimbar and third_party/libcimbar_cpp
+                // itself, so a rename upstream can't break the build.
+                if (opencvSdkDir) {
+                    cmakeArgs.add("-DOPENCV_ANDROID_SDK_PATH=${opencvSdkDir}")
+                }
+                // `*` spreads the list: arguments() is varargs, not a
+                // collection setter, so passing the list directly fails with
+                // "Could not find method arguments()".
+                arguments(*cmakeArgs)
                 cppFlags '-std=c++17 -fexceptions'
             }
         }

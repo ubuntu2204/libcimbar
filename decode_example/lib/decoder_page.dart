@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert' show jsonDecode, jsonEncode, utf8;
-import 'dart:io' show File;
+import 'dart:io' show File, Platform;
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
@@ -181,32 +181,41 @@ class _DecoderPageState extends State<DecoderPage> {
 
   Future<void> _initialize() async {
     try {
-      debugPrint('[Decoder] Waiting for WASM module...');
-      setState(() {
-        _statusMessage = '正在等待 WASM 模块初始化…';
-      });
-
-      final wasmDiag = await waitForWasmReady(
-        timeout: const Duration(seconds: 60),
-        onStatusUpdate: (status) {
-          debugPrint('[Decoder] $status');
-          if (mounted) {
-            setState(() => _statusMessage = status);
-          }
-        },
-      );
-
-      if (!wasmDiag.ready) {
-        debugPrint('[Decoder] WASM not ready. Diagnostics:');
-        debugPrint('[Decoder] ${wasmDiag.toReport()}');
+      // WASM is a web-only concern. Android talks to the same native C++
+      // core as desktop — via FFI into libcimbar_jni.so — so waiting on the
+      // WASM runtime here would just fail with "WASM module failed to load"
+      // on a platform that never needed it.
+      if (kIsWeb) {
+        debugPrint('[Decoder] Waiting for WASM module...');
         setState(() {
-          _statusMessage = 'WASM 模块初始化失败。\n\n${wasmDiag.toReport()}';
+          _statusMessage = '正在等待 WASM 模块初始化…';
         });
-        return;
+
+        final wasmDiag = await waitForWasmReady(
+          timeout: const Duration(seconds: 60),
+          onStatusUpdate: (status) {
+            debugPrint('[Decoder] $status');
+            if (mounted) {
+              setState(() => _statusMessage = status);
+            }
+          },
+        );
+
+        if (!wasmDiag.ready) {
+          debugPrint('[Decoder] WASM not ready. Diagnostics:');
+          debugPrint('[Decoder] ${wasmDiag.toReport()}');
+          setState(() {
+            _statusMessage = 'WASM 模块初始化失败。\n\n${wasmDiag.toReport()}';
+          });
+          return;
+        }
+
+        debugPrint(
+            '[Decoder] WASM ready (${wasmDiag.waitDuration?.inMilliseconds}ms). Creating decoder...');
+      } else {
+        setState(() => _statusMessage = '正在初始化原生解码库…');
       }
 
-      debugPrint(
-          '[Decoder] WASM ready (${wasmDiag.waitDuration?.inMilliseconds}ms). Creating decoder...');
       _decoder = await _platform.createDecoder();
       await _decoder!.configure(_config);
 
@@ -231,13 +240,29 @@ class _DecoderPageState extends State<DecoderPage> {
     }
   }
 
-  /// Get WASM diagnostic info.
+  /// Diagnostics for whichever backend this platform actually uses:
+  /// WASM on web, the native shared library everywhere else.
   String _getDiagnostics() {
-    try {
-      return checkWasmDiagnostics().toReport();
-    } catch (_) {
-      return 'WASM module not available.';
+    if (kIsWeb) {
+      try {
+        return checkWasmDiagnostics().toReport();
+      } catch (_) {
+        return 'WASM module not available.';
+      }
     }
+    // Android/desktop load the same C++ core via FFI; probing WASM here
+    // would report a failure that is irrelevant (and misleading) on these
+    // platforms, so report the native state instead.
+    final lib = Platform.isAndroid
+        ? 'libcimbar_jni.so'
+        : Platform.isWindows
+            ? 'libcimbar.dll'
+            : Platform.isMacOS
+                ? 'libcimbar.dylib'
+                : 'libcimbar.so';
+    return '原生解码库：$lib\n'
+        'isReady：${_decoder?.isReady}\n'
+        'mode：${_config.mode.name}';
   }
 
   // ─── Camera flow ──────────────────────────────────────────────

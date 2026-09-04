@@ -1,0 +1,58 @@
+{
+  "buildFiles": [
+    "/home/ubuntu/project/libcimbar/android/src/main/cpp/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/ubuntu/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/armeabi-v7a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/ubuntu/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/armeabi-v7a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "cimbar_jni::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "cimbar_jni",
+      "output": "/home/ubuntu/project/libcimbar/decode_example/build/libcimbar/intermediates/cxx/Debug/q146b1n2/obj/armeabi-v7a/libcimbar_jni.so",
+      "runtimeFiles": []
+    },
+    "correct::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "correct",
+      "output": "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/armeabi-v7a/libcorrect.a"
+    },
+    "wirehair::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "wirehair",
+      "output": "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/armeabi-v7a/libwirehair.a"
+    },
+    "zstd::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "armeabi-v7a",
+      "artifactName": "zstd",
+      "output": "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/armeabi-v7a/libzstd.a"
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/ubuntu/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/ubuntu/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [
+    "c"
+  ],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

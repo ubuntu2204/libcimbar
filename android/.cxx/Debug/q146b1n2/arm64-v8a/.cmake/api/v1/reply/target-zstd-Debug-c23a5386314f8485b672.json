@@ -1,0 +1,301 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "libzstd.a"
+		}
+	],
+	"backtrace" : 1,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"target_compile_definitions",
+			"target_include_directories"
+		],
+		"files" : 
+		[
+			"CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 82,
+				"parent" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 84,
+				"parent" : 0
+			},
+			{
+				"command" : 2,
+				"file" : 0,
+				"line" : 83,
+				"parent" : 0
+			}
+		]
+	},
+	"compileGroups" : 
+	[
+		{
+			"compileCommandFragments" : 
+			[
+				{
+					"fragment" : "-g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC"
+				}
+			],
+			"defines" : 
+			[
+				{
+					"backtrace" : 2,
+					"define" : "ZSTD_DISABLE_ASM"
+				}
+			],
+			"includes" : 
+			[
+				{
+					"backtrace" : 3,
+					"path" : "/home/ubuntu/project/libcimbar/android/src/main/cpp/../../../../third_party/libcimbar/src/third_party_lib/zstd"
+				}
+			],
+			"language" : "C",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24
+			],
+			"sysroot" : 
+			{
+				"path" : "/home/ubuntu/Android/Sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+			}
+		}
+	],
+	"id" : "zstd::@6890427a1f51a3e7e1df",
+	"name" : "zstd",
+	"nameOnDisk" : "libzstd.a",
+	"paths" : 
+	{
+		"build" : ".",
+		"source" : "."
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Source Files",
+			"sourceIndexes" : 
+			[
+				0,
+				1,
+				2,
+				3,
+				4,
+				5,
+				6,
+				7,
+				8,
+				9,
+				10,
+				11,
+				12,
+				13,
+				14,
+				15,
+				16,
+				17,
+				18,
+				19,
+				20,
+				21,
+				22,
+				23,
+				24
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/debug.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/entropy_common.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/error_private.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/fse_decompress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/pool.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/threading.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/xxhash.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/common/zstd_common.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/fse_compress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/hist.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/huf_compress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_literals.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_sequences.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_compress_superblock.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_double_fast.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_fast.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_lazy.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_ldm.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstd_opt.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/compress/zstdmt_compress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/huf_decompress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_ddict.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress.c",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "/home/ubuntu/project/libcimbar/third_party/libcimbar/src/third_party_lib/zstd/decompress/zstd_decompress_block.c",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import 'dart:io' show Platform;
-import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 
@@ -12,8 +11,6 @@ import 'interfaces/cimbar_decoder_interface.dart';
 import 'interfaces/screen_capture_interface.dart';
 import 'interfaces/camera_capture_interface.dart';
 import 'interfaces/image_compressor_interface.dart';
-import 'models/cimbar_config.dart';
-import 'models/decode_result.dart';
 
 import 'impl/avif_compressor.dart';
 import 'impl/windows_screen_capture.dart'
@@ -27,8 +24,11 @@ import 'native/camera_capture_stub.dart'
 //
 // Platform responsibilities:
 //   Windows  → Encoder (FFI), Screen Capture (Win32 GDI), Image Compressor
-//   Android  → Decoder (MethodChannel/JNI), Camera Capture
+//   Android  → Decoder (FFI into libcimbar_jni.so), Camera Capture
 //   Web      → Decoder (JS interop/WASM), Camera Capture
+//
+// Android deliberately uses the same FFI path as desktop. The native core is
+// identical; only the library name differs. WASM is web-only.
 import 'ffi/cimbar_encoder_ffi.dart'
     if (dart.library.js_interop) 'web/cimbar_encoder_web.dart';
 import 'ffi/cimbar_decoder_ffi.dart'
@@ -81,18 +81,19 @@ class CimbarPlatform {
   /// Create a cimbar decoder.
   ///
   /// - Web: WASM decoder via JS interop
-  /// - Android: MethodChannel decoder (JNI)
-  /// - Windows / Linux / macOS: native FFI decoder (`cimbard_*` C API in
-  ///   libcimbar.dll / libcimbar.so) — used by the encoder app for
-  ///   screenshot-based encode→decode loopback self-tests.
+  /// - Android / Windows / Linux / macOS: native FFI decoder against the
+  ///   `cimbard_*` C API. Android loads `libcimbar_jni.so` — the same C++
+  ///   core, just packaged for the platform — so every native platform uses
+  ///   one code path and one dependency (OpenCV + libcimbar), rather than
+  ///   also requiring a WASM build.
   Future<ICimbarDecoder> createDecoder() async {
     if (kIsWeb) {
       return CimbarDecoderFfi();
     }
-    if (Platform.isAndroid) {
-      return _MethodChannelDecoder();
-    }
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (Platform.isAndroid ||
+        Platform.isWindows ||
+        Platform.isLinux ||
+        Platform.isMacOS) {
       return CimbarDecoderFfi();
     }
     throw UnsupportedError(
@@ -135,52 +136,6 @@ class CimbarPlatform {
     }
     return AvifCompressor();
   }
-}
-
-// =================================================================
-// MethodChannel decoder stub for Android
-// =================================================================
-
-class _MethodChannelDecoder implements ICimbarDecoder {
-  @override
-  bool get isReady => false;
-
-  @override
-  double get progress => 0.0;
-
-  @override
-  bool get isComplete => false;
-
-  @override
-  Future<void> configure(CimbarConfig config) async {
-    throw UnimplementedError(
-      'Android decoder requires the native JNI library. '
-      'Run native/build_android.sh to compile.',
-    );
-  }
-
-  @override
-  Future<DecodeResult> decodeFrame(
-    Uint8List imageData, {
-    required int width,
-    required int height,
-    CimbarImageFormat format = CimbarImageFormat.rgb,
-  }) async {
-    throw UnimplementedError('Android decoder not yet wired up.');
-  }
-
-  @override
-  Future<Uint8List?> recoverFile(int fileId) async {
-    throw UnimplementedError('Android decoder not yet wired up.');
-  }
-
-  @override
-  Future<String> recoverFilename(int fileId) async {
-    throw UnimplementedError('Android decoder not yet wired up.');
-  }
-
-  @override
-  Future<void> dispose() async {}
 }
 
 // =================================================================

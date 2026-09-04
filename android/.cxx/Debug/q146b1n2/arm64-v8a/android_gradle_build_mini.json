@@ -1,0 +1,45 @@
+{
+  "buildFiles": [
+    "/home/ubuntu/project/libcimbar/android/src/main/cpp/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/ubuntu/Android/Sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/ubuntu/Android/Sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "zstd::@6890427a1f51a3e7e1df": {
+      "artifactName": "zstd",
+      "abi": "arm64-v8a",
+      "output": "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/libzstd.a",
+      "runtimeFiles": []
+    },
+    "cimbar_jni::@6890427a1f51a3e7e1df": {
+      "artifactName": "cimbar_jni",
+      "abi": "arm64-v8a",
+      "output": "/home/ubuntu/project/libcimbar/decode_example/build/libcimbar/intermediates/cxx/Debug/q146b1n2/obj/arm64-v8a/libcimbar_jni.so",
+      "runtimeFiles": []
+    },
+    "correct::@6890427a1f51a3e7e1df": {
+      "artifactName": "correct",
+      "abi": "arm64-v8a",
+      "output": "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/libcorrect.a",
+      "runtimeFiles": []
+    },
+    "wirehair::@6890427a1f51a3e7e1df": {
+      "artifactName": "wirehair",
+      "abi": "arm64-v8a",
+      "output": "/home/ubuntu/project/libcimbar/android/.cxx/Debug/q146b1n2/arm64-v8a/libwirehair.a",
+      "runtimeFiles": []
+    }
+  }
+}

@@ -78,6 +78,11 @@ class CimbarNative {
       if (Platform.isWindows) return DynamicLibrary.open('libcimbar.dll');
       if (Platform.isLinux) return DynamicLibrary.open('libcimbar.so');
       if (Platform.isMacOS) return DynamicLibrary.open('libcimbar.dylib');
+      // Android ships the same native core, packaged by the Flutter tooling
+      // as lib/<abi>/libcimbar_jni.so. It exports the identical `cimbare_*` /
+      // `cimbard_*` C API, so Dart FFI binds to it exactly as on desktop —
+      // no WASM and no JNI/MethodChannel shim in between.
+      if (Platform.isAndroid) return DynamicLibrary.open('libcimbar_jni.so');
     } catch (_) {}
     return DynamicLibrary.process(); // fallback, will fail on lookups
   }
