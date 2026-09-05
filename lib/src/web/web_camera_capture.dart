@@ -33,8 +33,14 @@ external JSAny? _reflectGet(JSObject target, JSString key);
 external JSAny? _reflectApply(
     JSFunction fn, JSObject thisArg, JSArray<JSAny?> args);
 
+@JS('Reflect.construct')
+external JSObject _reflectConstruct(JSFunction ctor, JSArray<JSAny?> args);
+
 @JS('Object')
 external JSObject _newObject();
+
+@JS('window.matchMedia')
+external JSObject _matchMedia(JSString query);
 
 // Promise → Future bridge
 Future<JSAny?> _jsAwait(JSPromise<JSAny?> promise) {
@@ -60,31 +66,37 @@ Future<JSAny?> _jsAwait(JSPromise<JSAny?> promise) {
 
 /// Web camera capture using getUserMedia API.
 ///
-/// The pipeline mirrors the official Android decoder (sz3/cfc,
-/// `OpencvCameraView` + `MultiThreadedDecoder`) as closely as the browser
-/// allows:
+/// The pipeline mirrors the OFFICIAL web receiver (libcimbar/web/recv.js,
+/// i.e. https://cimbar.org/recv.html) — itself the WebCodecs port of the
+/// Android cfc architecture:
 ///
-///  1. **1080p-class capture.** cfc's `bestCameraFrameSize` only accepts
-///     preview sizes whose short edge is in [960, 1080]. We request
-///     1920x1080 (`ideal`) and, if the camera delivers more, downscale the
-///     frame ONCE so the short edge is [maxTargetSize] (default 1080).
-///     A camera that delivers less is used as-is — upscaling adds no
-///     information and the interpolation blur is what used to destroy the
-///     corner anchors.
-///  2. **Full frame, zero cropping.** cfc hands the entire upright RGBA
-///     frame to the decoder; the Scanner searches the whole frame for the
-///     4 corner anchors and the Deskewer's homography normalises the
-///     barcode to its fixed size (rotation, perspective AND scale). There
-///     is no center-crop and no auto-crop — both could slice anchors off
-///     an off-centre barcode, and every extra resampling step blurred the
-///     cell grid. Verified offline against the WASM build: a 1024px
-///     barcode anywhere in a 1920x1080 frame decodes, and an 800px
-///     barcode still decodes (the deskew upscale handles it); ~700px is
-///     the practical anchor-detection floor at 1080p.
-///  3. **RGB pixels to the decoder.** The frame is read back with
-///     getImageData and the alpha channel stripped in Dart — the WASM
-///     build's own RGBA->RGB conversion (getUMat + cvtColor) is
-///     unreliable on Emscripten, so format 3 (RGB) is the proven input.
+///  1. **recv.html's camera constraints, verbatim**: width/height
+///     {min: 720, ideal: 1920x1080}, aspectRatio by screen orientation,
+///     facingMode environment, `exposureMode: 'continuous'`,
+///     `focusMode: 'continuous'` (the autofocus hint that keeps the
+///     barcode sharp — cfc uses FOCUS_MODE_CONTINUOUS_VIDEO), frameRate
+///     {ideal: 15}.
+///  2. **Full frame, zero cropping.** The Scanner searches the whole
+///     frame for the 4 corner anchors and the Deskewer's homography
+///     normalises the barcode to its fixed size (rotation, perspective
+///     AND scale). There is no center-crop and no auto-crop — both could
+///     slice anchors off an off-centre barcode, and every extra
+///     resampling step blurred the cell grid. Verified offline against
+///     the WASM build: a 1024px barcode anywhere in a 1920x1080 frame
+///     decodes, an 800px barcode still decodes (the deskew upscale
+///     handles it); ~700px is the practical anchor-detection floor.
+///  3. **Native pixels via WebCodecs `VideoFrame.copyTo`** — the key
+///     recv.js trick. When the camera delivers NV12/I420 (the usual
+///     Android Chrome case) the raw YUV planes go to the decoder
+///     UNTOUCHED (format 12/420) and OpenCV does the YUV→RGB conversion,
+///     exactly like cfc's `COLOR_YUV2RGBA_NV21`. The canvas 2D pipeline
+///     instead routes through the browser's own conversion (color
+///     matrix + color management + premultiplied-alpha round trip).
+///     Other formats are read back as RGBA and stripped to RGB in Dart
+///     (format 3 — the WASM build's own RGBA→RGB path is unreliable on
+///     Emscripten). When `VideoFrame` is unavailable, a canvas path
+///     (full-frame draw + getImageData + RGB strip, optional single
+///     downscale to [maxTargetSize] short edge) takes over.
 ///
 /// What you see in the preview is exactly what the decoder receives.
 class WebCameraCapture implements ICameraCapture {
@@ -122,7 +134,10 @@ class WebCameraCapture implements ICameraCapture {
   /// Current capture cadence in milliseconds (driven by [start]).
   int _frameIntervalMs = _defaultFrameIntervalMs;
 
-  /// Short-edge cap (px) for the frame handed to the decoder.
+  /// Short-edge cap (px) for the frame handed to the decoder — applied
+  /// ONLY on the canvas fallback path (the VideoFrame path has no
+  /// scaling opportunity and always runs at native resolution, like the
+  /// official receiver).
   ///
   /// Frames whose short edge exceeds this are downscaled once so the
   /// short edge equals the cap; smaller frames pass through at native
@@ -157,10 +172,15 @@ class WebCameraCapture implements ICameraCapture {
   int get videoWidth => _videoWidth;
   int get videoHeight => _videoHeight;
 
-  /// Dimensions of the frame handed to the decoder (after the optional
-  /// single downscale to [maxTargetSize] short edge).
-  int get decoderInputWidth => _canvasWidth;
-  int get decoderInputHeight => _canvasHeight;
+  /// Dimensions of the frame handed to the decoder. Native resolution on
+  /// the VideoFrame path; the (possibly downscaled) canvas size on the
+  /// fallback path. 0 until the first frame is delivered.
+  int get decoderInputWidth => _deliveredWidth;
+  int get decoderInputHeight => _deliveredHeight;
+
+  /// Last frame size actually handed to the decoder.
+  int _deliveredWidth = 0;
+  int _deliveredHeight = 0;
 
   /// Long-edge size of the decoder input. Kept for callers that predate
   /// the full-frame pipeline (the decoder input used to be square).
@@ -267,23 +287,204 @@ class WebCameraCapture implements ICameraCapture {
     _streaming = true;
     _frameTimer = Timer.periodic(
       Duration(milliseconds: _frameIntervalMs),
-      (_) => _captureFrame(),
+      (_) => _tick(),
     );
   }
 
+  /// Set while a frame is being grabbed/converted. New ticks are dropped
+  /// (not queued) while busy — the same trade-off the official decoder
+  /// makes: cfc's `thread_pool::try_execute` silently drops frames when
+  /// the workers are saturated, and recv.js stalls when its worker
+  /// in-flight count exceeds 20.
+  bool _busy = false;
+
+  /// Set when the WebCodecs VideoFrame path throws once — it is then
+  /// disabled for the rest of the session and every frame goes through
+  /// the canvas fallback instead.
+  bool _videoFrameBroken = false;
+
+  /// Counts delivered frames (for throttled diagnostics).
+  int _frameCounter = 0;
+
+  Future<void> _tick() async {
+    if (_busy) return;
+    _busy = true;
+    try {
+      await _captureFrame();
+    } finally {
+      _busy = false;
+    }
+  }
+
+  Future<void> _captureFrame() async {
+    if (!_streaming || _callback == null || _video == null) {
+      return;
+    }
+    // Preferred path — what the official receiver (libcimbar/web/recv.js)
+    // does: WebCodecs `VideoFrame` readback with the camera's NATIVE
+    // pixel format passed straight through to the decoder.
+    if (!_videoFrameBroken) {
+      try {
+        if (await _captureViaVideoFrame(_video!)) return;
+      } catch (e) {
+        debugPrint('[Camera] VideoFrame path failed ($e) — '
+            'falling back to canvas for the rest of the session');
+        _videoFrameBroken = true;
+      }
+    }
+    _captureViaCanvas();
+  }
+
+  /// Grab one frame through WebCodecs `VideoFrame.copyTo`, feeding the
+  /// decoder the camera's native pixel format whenever possible.
+  ///
+  /// This mirrors recv.js: when the VideoFrame format is NV12 or I420
+  /// (the usual cases on Android Chrome), the raw YUV planes go to the
+  /// wasm decoder untouched (type 12/420) and OpenCV does the YUV→RGB
+  /// conversion — the same conversion cfc performs with
+  /// `COLOR_YUV2RGBA_NV21`. The canvas 2D pipeline, by contrast, routes
+  /// through the browser's own YUV→RGB conversion (color-matrix and
+  /// color-management included) plus a premultiplied-alpha round trip,
+  /// none of which the decoder asked for. Anything that is not NV12/I420
+  /// is read back as RGBA and the alpha channel is stripped in Dart
+  /// (format 3, the proven input).
+  ///
+  /// Returns false when the path is unavailable for this frame (caller
+  /// then uses the canvas fallback).
+  Future<bool> _captureViaVideoFrame(JSObject video) async {
+    final ctor = _reflectGet(globalContext, 'VideoFrame'.toJS) as JSFunction?;
+    if (ctor == null) return false;
+
+    JSObject? vf;
+    try {
+      final init = _newObject();
+      _setProp(init, 'timestamp',
+          DateTime.now().microsecondsSinceEpoch.toJS);
+      vf = _reflectConstruct(ctor, <JSAny?>[video, init].toJS);
+
+      final formatJs = _reflectGet(vf, 'format'.toJS);
+      final format = formatJs is JSString ? formatJs.toDart : '';
+      final w = _getIntProp(vf, 'displayWidth') ?? 0;
+      final h = _getIntProp(vf, 'displayHeight') ?? 0;
+      if (w <= 0 || h <= 0) return false;
+
+      final bool nativeYuv = format == 'NV12' || format == 'I420';
+      final String outFormat;
+      final JSAny? copyOpts;
+      if (nativeYuv) {
+        outFormat = format == 'NV12' ? 'nv12' : 'yuv420';
+        copyOpts = null; // no conversion — native planes, packed
+      } else {
+        outFormat = 'rgb';
+        final o = _newObject();
+        _setProp(o, 'format', 'RGBA'.toJS);
+        copyOpts = o;
+      }
+
+      final allocFn = _reflectGet(vf, 'allocationSize'.toJS) as JSFunction?;
+      if (allocFn == null) return false;
+      final allocArgs =
+          copyOpts == null ? <JSAny?>[].toJS : <JSAny?>[copyOpts].toJS;
+      final sizeVal = allocFn.callAsFunction(vf, allocArgs);
+      final size = sizeVal is JSNumber ? sizeVal.toDartInt : 0;
+      // Packed-layout sanity check (recv.js makes the same assumption):
+      // 4:2:0 must be exactly w*h*1.5, RGBA exactly w*h*4. A strided or
+      // padded layout would need per-plane repacking, which we don't do.
+      final expected = nativeYuv ? (w * h * 3) ~/ 2 : w * h * 4;
+      if (size != expected) {
+        debugPrint('[Camera] VideoFrame $format ${w}x$h: allocationSize '
+            '$size != expected $expected — using canvas fallback');
+        return false;
+      }
+
+      final jsDst = Uint8List(size).toJS;
+      final copyFn = _reflectGet(vf, 'copyTo'.toJS) as JSFunction?;
+      if (copyFn == null) return false;
+      final copyArgs = copyOpts == null
+          ? <JSAny?>[jsDst].toJS
+          : <JSAny?>[jsDst, copyOpts].toJS;
+      final promise = copyFn.callAsFunction(vf, copyArgs);
+      if (promise is! JSPromise<JSAny?>) return false;
+      // copyTo resolves to the PlaneLayout list; the data lands in jsDst.
+      await _jsAwait(promise);
+
+      final data = jsDst.toDart;
+      if (data.length != size) return false;
+      final Uint8List payload;
+      if (nativeYuv) {
+        payload = data;
+      } else {
+        // Strip alpha: RGB (format 3) is the proven decoder input.
+        final pixelCount = w * h;
+        final rgb = Uint8List(pixelCount * 3);
+        for (int i = 0; i < pixelCount; i++) {
+          rgb[i * 3] = data[i * 4];
+          rgb[i * 3 + 1] = data[i * 4 + 1];
+          rgb[i * 3 + 2] = data[i * 4 + 2];
+        }
+        payload = rgb;
+      }
+
+      _frameCounter++;
+      if (_frameCounter % 50 == 1) {
+        debugPrint('[Camera] frame #$_frameCounter via VideoFrame: '
+            '$format ${w}x$h -> $outFormat (${payload.length}B)');
+      }
+
+      _deliveredWidth = w;
+      _deliveredHeight = h;
+      _callback!(CameraFrame(
+        data: payload,
+        width: w,
+        height: h,
+        format: outFormat,
+        timestampUs: DateTime.now().microsecondsSinceEpoch,
+      ));
+      return true;
+    } finally {
+      if (vf != null) {
+        final closeFn = _reflectGet(vf, 'close'.toJS) as JSFunction?;
+        closeFn?.callAsFunction(vf);
+      }
+    }
+  }
+
   JSObject _buildConstraints(int width, int height) {
+    // Mirrors the official receiver (libcimbar/web/recv.js) verbatim —
+    // including the plain (non-`ideal`) continuous focus/exposure hints.
+    // Unknown constraints are ignored by the browser; on the phone where
+    // recv.html was verified to decode, these are exactly what it sends.
     final obj = _newObject();
     final video = _newObject();
 
     final widthObj = _newObject();
+    _setProp(widthObj, 'min', 720.toJS);
     _setProp(widthObj, 'ideal', width.toJS);
     _setProp(video, 'width', widthObj);
 
     final heightObj = _newObject();
+    _setProp(heightObj, 'min', 720.toJS);
     _setProp(heightObj, 'ideal', height.toJS);
     _setProp(video, 'height', heightObj);
 
+    // recv.js: aspectRatio tracks the SCREEN orientation, not the sensor.
+    final media = _matchMedia('all and (orientation:landscape)'.toJS);
+    final matches = _reflectGet(media, 'matches'.toJS);
+    final landscape = matches is JSBoolean && matches.toDart;
+    _setProp(video, 'aspectRatio', (landscape ? 16 / 9 : 9 / 16).toJS);
+
     _setProp(video, 'facingMode', 'environment'.toJS);
+    // Continuous autofocus is what keeps the barcode sharp on a phone —
+    // cfc uses FOCUS_MODE_CONTINUOUS_VIDEO for the same reason. Without
+    // this hint some devices stay at a fixed/hunted focus and every frame
+    // is too blurry for the anchor scan.
+    _setProp(video, 'exposureMode', 'continuous'.toJS);
+    _setProp(video, 'focusMode', 'continuous'.toJS);
+
+    final frameRate = _newObject();
+    _setProp(frameRate, 'ideal', 15.toJS);
+    _setProp(video, 'frameRate', frameRate);
+
     _setProp(obj, 'video', video);
     _setProp(obj, 'audio', false.toJS);
     return obj;
@@ -304,7 +505,10 @@ class WebCameraCapture implements ICameraCapture {
     }
   }
 
-  void _captureFrame() {
+  /// Canvas fallback: draw the full frame into the offscreen canvas and
+  /// read it back as RGBA, stripping alpha in Dart. Used when WebCodecs
+  /// `VideoFrame` is unavailable (older browsers) or misbehaves.
+  void _captureViaCanvas() {
     if (!_streaming || _callback == null || _video == null || _ctx == null) {
       return;
     }
@@ -368,6 +572,8 @@ class WebCameraCapture implements ICameraCapture {
       rgbPixels[i * 3 + 2] = rgbaPixels[i * 4 + 2];
     }
 
+    _deliveredWidth = cw;
+    _deliveredHeight = ch;
     _callback!(CameraFrame(
       data: rgbPixels,
       width: cw,

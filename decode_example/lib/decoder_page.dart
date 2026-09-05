@@ -421,12 +421,22 @@ class _DecoderPageState extends State<DecoderPage> {
   Future<Uint8List?> _lastFramePng() async {
     final frame = _lastFrame;
     if (frame == null) return null;
-    // Convert RGB to RGBA
+    // Convert to RGBA. YUV formats (NV12/I420 from the WebCodecs path)
+    // are rendered as grayscale from their Y plane — good enough for the
+    // diagnostic screenshot, whose job is showing what the anchor scanner
+    // saw (it works on grayscale anyway).
     final pixelCount = frame.width * frame.height;
     final rgba = Uint8List(pixelCount * 4);
     final isRgba = frame.format == 'rgba';
+    final isYuv = frame.format == 'nv12' || frame.format == 'yuv420';
     for (int i = 0; i < pixelCount; i++) {
-      if (isRgba) {
+      if (isYuv) {
+        final y = frame.data[i];
+        rgba[i * 4] = y;
+        rgba[i * 4 + 1] = y;
+        rgba[i * 4 + 2] = y;
+        rgba[i * 4 + 3] = 255;
+      } else if (isRgba) {
         rgba[i * 4] = frame.data[i * 4];
         rgba[i * 4 + 1] = frame.data[i * 4 + 1];
         rgba[i * 4 + 2] = frame.data[i * 4 + 2];
