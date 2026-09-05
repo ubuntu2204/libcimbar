@@ -50,11 +50,30 @@ node wasm_decode_test.js --frames /path/to/frames [--scale N] [--verbose]
 | `--width/--height` | source frame dimensions (default 1024x1024) |
 | `--verbose` | per-frame scan time and native report |
 
+## Real-video test
+
+`decode_video.sh` runs the same decoder against frames extracted from a
+**real recorded video** (e.g. a phone filming the encoder screen) — no
+browser needed, finishes in seconds:
+
+```bash
+./decode_video.sh                      # default fixture (test/74c1430d...mp4)
+./decode_video.sh /path/to/clip.mp4    # any video
+./decode_video.sh clip.mp4 --every 3 --verbose
+```
+
+Requires `ffmpeg`/`ffprobe` and `node`. The default fixture is a 720x1280
+phone recording that decodes on its first sampled frame. For the full
+in-browser end-to-end run (also drives a video through Chrome's fake
+camera into the actual app), see `test/e2e/` — much slower, so prefer
+this script for routine checks.
+
 ## Files
 
 | File | Role |
 |---|---|
 | `run.sh` | builds `dump_frames`, generates frames, runs the test |
+| `decode_video.sh` | decodes frames extracted from a real video (ffmpeg) |
 | `dump_frames.cpp` | encodes a payload, dumps raw RGB frames |
 | `wasm_decode_test.js` | drives `cimbard_*` via the emscripten module |
 
