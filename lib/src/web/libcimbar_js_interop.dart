@@ -79,6 +79,9 @@ extension CimbarModuleMembers on CimbarModule {
   void deallocate(int ptr) => free(ptr.toJS);
 }
 
+@JS('String')
+external JSString _jsStringCoerce(JSAny? value);
+
 /// Convert a JS value ([JSNumber] or [JSAny]) to a Dart [int], handling
 /// the case where the JS value is actually a [BigInt] (which the WASM
 /// heap can surface when the pointer exceeds 2^53).
@@ -86,7 +89,14 @@ int jsNumberToInt(JSAny n) {
   final v = n.dartify();
   if (v is BigInt) return v.toInt();
   if (v is num) return v.toInt();
-  return 0;
+  // Emscripten returns int64_t results (e.g. cimbard_fountain_decode's
+  // file id) as genuine JS BigInts. dart2js's dartify() cannot convert
+  // those — the value comes back as an opaque JS object, so WITHOUT this
+  // fallback the conversion silently yielded 0: the decoder completed
+  // files but the file id read as "0 = incomplete" forever (and negative
+  // error codes were masked the same way). String(bigint) is the decimal
+  // form, which parses cleanly.
+  return int.tryParse(_jsStringCoerce(n).toDart) ?? 0;
 }
 
 // ─── Encoder functions ───────────────────────────────────────────

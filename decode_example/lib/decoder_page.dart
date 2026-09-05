@@ -199,6 +199,14 @@ class _DecoderPageState extends State<DecoderPage> {
       } catch (e) {
         debugPrint('Camera init failed: $e');
       }
+
+      // E2E/headless test hook: ?autostart=1 begins scanning as soon as
+      // everything is ready, without needing to tap 启动摄像头 (Flutter's
+      // canvas UI is awkward to drive from browser automation).
+      if (kIsWeb && Uri.base.queryParameters.containsKey('autostart')) {
+        debugPrint('[Decoder] autostart hook: starting camera');
+        await _startCamera();
+      }
     } catch (e) {
       debugPrint('[Decoder] Initialization error: $e');
       setState(() {

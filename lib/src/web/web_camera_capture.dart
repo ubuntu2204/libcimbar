@@ -383,9 +383,15 @@ class WebCameraCapture implements ICameraCapture {
 
       final allocFn = _reflectGet(vf, 'allocationSize'.toJS) as JSFunction?;
       if (allocFn == null) return false;
+      // NOTE: multi-arg calls must go through Reflect.apply (which SPREADS
+      // the argument array). JSFunction.callAsFunction(thisArg, args)
+      // passes the array as a SINGLE argument instead — that is what made
+      // copyTo throw "The provided value is not of type '([AllowShared]
+      // ArrayBuffer or [AllowShared] ArrayBufferView)'": the callee got a
+      // JSArray of buffers rather than the buffer itself.
       final allocArgs =
           copyOpts == null ? <JSAny?>[].toJS : <JSAny?>[copyOpts].toJS;
-      final sizeVal = allocFn.callAsFunction(vf, allocArgs);
+      final sizeVal = _reflectApply(allocFn, vf, allocArgs);
       final size = sizeVal is JSNumber ? sizeVal.toDartInt : 0;
       // Packed-layout sanity check (recv.js makes the same assumption):
       // 4:2:0 must be exactly w*h*1.5, RGBA exactly w*h*4. A strided or
@@ -397,13 +403,24 @@ class WebCameraCapture implements ICameraCapture {
         return false;
       }
 
-      final jsDst = Uint8List(size).toJS;
+      // The destination buffer MUST be allocated in JS land. A Dart
+      // `Uint8List(size).toJS` does not necessarily produce an object
+      // the browser's WebIDL bindings accept as
+      // '[AllowShared] ArrayBufferView' — copyTo then throws
+      // "The provided value is not of type ...", which used to disable
+      // this whole path for the session (observed in headless Chrome).
+      // `new Uint8Array(size)` via the JS constructor is unambiguous.
+      final uaCtor =
+          _reflectGet(globalContext, 'Uint8Array'.toJS) as JSFunction?;
+      if (uaCtor == null) return false;
+      final jsDst = _reflectConstruct(uaCtor, <JSAny?>[size.toJS].toJS)
+          as JSUint8Array;
       final copyFn = _reflectGet(vf, 'copyTo'.toJS) as JSFunction?;
       if (copyFn == null) return false;
       final copyArgs = copyOpts == null
           ? <JSAny?>[jsDst].toJS
           : <JSAny?>[jsDst, copyOpts].toJS;
-      final promise = copyFn.callAsFunction(vf, copyArgs);
+      final promise = _reflectApply(copyFn, vf, copyArgs);
       if (promise is! JSPromise<JSAny?>) return false;
       // copyTo resolves to the PlaneLayout list; the data lands in jsDst.
       await _jsAwait(promise);
