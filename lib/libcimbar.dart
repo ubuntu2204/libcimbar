@@ -65,5 +65,10 @@ export 'src/cimbar_platform.dart';
 // model file so native builds never pull in `dart:js_interop`.
 export 'src/models/capture_mode.dart' show WebCaptureMode;
 
+// App-facing conveniences (widgets & helpers built on the interfaces)
+export 'src/widgets/cimbar_player.dart'; // CimbarFramePlayer, CimbarShake
+export 'src/utils/cimbar_file_saver.dart'; // saveRecoveredFile
+export 'src/utils/cimbar_file_loader.dart'; // pickCimbarInputFile
+
 // Implementations (for direct use or testing)
 export 'src/impl/avif_compressor.dart';

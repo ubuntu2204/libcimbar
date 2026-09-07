@@ -1,19 +1,15 @@
 // Platform responsibilities:
-//   Windows / Linux → Encoder (screen capture on Windows; test payload on both)
-//   Android / Web → see decode_example project
+//   Windows / Linux → Encoder (pick file → encode → display)
+//   Android / Web   → see decode_example project
 
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
-import 'package:hotkey_manager/hotkey_manager.dart';
 
-import 'core/screenshot_capture.dart';
 import 'core/window_display.dart';
 import 'encoder_page.dart';
-
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 /// Desktop platforms that can run the encoder (Windows + Linux).
 bool get isEncoderDesktop =>
@@ -22,7 +18,7 @@ bool get isEncoderDesktop =>
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Desktop only: initialize window_manager for screenshot hide/show
+  // Desktop only: initialize window_manager.
   if (isEncoderDesktop) {
     await windowManager.ensureInitialized();
 
@@ -44,22 +40,10 @@ void main() async {
         await coverTaskbar();
       } else {
         // Windows: start in a normal centered windowed size, kept topmost so
-        // it stays above the taskbar. This is NOT fullscreen mode, so the
-        // screenshot capture flow keeps working (it hides the window before
-        // grabbing).
+        // it stays above the taskbar.
         await restoreWindowed();
       }
     });
-  }
-
-  // Desktop only: set navigator key for screenshot overlay
-  if (isEncoderDesktop) {
-    ScreenshotCapture.navigatorKey = navigatorKey;
-  }
-
-  // Desktop only: initialize hotkey manager
-  if (isEncoderDesktop) {
-    await hotKeyManager.unregisterAll();
   }
 
   runApp(const LibcimbarExampleApp());
@@ -71,7 +55,6 @@ class LibcimbarExampleApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey,
       title: 'libcimbar Example',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
