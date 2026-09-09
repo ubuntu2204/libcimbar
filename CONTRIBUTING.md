@@ -36,11 +36,31 @@ libcimbar/
 flutter test
 ```
 
-### Building the Native Library (Windows)
+### Building the Native Library
+
+**Linux** — the platform used for day-to-day development and testing:
+
+```bash
+cd native && mkdir -p build_linux && cd build_linux
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . -j$(nproc)
+# Output: build_linux/libcimbar.so
+```
+
+**Windows** — cross-compiled from Ubuntu with
+[flutter_build](https://github.com/ubuntu2610/flutter_build); there is no
+Windows toolchain in the dev loop:
 
 ```bash
 cd native
-build_windows.bat C:\project\libcimbar\libcimbar
+build_windows.bat /path/to/libcimbar
+```
+
+**Web (WASM)** — used by `decode_example` (the decoder app):
+
+```bash
+source /path/to/emsdk/emsdk_env.sh
+cd native && bash build_wasm.sh /path/to/libcimbar
+# Copy the output into decode_example/web/assets/wasm/
 ```
 
 ### Code Style

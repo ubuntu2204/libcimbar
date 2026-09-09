@@ -23,9 +23,9 @@ import 'native/android_camera_capture.dart'
 //   Web              → stubs / JS interop implementations
 //
 // Platform responsibilities:
-//   Windows  → Encoder (FFI), Screen Capture (Win32 GDI), Image Compressor
-//   Android  → Decoder (FFI into libcimbar_jni.so), Camera Capture
-//   Web      → Decoder (JS interop/WASM), Camera Capture
+//   Desktop (Linux/Windows) → Encoder (FFI) + Decoder (FFI)
+//   Android                 → Decoder (FFI into libcimbar_jni.so), Camera Capture
+//   Web                     → Decoder (JS interop/WASM), Camera Capture
 //
 // Android deliberately uses the same FFI path as desktop. The native core is
 // identical; only the library name differs. WASM is web-only.
@@ -39,20 +39,21 @@ import 'ffi/cimbar_decoder_ffi.dart'
 ///
 /// ## Platform Responsibilities
 ///
-/// | Feature           | Windows | Android | Web |
-/// |-------------------|---------|---------|-----|
-/// | Encoder           | FFI     | --      | --  |
-/// | Decoder           | --      | JNI     | WASM|
-/// | Screen Capture    | Win32   | --      | --  |
-/// | Camera Capture    | --      | plugin  | getUserMedia |
-/// | Image Compressor  | AVIF    | --      | --  |
+/// | Feature        | Linux/Windows | Android | Web            |
+/// |----------------|---------------|---------|----------------|
+/// | Encoder        | FFI           | --      | --             |
+/// | Decoder        | FFI           | FFI     | WASM           |
+/// | Camera Capture | --            | plugin  | getUserMedia   |
+///
+/// `createScreenCapture()` and `createImageCompressor()` still exist, but the
+/// example apps no longer use them (no Alt+A screenshot / AVIF workflow).
 ///
 /// Usage:
 /// ```dart
-/// // Windows only:
+/// // Desktop only:
 /// final encoder = await CimbarPlatform.instance.createEncoder();
 ///
-/// // Web / Android only:
+/// // Web / Android / desktop:
 /// final decoder = await CimbarPlatform.instance.createDecoder();
 /// ```
 class CimbarPlatform {
@@ -63,18 +64,20 @@ class CimbarPlatform {
   /// Singleton access to the platform registry.
   static CimbarPlatform get instance => _instance;
 
-  /// Create a cimbar encoder (Windows only).
+  /// Create a cimbar encoder (desktop only).
   ///
-  /// Throws [UnsupportedError] on Web and Android — encoding is
-  /// only supported on Windows via FFI to the native libcimbar library.
+  /// Throws [UnsupportedError] on Web and Android — encoding needs FFI to
+  /// the native libcimbar library, which only desktop builds ship.
   Future<ICimbarEncoder> createEncoder() async {
     if (kIsWeb) {
-      throw UnsupportedError('Encoding is only supported on Windows.');
+      throw UnsupportedError(
+          'Encoding is only supported on desktop (Linux/Windows).');
     }
     if (Platform.isAndroid) {
-      throw UnsupportedError('Encoding is only supported on Windows.');
+      throw UnsupportedError(
+          'Encoding is only supported on desktop (Linux/Windows).');
     }
-    // Windows → FFI
+    // Linux / Windows → FFI
     return CimbarEncoderFfi();
   }
 

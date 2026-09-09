@@ -8,7 +8,7 @@ import '../interfaces/cimbar_encoder_interface.dart';
 import '../models/cimbar_config.dart';
 import '../models/cimbar_frame.dart';
 
-/// Web stub for cimbar encoder — encoding is only supported on Windows.
+/// Web stub for cimbar encoder — encoding is only supported on desktop.
 ///
 /// This stub exists solely to satisfy the conditional import system
 /// and avoid pulling `dart:ffi` into web builds.
@@ -20,7 +20,8 @@ class CimbarEncoderFfi implements ICimbarEncoder {
 
   @override
   Future<void> configure(CimbarConfig config) async {
-    throw UnsupportedError('Encoding is only supported on Windows.');
+    throw UnsupportedError(
+        'Encoding is only supported on desktop (Linux/Windows).');
   }
 
   @override
@@ -28,12 +29,14 @@ class CimbarEncoderFfi implements ICimbarEncoder {
     Uint8List data, {
     String filename = 'data.bin',
   }) async {
-    throw UnsupportedError('Encoding is only supported on Windows.');
+    throw UnsupportedError(
+        'Encoding is only supported on desktop (Linux/Windows).');
   }
 
   @override
   Future<List<CimbarFrame>> encodeFile(String filePath) async {
-    throw UnsupportedError('Encoding is only supported on Windows.');
+    throw UnsupportedError(
+        'Encoding is only supported on desktop (Linux/Windows).');
   }
 
   @override

@@ -1,93 +1,63 @@
 # libcimbar Example App
 
-Demonstrates the full workflow of the `libcimbar` Dart/Flutter plugin.
+桌面**编码发送端**（Linux / Windows），演示 `libcimbar` 插件的编码流程。
 
 ## What This App Does
 
-### Encoder Page (Windows Desktop)
-1. Press **Alt+A** to activate screen region selection
-2. Drag to select a rectangular area on screen
-3. The selected region is captured as raw pixels
-4. Pixels are compressed to **AVIF** format
-5. AVIF data is encoded into **cimbar barcode** frames
-6. Frames are displayed as an **animated sequence** on screen
+1. 点击"选择文件"选择要发送的文件（任意类型）
+2. 文件字节经 cimbar 编码为条码帧序列
+   （zstd 压缩 → fountain 编码 → Reed-Solomon 纠错 → 彩色 tile 网格）
+3. 帧序列按设定 fps 循环播放，并带官方 sender 的画面抖动（shake）
+4. 可切换编码模式（modeB / modeBm / modeBu / mode4C）、调节帧率、控制窗口显示
 
-### Decoder Page (Android / Web)
-1. Tap "Start Camera" to open the device camera
-2. Point the camera at a screen displaying cimbar barcodes
-3. Frames are decoded in real-time via fountain codes
-4. Progress bar shows decoding progress
-5. Once complete, the original file is recovered and saved
+本应用**不包含解码功能** —— 解码接收端在 `decode_example`。
 
 ## Running the Example
 
 ### Prerequisites
 
-Make sure you've built the native libraries first:
+先编译原生库（`libcimbar.so` / `libcimbar.dll`）：
 
 ```bash
-# Windows (for encoder)
-cd ../native
-build_windows.bat C:\project\libcimbar\libcimbar
-# Copy libcimbar.dll to example/build/windows/x64/runner/Release/
+# Linux（日常开发）
+cd ../native && mkdir -p build_linux && cd build_linux
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . -j$(nproc)
+# 输出 build_linux/libcimbar.so
+# 复制到 example/build/linux/x64/debug/bundle/lib/
 
-# Web/WASM (for web decoder)
+# Windows（在 Ubuntu 上用 flutter_build 交叉构建）
 cd ../native
-bash build_wasm.sh /path/to/libcimbar
-# Copy libcimbar.js and libcimbar.wasm to web/assets/wasm/
+build_windows.bat /path/to/libcimbar
+# 输出到 example/build/windows/x64/runner/Release/
+```
+
+### Linux
+
+```bash
+flutter run -d linux
 ```
 
 ### Windows
 
+Windows 产物由 [flutter_build](https://github.com/ubuntu2610/flutter_build)
+在 Ubuntu 上交叉编译生成（本项目不在 Windows 机器上构建）：
+
 ```bash
 flutter run -d windows
 ```
-
-The app will show the **Encoder** tab by default:
-- Use the "Capture Screen (Alt+A)" button or press Alt+A
-- Select a screen region
-- Click "Encode & Display" to generate cimbar barcode animation
-
-### Android
-
-```bash
-flutter run -d <device-id>
-```
-
-The app will show the **Decoder** tab:
-- Grant camera permission when prompted
-- Tap "Start Camera"
-- Point at a screen showing cimbar barcodes
-
-### Web
-
-```bash
-flutter run -d chrome
-
-adb reverse tcp:8080 tcp:8080
-flutter run -d web-server --release --web-port 8080 --web-hostname 0.0.0.0
-手机访问localhost:8080
-```
-
-Make sure the WASM files are in `web/assets/wasm/`:
-- `libcimbar.js`
-- `libcimbar.wasm`
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────┐
 │           Example App               │
-│                                     │
-│  ┌───────────┐  ┌───────────────┐  │
-│  │  Encoder   │  │   Decoder     │  │
-│  │  Page      │  │   Page        │  │
-│  │ (Windows)  │  │ (Android/Web) │  │
-│  └─────┬─────┘  └──────┬────────┘  │
-│        │               │            │
-│  ┌─────▼───────────────▼─────────┐  │
-│  │    libcimbar Plugin            │  │
-│  │  (abstract interfaces)         │  │
+│  ┌───────────────────────────────┐  │
+│  │  Encoder Page                 │  │
+│  │  选文件 → 编码 → 帧播放        │  │
+│  └──────────────┬────────────────┘  │
+│  ┌──────────────▼────────────────┐  │
+│  │  libcimbar Plugin             │  │
+│  │  ICimbarEncoder (dart:ffi)    │  │
 │  └───────────────────────────────┘  │
 └─────────────────────────────────────┘
 ```
@@ -98,37 +68,17 @@ The example app only calls the abstract interfaces provided by the `libcimbar` p
 
 | File | Description |
 |------|-------------|
-| `lib/main.dart` | App entry point, navigation between encoder/decoder |
-| `lib/encoder_page.dart` | Screen capture → AVIF → cimbar encoding UI |
-| `lib/decoder_page.dart` | Camera → cimbar decoding UI |
-| `lib/screen_select_overlay.dart` | Fullscreen transparent overlay for region selection |
+| `lib/main.dart` | App entry point |
+| `lib/encoder_page.dart` | 选文件 → cimbar 编码 → 帧播放 UI |
+| `lib/core/window_display.dart` | 窗口显示控制（window_manager / screen_retriever）|
 
 ## Troubleshooting
 
-**"Native library not loaded"** (Windows)
-- Ensure `libcimbar.dll` is in the same directory as the executable
-- Check that OpenCV DLLs are also available in PATH
+**"Native library not loaded"**
+- Linux：确认 `libcimbar.so` 在 `build/linux/x64/debug/bundle/lib/` 下
+- Windows：确认 `libcimbar.dll` 与 exe 同目录，且 OpenCV DLL 在 PATH 中
+- 修改原生代码后必须重新编译并复制到上述目录
 
-**Camera not working** (Android)
-- Ensure camera permission is granted
-- Check that the device has a rear camera
-
-**WASM not loading** (Web)
-- Verify `libcimbar.js` and `libcimbar.wasm` exist in `web/assets/wasm/`
-- Check browser console for errors
-## 要让解码器真正工作，还需要编译 WASM 模块：
-# 1. 安装 Emscripten
-git clone https://github.com/emscripten-core/emsdk.git
-cd emsdk && ./emsdk install latest && ./emsdk activate latest
-source emsdk_env.sh
-
-# 2. 编译 WASM
-cd /home/ubuntu/project/libcimbar/native && ./build_wasm.sh
-
-# 3. 复制到 web assets
-mkdir -p ../example/web/assets/wasm/
-cp build_wasm/libcimbar.js ../example/web/assets/wasm/
-cp build_wasm/libcimbar.wasm ../example/web/assets/wasm/
-
-# 4. 重新构建
-cd ../example && flutter build web
+**编码一直卡在 0 帧**
+- 检查控制台是否报 `cimbare_init_encode failed`
+- 文件名含非 ASCII 字符是支持的（fnsize 按 UTF-8 字节数传递）

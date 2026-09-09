@@ -9,33 +9,30 @@
 ///
 /// ## Features
 ///
-/// - **Encode** (Windows): Convert binary data into cimbar barcode frame images
-/// - **Decode** (Web / Android): Decode cimbar barcode images back into binary data
-/// - **Screen Capture** (Windows): Hotkey-triggered region capture
+/// - **Encode** (Linux / Windows): Convert a file into cimbar barcode frame images
+/// - **Decode** (Web / Android / desktop): Decode cimbar barcode images back into
+///   the original file
 /// - **Camera Capture** (Android / Web): Real-time camera barcode scanning
-/// - **AVIF Compression** (Windows): Compress screenshots to AVIF before encoding
 ///
 /// ## Platform Responsibilities
 ///
-/// | Feature          | Windows | Android | Web  |
-/// |------------------|---------|---------|------|
-/// | Encoder          | FFI     | --      | --   |
-/// | Decoder          | --      | JNI     | WASM |
-/// | Screen Capture   | Win32   | --      | --   |
-/// | Camera Capture   | --      | plugin  | getUserMedia |
-/// | Image Compressor | AVIF    | --      | --   |
+/// | Feature          | Linux/Windows | Android | Web  |
+/// |------------------|---------------|---------|------|
+/// | Encoder          | FFI           | --      | --   |
+/// | Decoder          | FFI           | FFI     | WASM |
+/// | Camera Capture   | --            | plugin  | getUserMedia |
 ///
 /// ## Quick Start
 ///
 /// ```dart
 /// import 'package:libcimbar/libcimbar.dart';
 ///
-/// // Windows only — encode data into cimbar frames
+/// // Desktop only — encode data into cimbar frames
 /// final encoder = await CimbarPlatform.instance.createEncoder();
 /// await encoder.configure(CimbarConfig(mode: CimbarMode.modeB));
-/// final frames = await encoder.encodeData(avifBytes, filename: 'screen.avif');
+/// final frames = await encoder.encodeData(fileBytes, filename: 'photo.png');
 ///
-/// // Web / Android only — decode cimbar frames from camera
+/// // Web / Android / desktop — decode cimbar frames from camera
 /// final decoder = await CimbarPlatform.instance.createDecoder();
 /// await decoder.configure(CimbarConfig(mode: CimbarMode.modeB));
 /// final result = await decoder.decodeFrame(imageBytes, width: 1024, height: 1024);

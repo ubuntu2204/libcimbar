@@ -3,7 +3,7 @@
 [![pub.dev](https://img.shields.io/pub/v/libcimbar.svg)](https://pub.dev/packages/libcimbar)
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-blue.svg)](https://opensource.org/licenses/MPL-2.0)
 [![Flutter](https://img.shields.io/badge/Flutter-3.10%2B-blue?logo=flutter)](https://flutter.dev)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20Web-lightgrey)]()
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20Android%20%7C%20Web-lightgrey)]()
 
 **English** | [中文](#中文说明)
 
@@ -13,21 +13,24 @@ Encode files into animated color barcode sequences on one screen, and decode the
 
 ## Features
 
-- **Encode** binary data into cimbar barcode frame images (RGB pixel data)
-- **Decode** cimbar barcode images back into binary data via fountain codes
-- **Screen Capture** (Windows): Hotkey-triggered region selection with Alt+A
-- **AVIF Compression**: Compress screenshots to AVIF before encoding
-- **Camera Scanning** (Android / Web): Real-time camera-based barcode decoding
-- **Cross-platform**: Windows (native FFI), Android (JNI), Web (WASM)
-- **Clean interface design**: All APIs exposed as abstract interfaces for testability
+- **Encode** any file into cimbar barcode frames (raw RGB pixel data)
+- **Decode** cimbar barcode frames back into the original file via fountain codes
+- **Camera Scanning** (Android / Web): real-time camera-based barcode decoding
+- **Cross-platform**: desktop (native FFI), Android (JNI), Web (WASM)
+- **Clean interface design**: all APIs exposed as abstract interfaces for testability
 
 ## Platform Support
 
-| Platform | Encoder | Decoder | Camera | Screen Capture |
-|----------|---------|---------|--------|----------------|
-| Windows  | ✅ FFI  | ✅ FFI  | —      | ✅ Win32 GDI   |
-| Android  | ✅ JNI  | ✅ JNI  | ✅ CameraX | —          |
-| Web (WASM) | ✅ JS interop | ✅ JS interop | ✅ getUserMedia | — |
+| Platform   | Encoder | Decoder | Camera |
+|------------|---------|---------|--------|
+| Windows    | ✅ FFI  | ✅ FFI  | —      |
+| Linux      | ✅ FFI  | ✅ FFI  | —      |
+| Android    | —       | ✅ FFI (`libcimbar_jni.so`) | ✅ CameraX |
+| Web (WASM) | —       | ✅ JS interop | ✅ getUserMedia |
+
+Windows builds are produced by cross-compiling on Ubuntu with
+[flutter_build](https://github.com/ubuntu2610/flutter_build); Linux is the
+platform used for day-to-day development and testing.
 
 ## Quick Start
 
@@ -42,10 +45,20 @@ dependencies:
 
 The plugin requires the libcimbar C++ core to be compiled as a shared library.
 
-**Windows:**
+**Windows:** cross-compiled on Ubuntu with
+[flutter_build](https://github.com/ubuntu2610/flutter_build) (the project is
+developed and tested on Linux; no Windows toolchain is used directly):
 ```bash
 cd native
-build_windows.bat C:\project\libcimbar\libcimbar
+build_windows.bat /path/to/libcimbar
+```
+
+**Linux:**
+```bash
+cd native && mkdir -p build_linux && cd build_linux
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j$(nproc)
+# Output: build_linux/libcimbar.so
 ```
 
 **Android:** (handled automatically by the Flutter build system via CMake)
@@ -55,7 +68,7 @@ build_windows.bat C:\project\libcimbar\libcimbar
 source /path/to/emsdk/emsdk_env.sh
 cd native
 bash build_wasm.sh /path/to/libcimbar
-# Copy output to example/web/assets/wasm/
+# Copy output to decode_example/web/assets/wasm/
 ```
 
 ### 3. Encode data
@@ -68,8 +81,8 @@ await encoder.configure(const CimbarConfig(mode: CimbarMode.modeB));
 
 // Encode any binary data into cimbar barcode frames
 final frames = await encoder.encodeData(
-  avifBytes,
-  filename: 'screenshot.avif',
+  fileBytes,
+  filename: 'photo.png',
 );
 
 // Display frames as an animation for the receiver to scan
@@ -107,21 +120,20 @@ for (final cameraFrame in cameraStream) {
 │                    Example Application                     │
 │  ┌─────────────────┐    ┌──────────────────────────────┐  │
 │  │  Encoder Page    │    │       Decoder Page           │  │
-│  │  (Windows)       │    │  (Android / Web)             │  │
-│  │  Alt+A → Select  │    │  Camera → Scan → Recover     │  │
-│  │  → AVIF → Encode │    │                              │  │
+│  │  (Desktop)       │    │  (Android / Web)             │  │
+│  │  Pick file →     │    │  Camera → Scan → Save        │  │
+│  │  Encode → Play   │    │                              │  │
 │  └────────┬─────────┘    └──────────────┬───────────────┘  │
 │           │                             │                   │
 │  ┌────────▼─────────────────────────────▼───────────────┐  │
 │  │              Abstract Interfaces                      │  │
-│  │  ICimbarEncoder · ICimbarDecoder · IScreenCapture     │  │
-│  │  ICameraCapture · IImageCompressor                    │  │
+│  │  ICimbarEncoder · ICimbarDecoder · ICameraCapture     │  │
 │  └────────┬──────────────────────────────┬──────────────┘  │
 │           │                              │                  │
 │  ┌────────▼──────────┐   ┌──────────────▼───────────────┐  │
-│  │   Windows / FFI    │   │   Android / Web              │  │
-│  │   dart:ffi         │   │   MethodChannel / JS interop │  │
-│  │   Win32 GDI        │   │   CameraX / getUserMedia     │  │
+│  │   Desktop / FFI    │   │   Android / Web              │  │
+│  │   dart:ffi         │   │   FFI / JS interop           │  │
+│  │   libcimbar.so|dll │   │   CameraX / getUserMedia     │  │
 │  └────────┬──────────┘   └──────────────┬───────────────┘  │
 │           │                              │                  │
 │  ┌────────▼──────────────────────────────▼───────────────┐  │
@@ -165,25 +177,19 @@ abstract class ICimbarDecoder {
 }
 ```
 
-#### `IScreenCapture`
+#### `ICameraCapture`
 
 ```dart
-abstract class IScreenCapture {
+abstract class ICameraCapture {
   bool get isSupported;
-  Future<ScreenCaptureResult> captureRegion(Rect region);
-  Future<ScreenCaptureResult> captureFullScreen();
-  Future<void> dispose();
-}
-```
-
-#### `IImageCompressor`
-
-```dart
-abstract class IImageCompressor {
-  bool get isAvailable;
-  Future<Uint8List> compressRgba(Uint8List pixels, {int width, int height, CompressionQuality quality});
-  Future<Uint8List> compressRgb(Uint8List pixels, {int width, int height, CompressionQuality quality});
-  Future<DecompressedImage> decompress(Uint8List data);
+  bool get isStreaming;
+  Future<void> start({
+    int preferredWidth = 1920,
+    int preferredHeight = 1080,
+    int frameIntervalMs = 200, // ~5 fps
+  });
+  void onFrame(CameraFrameCallback callback);
+  Future<void> stop();
   Future<void> dispose();
 }
 ```
@@ -217,22 +223,35 @@ const config = CimbarConfig(
 - [libcimbar source](https://github.com/sz3/libcimbar) cloned locally
 - CMake 3.22+
 - OpenCV 4.5+
-- **Windows**: Visual Studio 2022 + vcpkg (for GLFW)
+- **Windows**: cross-compiled from Ubuntu via
+  [flutter_build](https://github.com/ubuntu2610/flutter_build) (no local
+  Windows toolchain needed)
 - **Android**: Android NDK r25+
 - **Web**: Emscripten SDK
 
 ### Windows
 
-```bash
-# Set OpenCV path
-set OPENCV_DIR=C:\opencv\build
+Windows binaries are **not** built on a Windows machine — this project is
+developed on Ubuntu and cross-compiled with
+[flutter_build](https://github.com/ubuntu2610/flutter_build):
 
-# Build
+```bash
 cd native
-build_windows.bat C:\project\libcimbar\libcimbar
+build_windows.bat /path/to/libcimbar
 
 # Output: build_windows/Release/libcimbar.dll
 # Copy to: example/build/windows/x64/runner/Release/
+```
+
+### Linux
+
+```bash
+sudo apt install libopencv-dev libglfw3-dev
+cd native && mkdir -p build_linux && cd build_linux
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . -j$(nproc)
+
+# Output: build_linux/libcimbar.so
+# Copy to: example/build/linux/x64/debug/bundle/lib/
 ```
 
 ### Android
@@ -252,32 +271,35 @@ source /path/to/emsdk/emsdk_env.sh
 cd native
 bash build_wasm.sh /path/to/libcimbar
 
-# Copy output to:
-# example/web/assets/wasm/libcimbar.js
-# example/web/assets/wasm/libcimbar.wasm
+# Copy output to the WEB DECODER app (not `example`, which is the encoder):
+# decode_example/web/assets/wasm/libcimbar.js
+# decode_example/web/assets/wasm/libcimbar.wasm
+# decode_example/web/assets/wasm/cimbar_js.wasm
 ```
 
 ## Example Apps
 
 The project provides two separate example applications:
 
-### `example` — Windows Encoder (发送端)
+### `example` — Desktop Encoder (发送端)
 
-Windows 专用编码发送端。左侧 200px 控制面板 + 右侧最大化显示 cimbar 编码图像。
+桌面编码发送端（Linux 日常开发调试，Windows 版本由 flutter_build 在 Ubuntu 上交叉构建）。
+左侧 200px 控制面板 + 右侧最大化显示 cimbar 编码图像。
 
-- Press **Alt+A** to select a screen region → compresses to AVIF → encodes into cimbar barcodes → displays as animation
-- 不包含解码功能
+- 选择文件 → 编码为 cimbar 条码帧 → 按设定 fps 循环播放（含官方的画面抖动 shake）
+- 可切换编码模式、调节帧率；不包含解码功能
 
 ```bash
 cd example
-flutter run -d windows
+flutter run -d linux      # 日常开发
+flutter run -d windows    # Windows 版，需 flutter_build 交叉构建
 ```
 
 ### `decode_example` — Web/Android Decoder (接收端)
 
 Web 和 Android 平台的解码接收端。通过摄像头扫描 cimbar 条码并恢复原始文件。
 
-- Opens camera → scans cimbar barcodes → recovers the original file
+- Opens camera → scans cimbar barcodes → recovers the original file → saves it
 
 ```bash
 cd decode_example
@@ -337,12 +359,10 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 
 ### 功能特性
 
-- 将二进制数据编码为 cimbar 条形码帧图像（RGB 像素数据）
-- 从摄像头帧中解码 cimbar 条形码，恢复原始数据
-- Windows 屏幕截图：Alt+A 快捷键触发区域选择
-- AVIF 压缩：截图先压缩为 AVIF 再编码
+- 将任意文件编码为 cimbar 条形码帧图像（RGB 像素数据）
+- 从摄像头帧中解码 cimbar 条形码，恢复原始文件
 - 摄像头扫描：Android 和 Web 平台实时解码
-- 跨平台支持：Windows（FFI）、Android（JNI）、Web（WASM）
+- 跨平台支持：桌面 Linux/Windows（FFI）、Android（JNI）、Web（WASM）
 - 接口化设计：所有 API 以抽象接口暴露，方便测试和扩展
 
 ### 快速开始
@@ -358,7 +378,7 @@ import 'package:libcimbar/libcimbar.dart';
 // 编码
 final encoder = await CimbarPlatform.instance.createEncoder();
 await encoder.configure(const CimbarConfig(mode: CimbarMode.modeB));
-final frames = await encoder.encodeData(data, filename: 'file.avif');
+final frames = await encoder.encodeData(data, filename: 'photo.png');
 
 // 解码
 final decoder = await CimbarPlatform.instance.createDecoder();
@@ -374,8 +394,12 @@ if (result.isComplete) {
 需要先编译 libcimbar C++ 核心库：
 
 ```bash
-# Windows
-native\build_windows.bat C:\project\libcimbar\libcimbar
+# Windows（在 Ubuntu 上用 flutter_build 交叉构建）
+native/build_windows.bat /path/to/libcimbar
+
+# Linux
+cd native && mkdir -p build_linux && cd build_linux
+cmake .. -DCMAKE_BUILD_TYPE=Release && cmake --build . -j$(nproc)
 
 # Web (WASM)
 bash native/build_wasm.sh /path/to/libcimbar
@@ -387,11 +411,17 @@ Android 原生库通过 Flutter 构建系统自动编译。
 
 项目提供两个独立的示例应用：
 
-- **`example`** — Windows 编码发送端（Alt+A 截图 → AVIF 压缩 → cimbar 编码 → 动画显示）
+- **`example`** — 桌面编码发送端（选择文件 → cimbar 编码 → 动画显示）
 - **`decode_example`** — Web/Android 解码接收端（摄像头扫描 → cimbar 解码 → 文件恢复）
 
+> Windows 版本不在 Windows 机器上构建：本项目在 Ubuntu 上开发，Windows 产物由
+> [flutter_build](https://github.com/ubuntu2610/flutter_build) 交叉编译生成。
+
 ```bash
-# Windows 发送端
+# Linux 发送端（日常开发）
+cd example && flutter run -d linux
+
+# Windows 发送端（flutter_build 交叉构建）
 cd example && flutter run -d windows
 
 # Web 接收端
