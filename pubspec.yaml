@@ -4,7 +4,7 @@ description: >-
   Encode files into high-density color barcode images and decode them
   from camera frames. Supports air-gapped data transfer at ~850 kbps
   using monitor + camera — no WiFi, Bluetooth, or NFC needed.
-  Platforms: Windows (FFI), Android (JNI), Web (WASM).
+  Platforms: Linux/Windows (FFI), Android (FFI), Web (WASM).
 version: 0.1.0
 homepage: https://github.com/sz3/libcimbar
 repository: https://github.com/sz3/libcimbar
@@ -20,6 +20,7 @@ topics:
 
 platforms:
   android:
+  linux:
   web:
   windows:
 
