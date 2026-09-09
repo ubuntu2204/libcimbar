@@ -21,13 +21,19 @@ class CimbarFrame {
   /// Total number of frames in the sequence (if known).
   final int? totalFrames;
 
-  const CimbarFrame({
+  /// Creates a frame holding a private snapshot of [pixels].
+  ///
+  /// The copy is deliberate: encoders hand us a buffer that the native/wasm
+  /// side keeps reusing for the next frame (see
+  /// `CimbarEncoderFfi.encodeData`, which reads straight out of the encoder's
+  /// frame buffer), so aliasing it would make every frame show the last one.
+  CimbarFrame({
     required this.index,
-    required this.pixels,
+    required Uint8List pixels,
     required this.width,
     required this.height,
     this.totalFrames,
-  });
+  }) : pixels = Uint8List.fromList(pixels);
 
   /// Number of bytes per row (stride = width * 3 for RGB).
   int get stride => width * 3;

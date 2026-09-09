@@ -130,8 +130,10 @@ class CimbarEncoderFfi implements ICimbarEncoder {
       final width = _isqrt(imageSize);
       final height = imageSize ~/ width;
 
-      // Efficient bulk copy via asTypedList (creates a view, then copies)
-      final pixels = Uint8List.fromList(ptr.asTypedList(size));
+      // asTypedList is a VIEW onto the encoder's frame buffer, which the
+      // next cimbare_next_frame() overwrites. CimbarFrame takes its own
+      // snapshot, so one copy total happens (inside the constructor).
+      final pixels = ptr.asTypedList(size);
 
       frames.add(CimbarFrame(
         index: frameIndex++,
