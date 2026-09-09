@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io' show Platform;
 import 'package:ffi/ffi.dart';
@@ -181,7 +182,12 @@ class CimbarNative {
   int initEncode(String filename, int encodeId) {
     final cFilename = filename.toNativeUtf8();
     try {
-      return _initEncode(cFilename, filename.length, encodeId);
+      // fnsize is a BYTE count — the C++ side builds the header name with
+      // std::string(filename, fnsize). Dart's String.length is UTF-16 code
+      // units, so a non-ASCII name (e.g. Chinese) was cut off mid UTF-8
+      // sequence and arrived truncated/garbled on the receiving side.
+      // (Upstream passes filename.size(), i.e. bytes — see cimbar_jsTest.cpp.)
+      return _initEncode(cFilename, utf8.encode(filename).length, encodeId);
     } finally {
       calloc.free(cFilename);
     }

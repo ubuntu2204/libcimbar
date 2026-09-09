@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
+import 'dart:convert';
 import 'dart:js_interop';
 import 'dart:typed_data';
 
@@ -282,7 +283,12 @@ class CimbarDecoderFfi implements ICimbarDecoder {
           '(runtimeType=${len.runtimeType})');
       if (len <= 0) return '';
       final bytes = copyFromWasmHeap(module, fnPtr, len);
-      return String.fromCharCodes(bytes);
+      // The name is stored as raw UTF-8 bytes. Decoding via
+      // String.fromCharCodes treats every byte as one UTF-16 code unit, so
+      // any non-ASCII name (e.g. Chinese) turns into one mojibake char per
+      // byte. Upstream recv.js does the same as this:
+      //   new TextDecoder("utf-8").decode(temparr)
+      return utf8.decode(bytes, allowMalformed: true);
     } finally {
       module.deallocate(fnPtr);
     }
@@ -323,7 +329,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       final len = jsNumberToInt(cimbardGetReport(ptr.toJS, maxLen.toJS));
       if (len <= 0) return '';
       final bytes = copyFromWasmHeap(module, ptr, len);
-      return String.fromCharCodes(bytes);
+      return utf8.decode(bytes, allowMalformed: true);
     } catch (e) {
       return '(report unavailable: $e)';
     } finally {
