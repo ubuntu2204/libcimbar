@@ -66,6 +66,9 @@ native/build_wasm/
 # ...except the prebuilt Android binaries we publish (so users don't need the
 # NDK/CMake at all). They are NOT build output.
 !android/src/main/jniLibs/**/*.so
+# Windows: the prebuilt dll we publish. It statically links OpenCV and the
+# MinGW runtimes, so it only needs kernel32/msvcrt from the target machine.
+!windows/libcimbar.dll
 *.exp
 *.pdb
 *.ilk

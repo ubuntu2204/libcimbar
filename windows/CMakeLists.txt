@@ -14,17 +14,19 @@ target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(${PLUGIN_NAME} PRIVATE flutter flutter_wrapper_plugin)
 
-# Pre-built native DLLs compiled separately via native/build_windows.bat
-set(LIBCIMBAR_NATIVE_DLL "${CMAKE_CURRENT_SOURCE_DIR}/../native/build_windows/Release/libcimbar.dll")
-set(OPENCV_DLL "C:/project/paddle_ocr/windows/third_party/opencv/lib/opencv_world490.dll")
+# Prebuilt native DLL shipped inside the package (windows/libcimbar.dll).
+#
+# It statically links OpenCV and the MinGW runtimes, so on the target machine
+# it only needs kernel32/msvcrt - no separate OpenCV DLL to distribute.
+# This used to point at native/build_windows/Release/... (a local build output
+# that is not part of the package) plus a hardcoded opencv_world490.dll from
+# somebody else's machine; both are gone.
+set(LIBCIMBAR_NATIVE_DLL "${CMAKE_CURRENT_SOURCE_DIR}/libcimbar.dll")
 
-# Bundled libraries: Flutter copies these to the runner output automatically
+# Bundled libraries: Flutter copies these next to the runner .exe.
 set(BUNDLED_LIBS "$<TARGET_FILE:${PLUGIN_NAME}>")
 if(EXISTS "${LIBCIMBAR_NATIVE_DLL}")
   list(APPEND BUNDLED_LIBS "${LIBCIMBAR_NATIVE_DLL}")
-endif()
-if(EXISTS "${OPENCV_DLL}")
-  list(APPEND BUNDLED_LIBS "${OPENCV_DLL}")
 endif()
 
 set(libcimbar_bundled_libraries

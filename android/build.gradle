@@ -23,11 +23,27 @@ def localProps = new Properties()
 def opencvSdkDir = localProps.getProperty('opencv.sdk.dir') ?:
         System.getenv('OPENCV_ANDROID_SDK')
 
-if (!opencvSdkDir) {
+// ─── Prebuilt vs. compiled native library ────────────────────────
+//
+// The package ships prebuilt libcimbar_jni.so files in src/main/jniLibs/<abi>
+// (OpenCV statically linked in), so consumers need neither the NDK nor the
+// OpenCV Android SDK, and `flutter build apk` gets much faster. This is the
+// default, and it is also required: leaving CMake enabled on top of jniLibs
+// makes AGP fail with "2 files found with path
+// 'lib/arm64-v8a/libcimbar_jni.so'" (jniLibs vs. compiled output).
+//
+// Set libcimbar.preferPrebuilt=false to compile from the vendored sources
+// instead, e.g. after changing native code (needs NDK + OpenCV Android SDK).
+def preferPrebuilt = true
+def preferPrebuiltProp = project.findProperty('libcimbar.preferPrebuilt')
+if (preferPrebuiltProp == null) { preferPrebuiltProp = localProps.getProperty('libcimbar.preferPrebuilt') }
+if (preferPrebuiltProp != null) { preferPrebuilt = Boolean.parseBoolean(preferPrebuiltProp.toString()) }
+
+if (!preferPrebuilt && !opencvSdkDir) {
     logger.warn(
-        'libcimbar: opencv.sdk.dir is not set (android/local.properties) and ' +
-        'OPENCV_ANDROID_SDK is unset — the native build will likely fail to ' +
-        'find OpenCV. Download the OpenCV Android SDK and point at it.')
+        'libcimbar: preferPrebuilt=false but opencv.sdk.dir is not set ' +
+        '(android/local.properties) and OPENCV_ANDROID_SDK is unset - the ' +
+        'native build will likely fail to find OpenCV.')
 }
 
 android {
@@ -42,28 +58,35 @@ android {
             abiFilters 'arm64-v8a', 'armeabi-v7a'
         }
 
-        externalNativeBuild {
-            cmake {
-                def cmakeArgs = ['-DANDROID_STL=c++_shared']
-                // LIBCIMBAR_SRC_PATH is left unset on purpose: the CMakeLists
-                // probes third_party/libcimbar and third_party/libcimbar_cpp
-                // itself, so a rename upstream can't break the build.
-                if (opencvSdkDir) {
-                    cmakeArgs.add("-DOPENCV_ANDROID_SDK_PATH=${opencvSdkDir}")
+        // Only meaningful when compiling from source (see preferPrebuilt).
+        if (!preferPrebuilt) {
+            externalNativeBuild {
+                cmake {
+                    def cmakeArgs = ['-DANDROID_STL=c++_shared']
+                    // LIBCIMBAR_SRC_PATH is left unset on purpose: the
+                    // CMakeLists probes third_party/libcimbar and
+                    // third_party/libcimbar_cpp itself, so a rename upstream
+                    // can't break the build.
+                    if (opencvSdkDir) {
+                        cmakeArgs.add("-DOPENCV_ANDROID_SDK_PATH=${opencvSdkDir}")
+                    }
+                    // `*` spreads the list: arguments() is varargs, not a
+                    // collection setter, so passing the list directly fails
+                    // with "Could not find method arguments()".
+                    arguments(*cmakeArgs)
+                    cppFlags '-std=c++17 -fexceptions'
                 }
-                // `*` spreads the list: arguments() is varargs, not a
-                // collection setter, so passing the list directly fails with
-                // "Could not find method arguments()".
-                arguments(*cmakeArgs)
-                cppFlags '-std=c++17 -fexceptions'
             }
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path file('src/main/cpp/CMakeLists.txt')
-            version '3.22.1'
+    // Skipped when using the prebuilt .so files - see preferPrebuilt above.
+    if (!preferPrebuilt) {
+        externalNativeBuild {
+            cmake {
+                path file('src/main/cpp/CMakeLists.txt')
+                version '3.22.1'
+            }
         }
     }
 
