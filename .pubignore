@@ -6,12 +6,14 @@
 # ====================
 # Vendored C++ sources
 # ====================
-# `third_party/libcimbar` and `third_party/cfc` are embedded git repositories
-# (gitlinks): git only records a pointer, so pub cannot tell what is ignored
-# inside them and reports them as "checked in while gitignored". They are not
-# needed by consumers — the native library is built from the user's own
-# libcimbar checkout (see README → "Building Native Libraries").
-third_party/
+# `third_party/libcimbar` IS published: the build hook compiles the native
+# library from it, and shipping the sources also satisfies the MPL-2.0
+# "source availability" obligation.
+#
+# `third_party/cfc` stays out: it is a reference implementation we never build
+# against, and it embeds a SECOND copy of the libcimbar sources (roughly half
+# of the vendored tree).
+third_party/cfc/
 
 # ====================
 # Dart / Flutter tooling
@@ -47,6 +49,13 @@ native/build_android/
 *.pdb
 *.ilk
 
+# ...but the PREBUILT binaries we ship are not build output — re-include them:
+#   Android: android/src/main/jniLibs/<abi>/libcimbar_jni.so  (Gradle merges
+#            them into the APK, so users don't need the NDK/CMake at all)
+#   Windows: windows/libcimbar.dll (copied next to the .exe by windows/CMakeLists)
+!android/src/main/jniLibs/**/*.so
+!windows/*.dll
+
 # ====================
 # Android
 # ====================
@@ -64,7 +73,10 @@ android/.externalNativeBuild/
 # ====================
 # WASM artifacts (built separately via native/build_wasm.sh)
 # ====================
+# The copy in `assets/wasm/` IS published (Flutter asset, loaded by the web
+# decoder); the per-app copies are duplicates and stay out.
 *.wasm
+!assets/wasm/*.wasm
 example/web/assets/wasm/
 decode_example/web/assets/wasm/
 test/wasm/.build/
