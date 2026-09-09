@@ -1,0 +1,85 @@
+# .pubignore — files excluded from the published package.
+#
+# IMPORTANT: when a package has a `.pubignore`, pub no longer consults
+# `.gitignore`, so every rule needed for publishing must live in this file.
+
+# ====================
+# Vendored C++ sources
+# ====================
+# `third_party/libcimbar` and `third_party/cfc` are embedded git repositories
+# (gitlinks): git only records a pointer, so pub cannot tell what is ignored
+# inside them and reports them as "checked in while gitignored". They are not
+# needed by consumers — the native library is built from the user's own
+# libcimbar checkout (see README → "Building Native Libraries").
+third_party/
+
+# ====================
+# Dart / Flutter tooling
+# ====================
+.dart_tool/
+**/.dart_tool/
+.pub-cache/
+.pub/
+.packages
+pubspec.lock
+**/pubspec.lock
+build/
+coverage/
+doc/api/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# ====================
+# Native build output
+# ====================
+native/build_linux/
+native/build_wasm/
+native/build_windows/
+native/build_android/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exp
+*.pdb
+*.ilk
+
+# ====================
+# Android
+# ====================
+android/local.properties
+android/.gradle/
+android/.cxx/
+android/.externalNativeBuild/
+**/.gradle/
+*.apk
+*.aab
+*.jks
+*.keystore
+*.iml
+
+# ====================
+# WASM artifacts (built separately via native/build_wasm.sh)
+# ====================
+*.wasm
+example/web/assets/wasm/
+decode_example/web/assets/wasm/
+test/wasm/.build/
+
+# ====================
+# Local test artifacts / media
+# ====================
+*.mp4
+*.log
+
+# ====================
+# IDE / editor / OS
+# ====================
+.idea/
+.vscode/
+.codebuddy/
+.DS_Store
+*.swp

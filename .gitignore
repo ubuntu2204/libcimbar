@@ -141,3 +141,14 @@ example/web/assets/wasm/
 third_party/libcimbar_cpp/.clangd
 third_party/libcimbar_cpp/compile_commands.json
 third_party/libcimbar_cpp/.cache/
+
+# ====================
+# Vendored C++ sources (third_party/libcimbar, third_party/cfc)
+# ====================
+# These are embedded git repositories (gitlinks) with no .gitmodules entry, so
+# a fresh clone only gets an empty directory anyway. Keeping them in the index
+# also makes `dart pub publish` fail: pub reports them as "checked in while
+# gitignored" and exits 65. Only the index entry is dropped — the local copies
+# stay on disk, and consumers build the native library from their own
+# libcimbar checkout (see README → "Building Native Libraries").
+third_party/
