@@ -63,6 +63,9 @@ native/build_wasm/
 *.dll
 *.so
 *.dylib
+# ...except the prebuilt Android binaries we publish (so users don't need the
+# NDK/CMake at all). They are NOT build output.
+!android/src/main/jniLibs/**/*.so
 *.exp
 *.pdb
 *.ilk
@@ -90,11 +93,17 @@ android/.cxx/
 android/.externalNativeBuild/
 
 # ====================
-# Web / WASM assets (built separately, not source)
+# Web / WASM assets
 # ====================
+# Built separately via native/build_wasm.sh — but the copies under
+# `assets/wasm/` are the ones we PUBLISH (the web decoder loads them), so they
+# are tracked. Per-app copies (example/web, decode_example/web) stay ignored.
 assets/wasm/*.wasm
 assets/wasm/*.js
 !assets/wasm/.gitkeep
+!assets/wasm/libcimbar.js
+!assets/wasm/libcimbar.wasm
+!assets/wasm/cimbar_js.wasm
 
 # ====================
 # WASM regression test scratch (test/wasm/run.sh compiles dump_frames here)
@@ -129,6 +138,10 @@ example/web/assets/wasm/
 *.png
 !assets/**/*.png
 !example/**/assets/**/*.png
+# ...but the vendored cimbar bitmap tiles are runtime assets of the C++ core
+# (loaded by CimbEncoder/CimbDecoder), so they MUST stay tracked now that
+# third_party/libcimbar is a normal tracked directory.
+!third_party/libcimbar/**
 
 # ====================
 # Vendored libcimbar C++ core (third_party/libcimbar_cpp)

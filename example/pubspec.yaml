@@ -18,5 +18,21 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.1
 
+# Build hook configuration for the libcimbar dependency.
+#
+# Linux has no prebuilt binary (glibc/distro differences), so libcimbar's
+# build hook compiles the vendored C++ core from source. That needs OpenCV,
+# and this machine has no system OpenCV — point the hook at the local build.
+# Remove/adjust this block if your OpenCV lives somewhere else (or is installed
+# system-wide, in which case it can be deleted entirely).
+# libcimbar's build hook compiles the native library from source on Linux, but
+# only when explicitly enabled (it needs OpenCV, and Flutter does not bundle
+# native assets for Linux desktop yet). Uncomment and adjust to try it:
+#hooks:
+#  user_defines:
+#    libcimbar:
+#      build: true
+#      opencv_dir: /home/ubuntu/project/opencv/install_linux_min/lib/cmake/opencv4
+
 flutter:
   uses-material-design: true
