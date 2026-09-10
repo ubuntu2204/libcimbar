@@ -22,14 +22,21 @@
 3. **已确立的对齐基线**（改动前先核对是否偏离）：
    - 安卓：**方向跟随设备**（竖屏/横屏皆可——官方 web 端 recv.js 的哲学；
      cfc 主线锁横屏是其 OpenCV SurfaceView 的 2020 年历史包袱，作者
-     自己在未合并的 orientation-station 分支里尝试过删除）、
+     自己在未合并的 orientation-station 分支里尝试过删除；扫描中旋转
+     需重启相机控制器，见 decoder_page didChangeMetrics）、
      全帧扫描（无中心裁剪）、短边 1080p 上限、I420 直送、
-     **取景框 4:3 letterbox 居中**（视觉对齐 cfc `mScale` letterbox；
-     Scanner 仍扫描全帧，与 cfc 同款——视觉引导 ≠ 裁剪）
+     **取景窗 = cfc 实测几何**：4:3 窗口填满屏幕短边居中（横屏 2412x1080
+     屏 → 1440x1080，与官方像素级同尺寸）、纯黑不透明方角 letterbox、
+     括号在**窗口角**（cfc drawGuidance 比例：stroke=minsz/128、
+     length=stroke*8、offset=minsz/32、黑描边）；Scanner 仍扫全帧
+     （视觉引导 ≠ 裁剪）
    - Web：rVFC 全帧调度、getUserMedia 约束照抄 recv.js、
      Worker 池并行解码、copyTo 不 await
    - UI：白/黄/绿三色 guidance 状态机（cfc drawGuidance 语义）、
      真实进度来自 `cimbard_get_report` 的 `[p1,p2,...]`
+   - **截图对比方法论**：模型不能直接看图时，用 Python+numpy 做按列/行
+     像素 std 剖面（相机内容 std>50 / 暗化 5-25 / 纯黑 <5）测量窗口
+     几何，不靠肉眼猜
 4. **third_party/ 目录只读**（既有铁律不变）；官方源码仅作参照与基准。
 5. **对比工具**：`test/e2e/compare_web.py` 官方 vs 本项目网页端基准，
    任何解码相关改动后跑一次，防止回归。

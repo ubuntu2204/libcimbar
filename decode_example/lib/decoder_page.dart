@@ -55,7 +55,7 @@ class DecoderPage extends StatefulWidget {
   State<DecoderPage> createState() => _DecoderPageState();
 }
 
-class _DecoderPageState extends State<DecoderPage> {
+class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
   // ─── State ────────────────────────────────────────────────────
 
   final CimbarPlatform _platform = CimbarPlatform.instance;
@@ -145,6 +145,7 @@ class _DecoderPageState extends State<DecoderPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initialize();
   }
 
@@ -302,6 +303,10 @@ class _DecoderPageState extends State<DecoderPage> {
     _camera!.onFrame((frame) {
       _processCameraFrame(frame);
     });
+    // Baseline for the orientation-change restart (see didChangeMetrics).
+    if (mounted) {
+      _lastOrientation = MediaQuery.of(context).orientation;
+    }
   }
 
   /// Explain why the camera could not start, with the insecure-origin case
@@ -335,6 +340,52 @@ class _DecoderPageState extends State<DecoderPage> {
       _isDecoding = false;
       _statusMessage = '摄像头已停止。';
     });
+  }
+
+  // ─── Orientation-change camera restart ────────────────────────
+  //
+  // The capture orientation is fixed when the camera controller is
+  // created. Rotating the phone mid-scan (orientation follows the device,
+  // unlike cfc's locked landscape) would otherwise leave the preview in
+  // the old orientation — a portrait image letterboxed into a landscape
+  // screen. Restart the capture so it re-targets the new display
+  // rotation; the decoder's fountain state is untouched by this.
+  Orientation? _lastOrientation;
+  bool _restartingCamera = false;
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    if (!_isCameraActive || _restartingCamera || !mounted) return;
+    final orientation = MediaQuery.of(context).orientation;
+    if (_lastOrientation == null) {
+      _lastOrientation = orientation;
+      return;
+    }
+    if (orientation != _lastOrientation) {
+      _lastOrientation = orientation;
+      unawaited(_restartCameraForOrientation());
+    }
+  }
+
+  Future<void> _restartCameraForOrientation() async {
+    _restartingCamera = true;
+    try {
+      await _camera?.dispose();
+      _camera = await _platform.createCameraCapture();
+      await _camera!.start(
+        preferredWidth: kPreferredCameraWidth,
+        preferredHeight: kPreferredCameraHeight,
+        frameIntervalMs: (1000 / kCaptureFps).round(),
+      );
+      _camera!.onFrame((frame) => _processCameraFrame(frame));
+      if (mounted) setState(() {});
+      debugPrint('[Decoder] camera restarted after orientation change');
+    } catch (e) {
+      debugPrint('[Decoder] camera restart after rotation failed: $e');
+    } finally {
+      _restartingCamera = false;
+    }
   }
 
   Future<void> _processCameraFrame(CameraFrame frame) async {
@@ -618,13 +669,14 @@ class _DecoderPageState extends State<DecoderPage> {
   }
 
   /// Full-screen scanning layout: the camera viewfinder fills the entire
-  /// screen, with a floating status strip on top and a minimal control bar
-  /// at the bottom.
+  /// screen with the cfc-style 4:3 window overlay, a floating status strip
+  /// on top, and a compact stop button at the bottom-right corner (the
+  /// spot cfc uses for its mode toggle).
   Widget _buildScanningLayout() {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _buildCameraPreview(fullBleed: true, overlayBottomInset: 80),
+        _buildCameraPreview(fullBleed: true),
         _buildScanningStatusBar(),
         _buildScanningControls(),
       ],
@@ -686,29 +738,26 @@ class _DecoderPageState extends State<DecoderPage> {
     );
   }
 
-  /// Minimal control bar under the viewfinder while scanning.
+  /// Compact stop control at the bottom-right corner — the position cfc
+  /// uses for its mode toggle. A full-width bottom bar would cover the
+  /// bottom of the 4:3 decode window (where the barcode's bottom anchors
+  /// live), so the button stays small and out of the window.
   Widget _buildScanningControls() {
     return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        color: Colors.black.withValues(alpha: 0.55),
-        child: Row(
-          children: [
-            Expanded(
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: _stopCamera,
-                icon: const Icon(Icons.stop),
-                label: const Text('停止扫描'),
-              ),
-            ),
-          ],
+      right: 16,
+      bottom: 16,
+      child: GestureDetector(
+        onTap: _stopCamera,
+        child: Container(
+          width: 56,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.55),
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white24),
+          ),
+          child: const Icon(Icons.stop_rounded, color: Colors.white70, size: 30),
         ),
       ),
     );
@@ -740,9 +789,8 @@ class _DecoderPageState extends State<DecoderPage> {
   }
 
   /// [fullBleed] renders the preview edge-to-edge (scanning layout);
-  /// [overlayBottomInset] lifts the hint text above the floating control bar.
-  Widget _buildCameraPreview(
-      {bool fullBleed = false, double overlayBottomInset = 0}) {
+  /// otherwise it is clipped into the idle layout's preview card.
+  Widget _buildCameraPreview({bool fullBleed = false}) {
     final vType = _cameraViewType;
     if (_isCameraActive && vType != null) {
       // Show camera preview with scanning frame overlay
@@ -752,7 +800,7 @@ class _DecoderPageState extends State<DecoderPage> {
           // Camera video stream
           HtmlElementView(viewType: vType),
           // Scanning frame overlay
-          _buildScanningOverlay(bottomInset: overlayBottomInset),
+          _buildScanningOverlay(),
         ],
       );
       if (fullBleed) return stack;
@@ -780,7 +828,7 @@ class _DecoderPageState extends State<DecoderPage> {
           // why the picture came out vertically stretched. Align() loosens
           // the constraints again so the texture keeps its real shape.
           Align(alignment: Alignment.center, child: CameraPreview(ctrl)),
-          _buildScanningOverlay(bottomInset: overlayBottomInset),
+          _buildScanningOverlay(),
         ],
       );
       if (fullBleed) return stack;
@@ -841,31 +889,32 @@ class _DecoderPageState extends State<DecoderPage> {
     );
   }
 
-  /// Scanning overlay, official style (cfc's recv UI): a 4:3 letterbox
-  /// (the same mScale-centered window cfc renders through OpenCV's
-  /// CameraBridgeViewBase) sits in the middle of the viewfinder, with the
-  /// rest of the camera frame dimmed; the screen-corner guidance brackets
-  /// carry the transfer-health state (white/yellow/green) like cfc's
-  /// drawGuidance. The Scanner still searches the FULL frame (we don't
-  /// crop), so a barcode just outside the letterbox still decodes — same
-  /// behavior as cfc, only the visual layer differs.
-  /// [bottomInset] lifts the hint text above the floating control bar in
-  /// the full-screen scanning layout.
-  Widget _buildScanningOverlay({double bottomInset = 0}) {
+  /// Scanning overlay with cfc's EXACT window geometry (measured against
+  /// a real cfc screenshot): a 4:3 window filling the view's short side,
+  /// centered, with OPAQUE black letterbox bars on the remaining sides;
+  /// guidance brackets at the WINDOW corners in cfc's drawGuidance
+  /// proportions (black outline under the white/yellow/green state
+  /// color); hint text at the window's bottom edge.
+  ///
+  /// The Scanner still searches the FULL camera frame — the bars are
+  /// presentation only, exactly like cfc (whose OpenCV mScale letterbox
+  /// affects drawing, never the decode input). A barcode just outside
+  /// the window still decodes.
+  Widget _buildScanningOverlay() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        // 4:3 letterbox, short side = view's short side (so it dominates
-        // the viewfinder), letterbox-centered via the same `mScale =
-        // min(viewW/frameW, viewH/frameH)` rule cfc uses — fits both
-        // landscape and portrait screens without distortion.
+        // cfc's window rule (CameraBridgeViewBase mScale): a 4:3 frame
+        // whose short side equals the view's short side, scaled by
+        // min(viewW/frameW, viewH/frameH) and centered. On a landscape
+        // 2412x1080 screen this lands at 1440x1080 — matching the
+        // official app's bright window pixel-for-pixel.
         final s = size.shortestSide;
-        final frameW = s * 4 / 3;
-        final frameH = s;
-        final mScale = math.min(size.width / frameW, size.height / frameH);
-        final drawW = frameW * mScale;
-        final drawH = frameH * mScale;
-        final letterboxRect = Rect.fromLTWH(
+        final mScale =
+            math.min(size.width / (s * 4 / 3), size.height / s);
+        final drawW = s * 4 / 3 * mScale;
+        final drawH = s * mScale;
+        final window = Rect.fromLTWH(
           (size.width - drawW) / 2,
           (size.height - drawH) / 2,
           drawW,
@@ -874,31 +923,27 @@ class _DecoderPageState extends State<DecoderPage> {
 
         return Stack(
           children: [
-            // Dim everything OUTSIDE the 4:3 letterbox window.
+            // Opaque black outside the window — cfc's bars are pure black
+            // (nothing is drawn there at all), which is what makes the
+            // window read as crisp and full-size.
             CustomPaint(
               size: size,
-              painter: _DarkOverlayPainter(
-                frameRect: letterboxRect,
-                color: Colors.black.withValues(alpha: 0.6),
-              ),
+              painter: _DarkOverlayPainter(frameRect: window),
             ),
-            // Screen-corner guidance brackets — cfc drawGuidance style.
+            // Guidance brackets at the WINDOW corners, cfc drawGuidance
+            // proportions, black outline under the status color.
             CustomPaint(
               size: size,
               painter: _CornerBracketsPainter(
+                frameRect: window,
                 color: _guideColor,
-                bracketLength:
-                    (size.shortestSide * 0.06).clamp(28.0, 96.0),
-                strokeWidth: 3.0,
-                inset: size.shortestSide * 0.03,
               ),
             ),
-            // Hint pinned to the bottom of the preview, color follows the
-            // guide so the state change catches the eye.
+            // Hint at the bottom edge of the window, colored by state.
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 10 + bottomInset,
+              left: window.left,
+              width: window.width,
+              bottom: size.height - window.bottom + 14,
               child: Text(
                 '对准 cimbar 条码（四个角都可见）',
                 textAlign: TextAlign.center,
@@ -957,6 +1002,7 @@ class _DecoderPageState extends State<DecoderPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _camera?.dispose();
     _decoder?.dispose();
     super.dispose();
@@ -965,84 +1011,90 @@ class _DecoderPageState extends State<DecoderPage> {
 
 // ─── Scanning frame painters ────────────────────────────────────
 
-/// Dim everything outside the letterbox rectangle, leaving the 4:3
-/// window centred and untouched. Mirrors cfc's OpenCV mScale letterbox
-/// visually (the official app darkens the same way — the dim regions
-/// still go to the Scanner, only the eye is guided).
+/// Opaque black outside the 4:3 window, square corners — a pixel-for-
+/// pixel match of cfc's OpenCV letterbox bars (pure black, sharp edges).
+/// The dimmed regions still go to the Scanner; only the eye is guided.
 class _DarkOverlayPainter extends CustomPainter {
   final Rect frameRect;
-  final Color color;
 
-  _DarkOverlayPainter({required this.frameRect, required this.color});
+  _DarkOverlayPainter({required this.frameRect});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final paint = Paint()..color = Colors.black;
     final path = Path()
-      ..addRect(fullRect)
-      ..addRRect(
-          RRect.fromRectAndRadius(frameRect, const Radius.circular(12)))
+      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
+      ..addRect(frameRect)
       ..fillType = PathFillType.evenOdd;
     canvas.drawPath(path, paint);
   }
 
   @override
   bool shouldRepaint(_DarkOverlayPainter old) =>
-      old.frameRect != frameRect || old.color != color;
+      old.frameRect != frameRect;
 }
 
-/// Draws the guidance brackets at the four corners of the SCREEN —
-/// cfc's drawGuidance (jni.cpp) marks the decode area the same way, with
-/// the bracket color carrying the transfer-health state (white/yellow/
-/// green). Full-frame scanning means no viewfinder box: the brackets are
-/// status feedback, not an aiming constraint.
+/// Guidance brackets at the four corners of the 4:3 window, in cfc's
+/// drawGuidance proportions (jni.cpp): with `minsz` the window's short
+/// side,
+///   stroke   = minsz >> 7      (~8px at 1080)
+///   outline  = stroke + minsz >> 8
+///   length   = stroke << 3     (~68px)
+///   offset   = minsz >> 5      (~34px inside the window corner)
+/// A black outline is drawn under the status color (white / yellow /
+/// green) so the brackets stay visible over bright camera content.
 class _CornerBracketsPainter extends CustomPainter {
+  final Rect frameRect;
   final Color color;
-  final double bracketLength;
-  final double strokeWidth;
-
-  /// Distance from each screen edge to the bracket.
-  final double inset;
 
   _CornerBracketsPainter({
+    required this.frameRect,
     required this.color,
-    required this.bracketLength,
-    required this.strokeWidth,
-    required this.inset,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = strokeWidth
+    final minsz = math.min(frameRect.width, frameRect.height);
+    final guideWidth = (minsz / 128).clamp(5.0, 14.0);
+    final outlineWidth = guideWidth + (minsz / 256).clamp(3.0, 10.0);
+    final guideLength = guideWidth * 8;
+    final guideOffset = (minsz / 32).clamp(20.0, 60.0);
+
+    final outlinePaint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = outlineWidth
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+      ..strokeCap = StrokeCap.square;
+    final colorPaint = Paint()
+      ..color = color
+      ..strokeWidth = guideWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.square;
 
-    final l = bracketLength;
-    final ox = inset;
-    final oy = inset;
-    final w = size.width;
-    final h = size.height;
+    // Corner anchors, inset from the window corners (cfc guideOffset).
+    final cx = frameRect.center.dx;
+    final cy = frameRect.center.dy;
+    final anchors = [
+      Offset(frameRect.left + guideOffset, frameRect.top + guideOffset),
+      Offset(frameRect.right - guideOffset, frameRect.top + guideOffset),
+      Offset(frameRect.left + guideOffset, frameRect.bottom - guideOffset),
+      Offset(frameRect.right - guideOffset, frameRect.bottom - guideOffset),
+    ];
 
-    void corner(Offset a, Offset corner, Offset b) {
-      canvas.drawLine(a, corner, paint);
-      canvas.drawLine(corner, b, paint);
+    for (final a in anchors) {
+      // Horizontal + vertical arm along the window edges (inward).
+      final h = Offset(
+          a.dx + (a.dx < cx ? guideLength : -guideLength), a.dy);
+      final v = Offset(
+          a.dx, a.dy + (a.dy < cy ? guideLength : -guideLength));
+      canvas.drawLine(a, h, outlinePaint);
+      canvas.drawLine(a, v, outlinePaint);
+      canvas.drawLine(a, h, colorPaint);
+      canvas.drawLine(a, v, colorPaint);
     }
-
-    // Top-left / top-right / bottom-left / bottom-right
-    corner(Offset(ox, oy + l), Offset(ox, oy), Offset(ox + l, oy));
-    corner(Offset(w - ox - l, oy), Offset(w - ox, oy), Offset(w - ox, oy + l));
-    corner(Offset(ox, h - oy - l), Offset(ox, h - oy), Offset(ox + l, h - oy));
-    corner(Offset(w - ox - l, h - oy), Offset(w - ox, h - oy),
-        Offset(w - ox, h - oy - l));
   }
 
   @override
   bool shouldRepaint(_CornerBracketsPainter old) =>
-      old.color != color ||
-      old.bracketLength != bracketLength ||
-      old.inset != inset ||
-      old.strokeWidth != strokeWidth;
+      old.frameRect != frameRect || old.color != color;
 }
