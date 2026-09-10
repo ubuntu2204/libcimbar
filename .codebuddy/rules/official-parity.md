@@ -20,7 +20,9 @@
 2. **逐项对齐，不自创替代**：相机约束、分辨率策略、方向锁定、帧调度、
    解码线程模型、UI 反馈（如三色 guidance）都以官方为唯一标准。
 3. **已确立的对齐基线**（改动前先核对是否偏离）：
-   - 安卓：横屏锁定（manifest `screenOrientation="landscape"`）、
+   - 安卓：**方向跟随设备**（竖屏/横屏皆可——官方 web 端 recv.js 的哲学；
+     cfc 主线锁横屏是其 OpenCV SurfaceView 的 2020 年历史包袱，作者
+     自己在未合并的 orientation-station 分支里尝试过删除）、
      全帧扫描（无中心裁剪）、短边 1080p 上限、I420 直送
    - Web：rVFC 全帧调度、getUserMedia 约束照抄 recv.js、
      Worker 池并行解码、copyTo 不 await

@@ -14,16 +14,21 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
-            android:screenOrientation="landscape"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Landscape, like the official Android decoder (cfc): the
-                 phone scans a landscape screen, the barcode then fills the
-                 preview's SHORT side (1080p -> full height) instead of the
-                 long one, and CameraX delivers frames already rotated —
-                 no per-frame orientation handling anywhere. -->
+            <!-- Orientation follows the device (portrait and landscape both
+                 work), like the official WEB receiver's philosophy
+                 (recv.js picks its camera aspectRatio from the screen
+                 orientation). The official Android app locks landscape,
+                 but that is 2020-era baggage from its OpenCV SurfaceView
+                 (the author's own unmerged "orientation-station" branch
+                 tried to remove it) — Flutter has no such constraint:
+                 configChanges keeps the Activity alive across rotations,
+                 CameraX re-targets the analysis frames to the new display
+                 rotation, and the full-frame scan + deskew homography are
+                 orientation-agnostic. -->
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues
