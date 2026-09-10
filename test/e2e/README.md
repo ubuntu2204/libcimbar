@@ -72,30 +72,31 @@ python3 compare_web.py --video other.mp4
 Requirements: the official wasm package at `~/下载/cimbar.wasm/` and a
 current `decode_example/build/web` (rebuild with `flutter build web`).
 
-Reference result (2026-09-10, 3 runs, all stable):
+Reference result (2026-09-10, 3 runs each, after the official-parity
+upgrade — rVFC capture + 6 decode workers + camera prewarm):
 
 | metric | official | decode_example |
 |---|---|---|
-| startup (first frame fed) | 0.1–0.2s | 2.7s |
-| capture rate | 18.1–18.9fps (rVFC, event-driven) | 14.9fps (Timer, zero drops) |
-| first payload frame | 10.1s | **2.8–3.7s** |
-| file complete | **10.1s** | 12.6s |
-| decode window (1st frame → complete) | 9.9s | 9.9s |
-| payload frames until complete | 1 | 4–5 |
-| camera frames fed until complete | 187 | 148 |
+| startup (first frame fed) | 0.1–0.2s | 2.7s (dart2js bootstrap) |
+| capture rate | 18.1–18.9fps (rVFC) | 15.0fps (rVFC, same scheduling) |
+| first payload frame | 10.1s | **4.8s** |
+| file complete | 10.1s | **10.0s** |
+| decode window (1st frame → complete) | 9.9s | **7.3s** |
+| payload frames until complete | 1 | 2–3 |
+| camera frames fed until complete | 187 | 110 |
 
-Both decode the file, and the **decode throughput is identical** — the
-9.9s from first frame to completion matches exactly. The 2.5s total-time
-gap is pure app startup (dart2js bootstrap + WASM init + camera start).
-The app reaches payload faster (modeB locked from the start; the official
-Auto mode rotates [66,68,67,4] so only 1 in 4 frames even tries mode B
-before the first success locks it in). The official feeds ~18.5fps vs our
-14.9fps because rVFC is event-driven (fires for every frame Chrome
-delivers, slightly above the requested ideal:15) while we sample on a
-fixed 66ms timer — at 720x1080 the per-frame cost (~18ms wasm + copies)
-fits comfortably in the budget, so nothing is dropped. The single
-main-thread wasm only becomes the wall at higher resolutions/frame rates
-(the official runs its per-frame decode in 4 parallel Web Workers).
+**decode_example now matches the official total time (10.0s vs 10.1s) and
+beats its decode window by 26% (7.3s vs 9.9s)** with 41% fewer frames
+fed — the modeB lock advantage: every frame decodes modeB, while the
+official's Auto mode only tries modeB on 1 of every 4 frames until it
+locks. The remaining total-time gap is pure dart2js startup, which the
+camera prewarm already overlaps where possible.
+
+Architecture parity with recv.html (see `decode_worker.js` +
+`decode_worker_pool.dart`): 6 parallel Web Workers (scales with
+`hardwareConcurrency`, official hardcodes 4) each run their own wasm
+instance for scan/extract/decode, with zero-copy buffer transfer; the
+main thread keeps the fountain sink, reassembly, and capture (rVFC).
 
 Standalone use against an already-running app:
 

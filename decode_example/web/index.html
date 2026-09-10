@@ -95,6 +95,32 @@
     })();
   </script>
 
+  <!-- Prewarm the camera in parallel with the (slow) dart2js bootstrap.
+       WebCameraCapture consumes window.__cimbarPrewarmedStream on start();
+       if this failed (permission denied / no camera), the app calls
+       getUserMedia itself. Constraints mirror _buildConstraints in
+       web_camera_capture.dart / recv.js. -->
+  <script>
+    (function() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+      var landscape = matchMedia('all and (orientation:landscape)').matches;
+      navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          width: { min: 720, ideal: 1920 },
+          height: { min: 720, ideal: 1080 },
+          aspectRatio: landscape ? 16 / 9 : 9 / 16,
+          facingMode: 'environment',
+          exposureMode: 'continuous',
+          focusMode: 'continuous',
+          frameRate: { ideal: 15 },
+        },
+      }).then(function(s) {
+        window.__cimbarPrewarmedStream = s;
+      }).catch(function() { /* the app will ask on its own */ });
+    })();
+  </script>
+
   <!-- Flutter bootstrap -->
   <script src="flutter_bootstrap.js" async></script>
 

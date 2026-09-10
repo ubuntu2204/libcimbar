@@ -12,6 +12,7 @@ import '../interfaces/cimbar_decoder_interface.dart';
 import '../models/cimbar_config.dart';
 import '../models/decode_result.dart';
 import '../utils/fountain_progress.dart';
+import 'decode_worker_pool.dart';
 import 'libcimbar_js_interop.dart';
 
 /// Web (Flutter WASM) cimbar decoder using JS interop.
@@ -127,6 +128,10 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       throw StateError('cimbard_configure_decode failed: $result');
     }
     _modeVal = config.modeValue;
+    // The workers each hold their own wasm instance: their Config (which
+    // sizes the scan output buffers) must follow the mode too. No bounce
+    // needed there — workers keep no fountain/sink state.
+    _pool?.configure(modeVal);
   }
 
   /// Active mode value (for [resetStreams]'s bounce trick).
@@ -160,6 +165,53 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     _checkReady();
     final module = cimbarModule!;
 
+    // ── Worker path (official recv.html architecture) ─────────────
+    // The heavy scan/extract/decode runs in parallel Web Workers, each
+    // with its own wasm instance; this thread only does the fountain
+    // sink (below). Returns null when the pool did not take the frame
+    // (spawn failed / not yet initialized / post failed) — in that case
+    // imageData is still valid and the main-thread fallback runs.
+    final workerResult =
+        await _tryWorkerDecode(imageData, width, height, format);
+    if (workerResult != null) {
+      // NOTE: the pixel buffer was TRANSFERRED to the worker — imageData
+      // must not be touched past this point.
+      final bytesDecoded = workerResult.len;
+      final report = workerResult.report ?? '';
+      if (bytesDecoded < 0) {
+        lastScanBytes = bytesDecoded;
+        _diag('scan_extract_decode => $bytesDecoded '
+            '(${width}x$height, fmt=${format.value}) — $report');
+        if (bytesDecoded == -100 || bytesDecoded == -101) {
+          // pool trouble (timeout / wasm not ready / trap), not an image
+          // problem — treat the frame as skipped, not failed.
+          return DecodeResult.inProgress(progress: _progress);
+        }
+        return DecodeResult.error(
+            'scan_extract_decode failed: $bytesDecoded — $report');
+      }
+      if (bytesDecoded == 0) {
+        lastScanBytes = 0;
+        _diag('scan_extract_decode => 0 bytes (anchors found, no payload) — '
+            '$report');
+        return DecodeResult.inProgress(progress: _progress);
+      }
+      if (bytesDecoded > _decodeBufSize || workerResult.bytes == null) {
+        // Chunk payload bigger than our main-thread buffer cannot happen
+        // with matching modes — but never write past the allocation.
+        return DecodeResult.error('worker chunk size mismatch: $bytesDecoded');
+      }
+      _diag('scan_extract_decode => $bytesDecoded bytes — $report',
+          force: true);
+      // Move the fountain chunks into the main-thread wasm heap (at most
+      // cimbard_get_bufsize() bytes — 7.5KB in modeB) and run the sink.
+      final heap = module.heapU8.toDart;
+      heap.setRange(
+          _decodeBufPtr, _decodeBufPtr + bytesDecoded, workerResult.bytes!);
+      return _fountainStep(bytesDecoded);
+    }
+
+    // ── Main-thread fallback (pre-worker path) ─────────────────────
     // Copy image data to WASM heap
     final imgPtr = module.allocate(imageData.length);
     try {
@@ -198,63 +250,101 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       _diag('scan_extract_decode => $bytesDecoded bytes — ${_readReport()}',
           force: true);
 
-      // Feed into the fountain decoder. scan_extract_decode returns
-      // buffers_in_use * fountain_chunk_size, i.e. the value is ALREADY
-      // chunk-aligned for the active mode — pass it through verbatim.
-      //
-      // (A former hardcoded 930-byte "alignment" was wrong for modeB, whose
-      // real chunk is 625 (frame = 12 x 625 = 7500): it truncated 7500 -> 7440,
-      // which cimbard_fountain_decode rejects outright (-5) — so decode
-      // progress stayed at 0% forever even on pristine frames.)
-      lastScanBytes = bytesDecoded;
-      final fileId = jsNumberToInt(
-          cimbardFountainDecode(_decodeBufPtr.toJS, bytesDecoded.toJS));
-      lastFountainResult = fileId;
-      // fountain_decode refreshes the native report with the per-stream
-      // chunk-accumulation list — capture it for diagnostics AND parse it
-      // into the real progress (same source the official recv.js renders
-      // as its progress bars).
-      lastFountainProgress = _readReport();
-      final streams = parseFountainProgress(lastFountainProgress);
-      if (streams.isNotEmpty) {
-        _progress = maxFountainProgress(streams);
-      }
-      debugPrint('[Decoder] fountain_decode => $fileId '
-          '(runtimeType=${fileId.runtimeType})');
-
-      if (fileId < 0) {
-        return DecodeResult.error(
-          'fountain_decode error: $fileId',
-          frameBytesDecoded: bytesDecoded,
-          frameCapacity: _decodeBufSize,
-        );
-      }
-      if (fileId == 0) {
-        return DecodeResult.inProgress(
-          progress: _progress,
-          frameBytesDecoded: bytesDecoded,
-          frameCapacity: _decodeBufSize,
-        );
-      }
-
-      // Complete!
-      _isComplete = true;
-      _progress = 1.0;
-
-      final filename = _recoverFilename(fileId);
-      final data = await recoverFile(fileId);
-
-      return DecodeResult.complete(
-        fileId: fileId,
-        filename: filename,
-        data: data ?? Uint8List(0),
-      );
+      return await _fountainStep(bytesDecoded);
     } catch (e, stack) {
       debugPrint('[Decoder] decodeFrame FAILED: $e');
       debugPrint('[Decoder] stack:\n$stack');
       rethrow;
     } finally {
       module.deallocate(imgPtr);
+    }
+  }
+
+  /// Shared tail of both decode paths: feed the scan's chunk output into
+  /// the main-thread fountain sink, parse the real progress, and finish
+  /// the file when the sink reports completion.
+  Future<DecodeResult> _fountainStep(int bytesDecoded) async {
+    // Feed into the fountain decoder. scan_extract_decode returns
+    // buffers_in_use * fountain_chunk_size, i.e. the value is ALREADY
+    // chunk-aligned for the active mode — pass it through verbatim.
+    //
+    // (A former hardcoded 930-byte "alignment" was wrong for modeB, whose
+    // real chunk is 625 (frame = 12 x 625 = 7500): it truncated 7500 -> 7440,
+    // which cimbard_fountain_decode rejects outright (-5) — so decode
+    // progress stayed at 0% forever even on pristine frames.)
+    lastScanBytes = bytesDecoded;
+    final fileId = jsNumberToInt(
+        cimbardFountainDecode(_decodeBufPtr.toJS, bytesDecoded.toJS));
+    lastFountainResult = fileId;
+    // fountain_decode refreshes the native report with the per-stream
+    // chunk-accumulation list — capture it for diagnostics AND parse it
+    // into the real progress (same source the official recv.js renders
+    // as its progress bars).
+    lastFountainProgress = _readReport();
+    final streams = parseFountainProgress(lastFountainProgress);
+    if (streams.isNotEmpty) {
+      _progress = maxFountainProgress(streams);
+    }
+    debugPrint('[Decoder] fountain_decode => $fileId '
+        '(runtimeType=${fileId.runtimeType})');
+
+    if (fileId < 0) {
+      return DecodeResult.error(
+        'fountain_decode error: $fileId',
+        frameBytesDecoded: bytesDecoded,
+        frameCapacity: _decodeBufSize,
+      );
+    }
+    if (fileId == 0) {
+      return DecodeResult.inProgress(
+        progress: _progress,
+        frameBytesDecoded: bytesDecoded,
+        frameCapacity: _decodeBufSize,
+      );
+    }
+
+    // Complete!
+    _isComplete = true;
+    _progress = 1.0;
+
+    final filename = _recoverFilename(fileId);
+    final data = await recoverFile(fileId);
+
+    return DecodeResult.complete(
+      fileId: fileId,
+      filename: filename,
+      data: data ?? Uint8List(0),
+    );
+  }
+
+  // ─── Worker pool (official-style parallel decode) ─────────────────
+
+  DecodeWorkerPool? _pool;
+  bool _poolDisabled = false;
+
+  /// Hand one frame to the decode worker pool. Returns null when the pool
+  /// did NOT take the frame (unavailable / not initialized / post failed)
+  /// — the caller then decodes it on the main thread.
+  Future<WorkerDecodeResult?> _tryWorkerDecode(
+      Uint8List imageData, int width, int height, CimbarImageFormat format) async {
+    if (_poolDisabled) return null;
+    final DecodeWorkerPool pool;
+    try {
+      pool = _pool ??= DecodeWorkerPool();
+    } catch (e) {
+      debugPrint('[Decoder] worker pool unavailable: $e');
+      _poolDisabled = true;
+      return null;
+    }
+    if (!pool.isOk) {
+      _poolDisabled = true;
+      return null;
+    }
+    try {
+      return await pool.decode(imageData, width, height, format.value, _modeVal);
+    } catch (e) {
+      debugPrint('[Decoder] worker decode failed: $e');
+      return null;
     }
   }
 
@@ -312,6 +402,8 @@ class CimbarDecoderFfi implements ICimbarDecoder {
 
   @override
   Future<void> dispose() async {
+    _pool?.terminate();
+    _pool = null;
     if (_ready && cimbarModule != null) {
       final module = cimbarModule!;
       if (_decodeBufPtr != 0) module.deallocate(_decodeBufPtr);

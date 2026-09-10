@@ -201,9 +201,22 @@ class WebCameraCapture implements ICameraCapture {
     // Build getUserMedia constraints
     final constraints = _buildConstraints(preferredWidth, preferredHeight);
 
-    // Request camera access
-    final stream = await _jsAwait(_getUserMedia(constraints));
-    _stream = stream as JSObject;
+    // Request camera access. index.html kicks off an identical getUserMedia
+    // at page load (window.__cimbarPrewarmedStream) so the camera warms up
+    // in parallel with the dart2js bootstrap — consume it if present; if
+    // the prewarm failed (permission denied, no camera) we simply ask again.
+    JSObject? stream;
+    try {
+      final prewarmed =
+          _reflectGet(globalContext, '__cimbarPrewarmedStream'.toJS);
+      if (prewarmed is JSObject) {
+        _reflectSet(globalContext, '__cimbarPrewarmedStream'.toJS, null);
+        stream = prewarmed;
+        debugPrint('[Camera] using prewarmed camera stream (started at page '
+            'load, in parallel with app bootstrap)');
+      }
+    } catch (_) {}
+    stream ??= await _jsAwait(_getUserMedia(constraints)) as JSObject;
 
     // Create video element
     final video = _createElement('video');
@@ -285,10 +298,71 @@ class WebCameraCapture implements ICameraCapture {
     );
 
     _streaming = true;
-    _frameTimer = Timer.periodic(
-      Duration(milliseconds: _frameIntervalMs),
-      (_) => _tick(),
-    );
+    _startFrameScheduling();
+  }
+
+  /// Whether the requestVideoFrameCallback chain is driving capture.
+  ///
+  /// Set false when the rVFC API is missing, or by the watchdog when rVFC
+  /// produces no frames (the video element must be presented for
+  /// composition for rVFC to fire — a never-mounted element would starve
+  /// the chain and we fall back to the Timer).
+  bool _rvfcEnabled = false;
+
+  /// Official-style frame scheduling: `requestVideoFrameCallback` delivers
+  /// EVERY frame the browser presents (~18.5fps against a 15fps ideal
+  /// request — the official receiver measured the same), instead of
+  /// sampling on a fixed Timer (14.9fps). Falls back to the Timer when rVFC
+  /// is unavailable or starved.
+  void _startFrameScheduling() {
+    final video = _video;
+    if (video == null) return;
+    JSFunction? rVfc;
+    try {
+      rVfc =
+          _reflectGet(video, 'requestVideoFrameCallback'.toJS) as JSFunction?;
+    } catch (_) {}
+    if (rVfc == null) {
+      debugPrint('[Camera] requestVideoFrameCallback unavailable — '
+          'Timer fallback (${_frameIntervalMs}ms)');
+      _frameTimer = Timer.periodic(
+          Duration(milliseconds: _frameIntervalMs), (_) => _tick());
+      return;
+    }
+    _rvfcEnabled = true;
+    debugPrint('[Camera] scheduling via requestVideoFrameCallback '
+        '(every presented frame, like the official receiver)');
+    _scheduleNextRvfc();
+    // Watchdog: if rVFC never fires (e.g. the video element is not
+    // rendered), switch permanently to the Timer after a grace period.
+    _frameTimer = Timer(const Duration(seconds: 2), () {
+      if (_streaming && _frameCounter == 0) {
+        debugPrint('[Camera] requestVideoFrameCallback produced no frames — '
+            'Timer fallback (${_frameIntervalMs}ms)');
+        _rvfcEnabled = false;
+        _frameTimer = Timer.periodic(
+            Duration(milliseconds: _frameIntervalMs), (_) => _tick());
+      }
+    });
+  }
+
+  void _scheduleNextRvfc() {
+    if (!_rvfcEnabled || !_streaming) return;
+    final video = _video;
+    if (video == null) return;
+    final rVfc =
+        _reflectGet(video, 'requestVideoFrameCallback'.toJS) as JSFunction?;
+    if (rVfc == null) return;
+    final cb = ((JSAny? now, JSAny? metadata) {
+      if (!_rvfcEnabled || !_streaming) return; // chain broken by stop()
+      // Reschedule FIRST: registering for the next presented frame must
+      // not wait behind this frame's capture/decode work, or the whole
+      // chain slips one work-duration per frame (measured: 15fps instead
+      // of the ~18.5 the official receiver gets from the same source).
+      _scheduleNextRvfc();
+      _tick();
+    }).toJS;
+    _reflectApply(rVfc, video, <JSAny?>[cb].toJS);
   }
 
   /// Set while a frame is being grabbed/converted. New ticks are dropped
@@ -426,9 +500,13 @@ class WebCameraCapture implements ICameraCapture {
           ? <JSAny?>[jsDst].toJS
           : <JSAny?>[jsDst, copyOpts].toJS;
       final promise = _reflectApply(copyFn, vf, copyArgs);
+      // The official receiver does NOT await this promise — in Chrome,
+      // VideoFrame.copyTo fills the destination buffer SYNCHRONOUSLY and
+      // the promise only carries the plane layouts. Awaiting it delayed
+      // the rVFC chain by one microtask hop per frame (measured ~3.5fps
+      // loss at 720x1080), so we follow the official pattern: use the
+      // data immediately, ignore the promise.
       if (promise is! JSPromise<JSAny?>) return false;
-      // copyTo resolves to the PlaneLayout list; the data lands in jsDst.
-      await _jsAwait(promise);
 
       final data = jsDst.toDart;
       if (data.length != size) return false;
@@ -698,6 +776,9 @@ class WebCameraCapture implements ICameraCapture {
   Future<void> stop() async {
     _frameTimer?.cancel();
     _frameTimer = null;
+    // Breaks the rVFC chain too: the callback checks _streaming before
+    // rescheduling (see _scheduleNextRvfc).
+    _streaming = false;
 
     // Snapshot the untouched frame BEFORE the video element is torn down,
     // so 截图 can still ship the raw photo after the scan has stopped.
