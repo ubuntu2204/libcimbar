@@ -96,13 +96,17 @@ class _DecoderPageState extends State<DecoderPage> {
   /// 0 = idle (white), 1 = payload flowing (light blue), 2 = healthy (green).
   int _transferStatus = 0;
 
-  /// Guide color, mirroring cfc's drawGuidance():
-  /// - white — no decode activity in the last window
-  /// - light blue (cfc BGR(255,244,94)) — partial decode
+  /// Guide color, mirroring cfc's drawGuidance() as it actually renders:
+  /// cfc draws on an **RGBA** Mat (frame.rgba()), so its cv::Scalar is
+  /// interpreted in R,G,B order — Scalar(255,244,94) shows as YELLOW, not
+  /// the sky-blue a BGR reading would suggest.
+  /// - white — no decode activity in the last window (bad/error frames
+  ///   don't count, so a misaligned camera settles back to white)
+  /// - yellow — partial decode: only one of decoded/perfect grew
   /// - green — decoded AND perfect frames are both accumulating
   Color get _guideColor => switch (_transferStatus) {
         2 => const Color(0xFF00FF00),
-        1 => const Color(0xFF5EF4FF),
+        1 => const Color(0xFFFFF45E),
         _ => Colors.white,
       };
 
@@ -382,9 +386,12 @@ class _DecoderPageState extends State<DecoderPage> {
             '文件已恢复："${result.filename}"（${result.data?.length ?? 0} 字节）';
         await _stopCamera();
         await _saveFile();
-      } else if (result.error != null) {
-        _statusMessage = '帧解码出错：${result.error}';
       } else {
+        // Error frames get NO message: like cfc, a frame that fails to
+        // decode (anchors not found, fountain rejects) simply doesn't
+        // count — the white guide color is the feedback. Flashing an
+        // error per frame was noise: scan_extract_decode returns -3 on
+        // every frame while the camera is merely not pointed at a code.
         _statusMessage = '解码中… ${(result.progress * 100).toStringAsFixed(1)}%'
             '（$_healthLine）';
       }
