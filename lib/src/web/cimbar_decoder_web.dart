@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import '../interfaces/cimbar_decoder_interface.dart';
 import '../models/cimbar_config.dart';
 import '../models/decode_result.dart';
+import '../utils/fountain_progress.dart';
 import 'libcimbar_js_interop.dart';
 
 /// Web (Flutter WASM) cimbar decoder using JS interop.
@@ -144,6 +145,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     final bounce = _modeVal == 67 ? 68 : 67;
     cimbardConfigureDecode(bounce.toJS);
     cimbardConfigureDecode(_modeVal.toJS);
+    _progress = 0.0;
     debugPrint('[Decoder] fountain streams reset (mode bounce '
         '$_modeVal->$bounce->$_modeVal)');
   }
@@ -209,16 +211,30 @@ class CimbarDecoderFfi implements ICimbarDecoder {
           cimbardFountainDecode(_decodeBufPtr.toJS, bytesDecoded.toJS));
       lastFountainResult = fileId;
       // fountain_decode refreshes the native report with the per-stream
-      // chunk-accumulation list — capture it for diagnostics.
+      // chunk-accumulation list — capture it for diagnostics AND parse it
+      // into the real progress (same source the official recv.js renders
+      // as its progress bars).
       lastFountainProgress = _readReport();
+      final streams = parseFountainProgress(lastFountainProgress);
+      if (streams.isNotEmpty) {
+        _progress = maxFountainProgress(streams);
+      }
       debugPrint('[Decoder] fountain_decode => $fileId '
           '(runtimeType=${fileId.runtimeType})');
 
       if (fileId < 0) {
-        return DecodeResult.error('fountain_decode error: $fileId');
+        return DecodeResult.error(
+          'fountain_decode error: $fileId',
+          frameBytesDecoded: bytesDecoded,
+          frameCapacity: _decodeBufSize,
+        );
       }
       if (fileId == 0) {
-        return DecodeResult.inProgress(progress: _progress);
+        return DecodeResult.inProgress(
+          progress: _progress,
+          frameBytesDecoded: bytesDecoded,
+          frameCapacity: _decodeBufSize,
+        );
       }
 
       // Complete!

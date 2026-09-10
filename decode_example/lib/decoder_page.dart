@@ -22,9 +22,19 @@ import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
 const int kPreferredCameraWidth = 1920;
 const int kPreferredCameraHeight = 1080;
 
-/// Camera frames fed to the decoder per second. The official web receiver
-/// schedules work per video frame; we sample the stream at a fixed cadence.
-const int kCaptureFps = 5;
+/// Camera frames fed to the decoder per second.
+///
+/// 15 matches the official receivers: recv.js asks getUserMedia for
+/// `frameRate: {ideal: 15}` and schedules per video frame; cfc decodes
+/// every camera frame it is handed. Fountain assembly throughput scales
+/// (roughly) linearly with good frames per second, so sampling at 5 fps
+/// made transfers take 3x as long as the official apps.
+///
+/// This is a REQUEST, not a guarantee: both captures have backpressure
+/// (web drops ticks while busy, Android's throttle is a minimum gap), so
+/// when a frame takes longer than the interval to decode, the effective
+/// rate settles at whatever the decoder can sustain.
+const int kCaptureFps = 15;
 
 /// Decoder page — receive cimbar barcodes via camera and decode them.
 ///
@@ -70,6 +80,36 @@ class _DecoderPageState extends State<DecoderPage> {
 
   // Frame counter
   int _framesProcessed = 0;
+
+  // ─── Transfer health (cfc's drawGuidance status machine) ─────────
+  //
+  // The official Android decoder colors its guide brackets by whether the
+  // last ~32-frame window saw progress: white = nothing decoding, light
+  // blue = some frames yield payload, green = payload AND high-quality
+  // frames are both flowing. (jni.cpp: _transferStatus, drawGuidance.)
+  int _callCount = 0; // every frame handed to the decoder (cfc `_calls`)
+  int _decodedFrames = 0; // frames that yielded fountain payload (`decoded`)
+  int _perfectFrames = 0; // payload >= 70% of frame capacity (`perfect`)
+  int _frameDecodeSnapshot = 0;
+  int _frameSuccessSnapshot = 0;
+
+  /// 0 = idle (white), 1 = payload flowing (light blue), 2 = healthy (green).
+  int _transferStatus = 0;
+
+  /// Guide color, mirroring cfc's drawGuidance():
+  /// - white — no decode activity in the last window
+  /// - light blue (cfc BGR(255,244,94)) — partial decode
+  /// - green — decoded AND perfect frames are both accumulating
+  Color get _guideColor => switch (_transferStatus) {
+        2 => const Color(0xFF00FF00),
+        1 => const Color(0xFF5EF4FF),
+        _ => Colors.white,
+      };
+
+  /// Human-readable transfer health, cfc's `#: perfect / decoded / scanned`
+  /// line condensed for the status strip.
+  String get _healthLine =>
+      '$_perfectFrames 完美/$_decodedFrames 有效/$_callCount 帧';
 
   // Consecutive fatal WASM traps (corrupted/exhausted heap).
   int _fatalWasmErrors = 0;
@@ -213,6 +253,12 @@ class _DecoderPageState extends State<DecoderPage> {
       _isDecoding = true;
       _statusMessage = '摄像头已开启，请对准 cimbar 条码…';
       _framesProcessed = 0;
+      _callCount = 0;
+      _decodedFrames = 0;
+      _perfectFrames = 0;
+      _frameDecodeSnapshot = 0;
+      _frameSuccessSnapshot = 0;
+      _transferStatus = 0;
     });
 
     // Fresh fountain state: drop streams possibly poisoned by earlier
@@ -307,6 +353,26 @@ class _DecoderPageState extends State<DecoderPage> {
       if (!mounted) return;
 
       _framesProcessed++;
+
+      // cfc guidance status machine: count decoded/perfect frames, then
+      // every 32 frames compare against the last snapshot. Green requires
+      // BOTH counters to have grown in the window (stable transfer); light
+      // blue means at least payload is trickling through; white means the
+      // decoder saw nothing usable for ~2 seconds.
+      _callCount++;
+      final frameBytes = result.frameBytesDecoded;
+      final frameCapacity = result.frameCapacity;
+      if (frameBytes > 0) _decodedFrames++;
+      if (frameCapacity > 0 && frameBytes >= frameCapacity * 0.7) {
+        _perfectFrames++;
+      }
+      if ((_callCount & 31) == 1) {
+        _transferStatus = (_perfectFrames > _frameSuccessSnapshot ? 1 : 0) +
+            (_decodedFrames > _frameDecodeSnapshot ? 1 : 0);
+        _frameDecodeSnapshot = _decodedFrames;
+        _frameSuccessSnapshot = _perfectFrames;
+      }
+
       _progress = result.progress;
 
       if (result.isComplete) {
@@ -320,7 +386,7 @@ class _DecoderPageState extends State<DecoderPage> {
         _statusMessage = '帧解码出错：${result.error}';
       } else {
         _statusMessage = '解码中… ${(result.progress * 100).toStringAsFixed(1)}%'
-            '（已处理 $_framesProcessed 帧）';
+            '（$_healthLine）';
       }
 
       setState(() {});
@@ -595,8 +661,15 @@ class _DecoderPageState extends State<DecoderPage> {
                 child: LinearProgressIndicator(
                   value: _progress,
                   minHeight: 6,
-                  color: Colors.greenAccent,
+                  color: _guideColor,
                 ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${(_progress * 100).toStringAsFixed(1)}% — $_healthLine',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
               ),
             ],
           ],
@@ -761,8 +834,11 @@ class _DecoderPageState extends State<DecoderPage> {
   }
 
   /// Scanning frame overlay: dark surroundings with a clear center frame
-  /// and animated corner brackets. [bottomInset] lifts the hint text above
-  /// the floating control bar in the full-screen scanning layout.
+  /// and corner brackets colored by transfer health (see [_guideColor] —
+  /// the brackets turn light blue when payload starts flowing and green
+  /// when the transfer is healthy, exactly like cfc's drawGuidance).
+  /// [bottomInset] lifts the hint text above the floating control bar in
+  /// the full-screen scanning layout.
   Widget _buildScanningOverlay({double bottomInset = 0}) {
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -788,18 +864,19 @@ class _DecoderPageState extends State<DecoderPage> {
                 color: Colors.black.withValues(alpha: 0.6),
               ),
             ),
-            // Corner brackets
+            // Corner brackets — colored by transfer health (cfc-style)
             CustomPaint(
               size: size,
               painter: _CornerBracketsPainter(
                 frameRect: frameRect,
-                color: Colors.white,
+                color: _guideColor,
                 bracketLength: frameSize * 0.15,
                 strokeWidth: 3.0,
               ),
             ),
             // Scanning hint text pinned to the bottom of the preview (the
-            // enlarged frame leaves no room below it).
+            // enlarged frame leaves no room below it). Color follows the
+            // guide so the user's eye is drawn to the state change.
             Positioned(
               left: 0,
               right: 0,
@@ -808,7 +885,7 @@ class _DecoderPageState extends State<DecoderPage> {
                 '将整个条码放入取景框内（四个角都可见）',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.8),
+                      color: _guideColor.withValues(alpha: 0.9),
                     ),
               ),
             ),
@@ -970,5 +1047,6 @@ class _CornerBracketsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_CornerBracketsPainter old) => old.frameRect != frameRect;
+  bool shouldRepaint(_CornerBracketsPainter old) =>
+      old.frameRect != frameRect || old.color != color;
 }

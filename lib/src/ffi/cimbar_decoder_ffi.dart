@@ -9,6 +9,7 @@ import 'package:ffi/ffi.dart';
 import '../interfaces/cimbar_decoder_interface.dart';
 import '../models/cimbar_config.dart';
 import '../models/decode_result.dart';
+import '../utils/fountain_progress.dart';
 import 'cimbar_bindings.dart';
 
 /// Windows/Linux/macOS cimbar decoder implementation using dart:ffi.
@@ -20,6 +21,10 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   double _progress = 0.0;
   bool _isComplete = false;
   int _framesProcessed = 0;
+
+  /// Mode value applied by the last [configure] — kept so [resetStreams]
+  /// can bounce it (see there).
+  int _modeVal = 68;
 
   /// Pre-allocated decode buffer (sized by cimbard_get_bufsize).
   Pointer<Uint8>? _decodeBuffer;
@@ -70,6 +75,21 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     if (result < 0) {
       throw StateError('cimbard_configure_decode failed: $result');
     }
+    _modeVal = modeVal;
+  }
+
+  /// Discard ALL accumulated fountain streams.
+  ///
+  /// Same rationale as the web decoder: a single corrupt-but-RS-passing
+  /// chunk can poison a stream for the rest of the session, and the C
+  /// sink is only reset on a mode CHANGE — so bounce to a different mode
+  /// and back. Called by the decoder UI when starting a fresh scan.
+  Future<void> resetStreams() async {
+    _checkReady();
+    final bounce = _modeVal == 67 ? 68 : 67;
+    _native.configureDecode(bounce);
+    _native.configureDecode(_modeVal);
+    _progress = 0.0;
   }
 
   @override
@@ -113,18 +133,30 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       // whose real chunk size is 625: 7500 -> 7440 gets rejected with -5.)
       final fileId = _native.fountainDecode(_decodeBuffer!, bytesDecoded);
 
+      // fountain_decode refreshes the native report with the per-stream
+      // progress ("[ p1,p2,... ]") — the same source the official
+      // receivers render (recv.js progress bars / cfc drawProgress).
+      // A former fake increment (+0.02 per frame, clamped at 0.99) is why
+      // the progress bar used to freeze at 99% forever.
+      _refreshProgressFromReport();
+
       if (fileId < 0) {
-        return DecodeResult.error('fountain_decode error: $fileId');
+        return DecodeResult.error(
+          'fountain_decode error: $fileId',
+          frameBytesDecoded: bytesDecoded,
+          frameCapacity: _decodeBufferSize,
+        );
       }
 
       _framesProcessed++;
 
       if (fileId == 0) {
-        // Decode in progress — update rough estimate
-        _progress = (_progress + 0.02).clamp(0.0, 0.99);
+        // Decode in progress — real progress from the fountain sink.
         return DecodeResult.inProgress(
           progress: _progress,
           framesDecoded: _framesProcessed,
+          frameBytesDecoded: bytesDecoded,
+          frameCapacity: _decodeBufferSize,
         );
       }
 
@@ -146,9 +178,18 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     }
   }
 
+  /// Pull the fountain sink's real per-stream progress out of the native
+  /// report and keep the most-complete stream as our headline progress.
+  /// Non-bracket report strings (scan diagnostics) leave it untouched.
+  void _refreshProgressFromReport() {
+    final streams = parseFountainProgress(_native.getReport());
+    if (streams.isNotEmpty) {
+      _progress = maxFountainProgress(streams);
+    }
+  }
+
   @override
-  Future<Uint8List?> recoverFile(int fileId) async {
-    _checkReady();
+  Future<Uint8List?> recoverFile(int fileId) async {    _checkReady();
 
     final result = BytesBuilder();
 

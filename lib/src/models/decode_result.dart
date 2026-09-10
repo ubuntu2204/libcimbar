@@ -30,6 +30,18 @@ class DecodeResult {
   /// Estimated total frames needed (if known).
   final int? estimatedTotalFrames;
 
+  /// Fountain payload bytes recovered from THIS frame (0 when the frame
+  /// located the barcode but yielded no payload).
+  ///
+  /// Mirrors cfc's per-frame `decodeRes` — the value its guidance
+  /// status machine feeds on (`decoded` grows when this is > 0).
+  final int frameBytesDecoded;
+
+  /// Full-frame fountain payload capacity (chunks per frame x chunk size,
+  /// i.e. `cimbard_get_bufsize()`), the denominator cfc uses for its
+  /// "perfect frame" test (`decodeRes >= capacity * 0.7`).
+  final int frameCapacity;
+
   const DecodeResult({
     this.fileId,
     this.filename = '',
@@ -39,12 +51,17 @@ class DecodeResult {
     this.error,
     this.framesDecoded = 0,
     this.estimatedTotalFrames,
+    this.frameBytesDecoded = 0,
+    this.frameCapacity = 0,
   });
 
   /// Create a result indicating an error occurred.
-  factory DecodeResult.error(String message) => DecodeResult(
+  factory DecodeResult.error(String message, {int frameBytesDecoded = 0,
+      int frameCapacity = 0}) => DecodeResult(
         error: message,
         progress: 0.0,
+        frameBytesDecoded: frameBytesDecoded,
+        frameCapacity: frameCapacity,
       );
 
   /// Create a progress-only result (decode in progress).
@@ -52,11 +69,15 @@ class DecodeResult {
     required double progress,
     int framesDecoded = 0,
     int? estimatedTotalFrames,
+    int frameBytesDecoded = 0,
+    int frameCapacity = 0,
   }) =>
       DecodeResult(
         progress: progress,
         framesDecoded: framesDecoded,
         estimatedTotalFrames: estimatedTotalFrames,
+        frameBytesDecoded: frameBytesDecoded,
+        frameCapacity: frameCapacity,
       );
 
   /// Create a completed result with the recovered file data.
