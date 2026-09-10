@@ -16,7 +16,11 @@ adb reverse tcp:8080 tcp:8080
 
 # Android
 flutter run -d <android-device-id>
+
+# eg.
+flutter run -d PGJM10
 ```
+
 
 调试钩子：在 URL 后加 `?autostart=1` 可跳过点击直接开启摄像头（端到端测试用）。
 

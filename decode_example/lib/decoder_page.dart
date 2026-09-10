@@ -689,7 +689,16 @@ class _DecoderPageState extends State<DecoderPage> {
       final stack = Stack(
         fit: StackFit.expand,
         children: [
-          CameraPreview(ctrl),
+          // Black behind the preview (letterboxing when the camera aspect
+          // ratio does not match the screen).
+          const ColoredBox(color: Colors.black),
+          // CameraPreview keeps the camera's aspect ratio itself, but ONLY
+          // when it is not given tight constraints: AspectRatio falls back to
+          // the constraints' biggest size when they are tight, and
+          // StackFit.expand hands tight constraints to every child — which is
+          // why the picture came out vertically stretched. Align() loosens
+          // the constraints again so the texture keeps its real shape.
+          Align(alignment: Alignment.center, child: CameraPreview(ctrl)),
           _buildScanningOverlay(bottomInset: overlayBottomInset),
         ],
       );

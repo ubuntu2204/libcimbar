@@ -57,7 +57,7 @@ class CimbarNative {
   late final int Function(Pointer<Uint8> buff, int maxlen) _getDebug;
 
   /// Whether the native library was loaded successfully.
-  final bool isLoaded;
+  late final bool isLoaded;
 
   /// Load the libcimbar shared library and resolve all symbols.
   ///
@@ -66,25 +66,57 @@ class CimbarNative {
   /// - Windows: `libcimbar.dll`
   /// - Linux: `libcimbar.so`
   /// - macOS: `libcimbar.dylib`
-  CimbarNative({String? libraryPath})
-      : _lib = _loadLibrary(libraryPath),
-        isLoaded = _loadLibrary(libraryPath) != DynamicLibrary.process() {
+  CimbarNative({String? libraryPath}) : _lib = _loadLibrary(libraryPath) {
+    // Note: this used to call _loadLibrary() twice (once for _lib, once for
+    // isLoaded), opening the library two times for no reason.
+    isLoaded = _lib != DynamicLibrary.process();
     if (!isLoaded) return;
     _bindAll();
   }
 
+  /// File name of the native library on the current platform (messages only).
+  static String get expectedLibraryName {
+    if (Platform.isWindows) return 'libcimbar.dll';
+    if (Platform.isLinux) return 'libcimbar.so';
+    if (Platform.isMacOS) return 'libcimbar.dylib';
+    if (Platform.isAndroid) return 'libcimbar_jni.so';
+    return 'the libcimbar native library';
+  }
+
+  /// Why the last [DynamicLibrary.open] attempt failed, or null on success.
+  ///
+  /// Without it, "decoder is not ready" gives no clue whether the library is
+  /// missing or one of ITS dependencies is — e.g. on Android a dlopen failure
+  /// naming libc++_shared.so means the STL is not bundled in the APK.
+  static String? lastLoadError;
+
+  static DynamicLibrary _opened(DynamicLibrary lib) {
+    lastLoadError = null;
+    return lib;
+  }
+
   static DynamicLibrary _loadLibrary(String? path) {
     try {
-      if (path != null) return DynamicLibrary.open(path);
-      if (Platform.isWindows) return DynamicLibrary.open('libcimbar.dll');
-      if (Platform.isLinux) return DynamicLibrary.open('libcimbar.so');
-      if (Platform.isMacOS) return DynamicLibrary.open('libcimbar.dylib');
+      if (path != null) return _opened(DynamicLibrary.open(path));
+      if (Platform.isWindows) {
+        return _opened(DynamicLibrary.open('libcimbar.dll'));
+      }
+      if (Platform.isLinux) {
+        return _opened(DynamicLibrary.open('libcimbar.so'));
+      }
+      if (Platform.isMacOS) {
+        return _opened(DynamicLibrary.open('libcimbar.dylib'));
+      }
       // Android ships the same native core, packaged by the Flutter tooling
       // as lib/<abi>/libcimbar_jni.so. It exports the identical `cimbare_*` /
       // `cimbard_*` C API, so Dart FFI binds to it exactly as on desktop —
       // no WASM and no JNI/MethodChannel shim in between.
-      if (Platform.isAndroid) return DynamicLibrary.open('libcimbar_jni.so');
-    } catch (_) {}
+      if (Platform.isAndroid) {
+        return _opened(DynamicLibrary.open('libcimbar_jni.so'));
+      }
+    } catch (e) {
+      lastLoadError = e.toString();
+    }
     return DynamicLibrary.process(); // fallback, will fail on lookups
   }
 

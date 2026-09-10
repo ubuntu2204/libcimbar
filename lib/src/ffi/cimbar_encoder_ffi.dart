@@ -171,9 +171,12 @@ class CimbarEncoderFfi implements ICimbarEncoder {
 
   void _checkReady() {
     if (!_ready) {
+      final why = CimbarNative.lastLoadError;
       throw StateError(
-        'CimbarEncoder is not ready. '
-        'Make sure libcimbar.dll is compiled and accessible.',
+        'CimbarEncoder is not ready: ${CimbarNative.expectedLibraryName} '
+        'could not be loaded${why == null ? '' : ' ($why)'}. On Android it is '
+        'bundled inside the package (lib/<abi>/); on desktop it must sit next '
+        'to the executable.',
       );
     }
   }
