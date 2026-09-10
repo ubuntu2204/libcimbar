@@ -76,16 +76,26 @@ Reference result (2026-09-10, 3 runs, all stable):
 
 | metric | official | decode_example |
 |---|---|---|
-| first payload frame | 10.0–10.1s | **3.8–3.9s** |
-| file complete | **10.0–10.1s** | 12.6–12.7s |
-| payload frames until complete | 1 | 3–5 |
-| camera frames fed until complete | ~183 (15fps, every frame) | 101 (~8fps, busy-dropped) |
+| startup (first frame fed) | 0.1–0.2s | 2.7s |
+| capture rate | 18.1–18.9fps (rVFC, event-driven) | 14.9fps (Timer, zero drops) |
+| first payload frame | 10.1s | **2.8–3.7s** |
+| file complete | **10.1s** | 12.6s |
+| decode window (1st frame → complete) | 9.9s | 9.9s |
+| payload frames until complete | 1 | 4–5 |
+| camera frames fed until complete | 187 | 148 |
 
-Both decode the file. The app reaches payload faster (modeB locked from
-the start; the official Auto mode rotates [66,68,67,4] so only 1 in 4
-frames even tries mode B before the first success locks it in), while the
-official completes a hair sooner overall and feeds every camera frame
-(4 parallel workers vs our single main-thread wasm).
+Both decode the file, and the **decode throughput is identical** — the
+9.9s from first frame to completion matches exactly. The 2.5s total-time
+gap is pure app startup (dart2js bootstrap + WASM init + camera start).
+The app reaches payload faster (modeB locked from the start; the official
+Auto mode rotates [66,68,67,4] so only 1 in 4 frames even tries mode B
+before the first success locks it in). The official feeds ~18.5fps vs our
+14.9fps because rVFC is event-driven (fires for every frame Chrome
+delivers, slightly above the requested ideal:15) while we sample on a
+fixed 66ms timer — at 720x1080 the per-frame cost (~18ms wasm + copies)
+fits comfortably in the budget, so nothing is dropped. The single
+main-thread wasm only becomes the wall at higher resolutions/frame rates
+(the official runs its per-frame decode in 4 parallel Web Workers).
 
 Standalone use against an already-running app:
 
