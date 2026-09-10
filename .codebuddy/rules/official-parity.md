@@ -23,7 +23,9 @@
    - 安卓：**方向跟随设备**（竖屏/横屏皆可——官方 web 端 recv.js 的哲学；
      cfc 主线锁横屏是其 OpenCV SurfaceView 的 2020 年历史包袱，作者
      自己在未合并的 orientation-station 分支里尝试过删除）、
-     全帧扫描（无中心裁剪）、短边 1080p 上限、I420 直送
+     全帧扫描（无中心裁剪）、短边 1080p 上限、I420 直送、
+     **取景框 4:3 letterbox 居中**（视觉对齐 cfc `mScale` letterbox；
+     Scanner 仍扫描全帧，与 cfc 同款——视觉引导 ≠ 裁剪）
    - Web：rVFC 全帧调度、getUserMedia 约束照抄 recv.js、
      Worker 池并行解码、copyTo 不 await
    - UI：白/黄/绿三色 guidance 状态机（cfc drawGuidance 语义）、

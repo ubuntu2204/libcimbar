@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
@@ -840,35 +841,60 @@ class _DecoderPageState extends State<DecoderPage> {
     );
   }
 
-  /// Scanning overlay, official style (cfc's recv UI): the camera picture
-  /// fills the WHOLE screen — the decoder scans the full frame, so there is
-  /// no viewfinder box and no darkened margin to aim inside. The only
-  /// decoration is the guidance brackets at the screen corners, colored by
-  /// transfer health (see [_guideColor]), mirroring cfc's drawGuidance.
+  /// Scanning overlay, official style (cfc's recv UI): a 4:3 letterbox
+  /// (the same mScale-centered window cfc renders through OpenCV's
+  /// CameraBridgeViewBase) sits in the middle of the viewfinder, with the
+  /// rest of the camera frame dimmed; the screen-corner guidance brackets
+  /// carry the transfer-health state (white/yellow/green) like cfc's
+  /// drawGuidance. The Scanner still searches the FULL frame (we don't
+  /// crop), so a barcode just outside the letterbox still decodes — same
+  /// behavior as cfc, only the visual layer differs.
   /// [bottomInset] lifts the hint text above the floating control bar in
   /// the full-screen scanning layout.
   Widget _buildScanningOverlay({double bottomInset = 0}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
+        // 4:3 letterbox, short side = view's short side (so it dominates
+        // the viewfinder), letterbox-centered via the same `mScale =
+        // min(viewW/frameW, viewH/frameH)` rule cfc uses — fits both
+        // landscape and portrait screens without distortion.
+        final s = size.shortestSide;
+        final frameW = s * 4 / 3;
+        final frameH = s;
+        final mScale = math.min(size.width / frameW, size.height / frameH);
+        final drawW = frameW * mScale;
+        final drawH = frameH * mScale;
+        final letterboxRect = Rect.fromLTWH(
+          (size.width - drawW) / 2,
+          (size.height - drawH) / 2,
+          drawW,
+          drawH,
+        );
 
         return Stack(
           children: [
-            // Corner guidance brackets — colored by transfer health
-            // (cfc drawGuidance style). Full-frame scanning means these
-            // are pure status feedback, not a sizing constraint.
+            // Dim everything OUTSIDE the 4:3 letterbox window.
+            CustomPaint(
+              size: size,
+              painter: _DarkOverlayPainter(
+                frameRect: letterboxRect,
+                color: Colors.black.withValues(alpha: 0.6),
+              ),
+            ),
+            // Screen-corner guidance brackets — cfc drawGuidance style.
             CustomPaint(
               size: size,
               painter: _CornerBracketsPainter(
                 color: _guideColor,
-                bracketLength: (size.shortestSide * 0.06)
-                    .clamp(28.0, 96.0),
+                bracketLength:
+                    (size.shortestSide * 0.06).clamp(28.0, 96.0),
                 strokeWidth: 3.0,
                 inset: size.shortestSide * 0.03,
               ),
             ),
-            // Scanning hint pinned to the bottom of the preview. Color
-            // follows the guide so the user's eye catches the state change.
+            // Hint pinned to the bottom of the preview, color follows the
+            // guide so the state change catches the eye.
             Positioned(
               left: 0,
               right: 0,
@@ -938,6 +964,33 @@ class _DecoderPageState extends State<DecoderPage> {
 }
 
 // ─── Scanning frame painters ────────────────────────────────────
+
+/// Dim everything outside the letterbox rectangle, leaving the 4:3
+/// window centred and untouched. Mirrors cfc's OpenCV mScale letterbox
+/// visually (the official app darkens the same way — the dim regions
+/// still go to the Scanner, only the eye is guided).
+class _DarkOverlayPainter extends CustomPainter {
+  final Rect frameRect;
+  final Color color;
+
+  _DarkOverlayPainter({required this.frameRect, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = color;
+    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
+    final path = Path()
+      ..addRect(fullRect)
+      ..addRRect(
+          RRect.fromRectAndRadius(frameRect, const Radius.circular(12)))
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_DarkOverlayPainter old) =>
+      old.frameRect != frameRect || old.color != color;
+}
 
 /// Draws the guidance brackets at the four corners of the SCREEN —
 /// cfc's drawGuidance (jni.cpp) marks the decode area the same way, with
