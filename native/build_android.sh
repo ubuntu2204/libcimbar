@@ -1,17 +1,29 @@
 #!/bin/bash
 # ===================================================================
-# build_android.sh — Cross-compile libcimbar for Android (arm64-v8a)
+# build_android.sh — Cross-compile libcimbar for Android
 #
 # Prerequisites:
 #   - Android NDK r25+ (set ANDROID_NDK_HOME)
 #   - OpenCV Android SDK (set OPENCV_ANDROID_SDK)
-#   - CMake 3.22+
+#   - CMake 3.22+ / Ninja
 #
 # Usage:
 #   ./build_android.sh [path-to-libcimbar-source]
 #
+# Environment:
+#   ABIS="arm64-v8a armeabi-v7a"   # default: both
+#   ANDROID_STL=c++_static         # default: static STL (see below)
+#
 # Output:
-#   build_android/arm64-v8a/libcimbar_jni.so
+#   build_android/<abi>/libcimbar_jni.so
+#
+# Why ANDROID_STL=c++_static:
+#   These .so files are shipped as PREBUILT binaries in
+#   android/src/main/jniLibs/<abi>/ so that consumers of the package need
+#   neither the NDK nor the OpenCV SDK. Nothing in that setup bundles
+#   libc++_shared.so, so a .so linked against the shared STL fails to dlopen
+#   at runtime ("library libc++_shared.so not found") and the decoder reports
+#   "not ready". Statically linking the STL makes each .so self-contained.
 # ===================================================================
 
 set -e
@@ -24,17 +36,21 @@ echo ""
 
 # Source path
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LIBCIMBAR_SRC="${1:-$SCRIPT_DIR/../third_party/libcimbar_cpp}"
+LIBCIMBAR_SRC="${1:-$SCRIPT_DIR/../third_party/libcimbar}"
 if [ ! -f "$LIBCIMBAR_SRC/src/lib/encoder/Encoder.h" ]; then
-    echo "ERROR: Cannot find libcimbar source at $LIBCIMBAR_SRC"
-    echo "Usage: $0 [path-to-libcimbar-source]"
-    exit 1
+    # The vendored directory used to be called libcimbar_cpp.
+    if [ -f "$SCRIPT_DIR/../third_party/libcimbar_cpp/src/lib/encoder/Encoder.h" ]; then
+        LIBCIMBAR_SRC="$SCRIPT_DIR/../third_party/libcimbar_cpp"
+    else
+        echo "ERROR: Cannot find libcimbar source at $LIBCIMBAR_SRC"
+        echo "Usage: $0 [path-to-libcimbar-source]"
+        exit 1
+    fi
 fi
-echo "[1/4] Source: $LIBCIMBAR_SRC"
+echo "[1/5] Source: $LIBCIMBAR_SRC"
 
 # Android NDK
 if [ -z "$ANDROID_NDK_HOME" ]; then
-    # Try common locations
     for dir in \
         "$HOME/Android/Sdk/ndk"/*  \
         "$HOME/Library/Android/sdk/ndk"/* \
@@ -51,7 +67,7 @@ if [ -z "$ANDROID_NDK_HOME" ]; then
     echo "Install Android NDK and set ANDROID_NDK_HOME."
     exit 1
 fi
-echo "[2/4] NDK: $ANDROID_NDK_HOME"
+echo "[2/5] NDK: $ANDROID_NDK_HOME"
 
 # OpenCV Android SDK
 if [ -z "$OPENCV_ANDROID_SDK" ]; then
@@ -60,36 +76,48 @@ if [ -z "$OPENCV_ANDROID_SDK" ]; then
     echo "Set OPENCV_ANDROID_SDK to the SDK root directory."
     exit 1
 fi
-echo "[3/4] OpenCV Android SDK: $OPENCV_ANDROID_SDK"
+echo "[3/5] OpenCV Android SDK: $OPENCV_ANDROID_SDK"
 
-# Build
-BUILD_DIR="$(dirname "$0")/build_android"
+ABIS="${ABIS:-arm64-v8a armeabi-v7a}"
+ANDROID_STL="${ANDROID_STL:-c++_static}"
+
+BUILD_DIR="$SCRIPT_DIR/build_android"
 mkdir -p "$BUILD_DIR"
-echo "[4/4] Build dir: $BUILD_DIR"
+echo "[4/5] Build dir: $BUILD_DIR"
+echo "      ABIs: $ABIS"
+echo "      STL:  $ANDROID_STL"
 
 echo ""
-echo "Building for arm64-v8a..."
+for ABI in $ABIS; do
+    echo "---- Building $ABI ----"
+    cmake "$SCRIPT_DIR/../android/src/main/cpp" \
+        -G "Ninja" \
+        -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
+        -DANDROID_ABI="$ABI" \
+        -DANDROID_PLATFORM=android-24 \
+        -DANDROID_STL="$ANDROID_STL" \
+        -DLIBCIMBAR_SRC_PATH="$LIBCIMBAR_SRC" \
+        -DOPENCV_ANDROID_SDK_PATH="$OPENCV_ANDROID_SDK" \
+        -DCMAKE_BUILD_TYPE=Release \
+        -B "$BUILD_DIR/$ABI"
 
-cmake "$SCRIPT_DIR/../android/src/main/cpp" \
-    -G "Ninja" \
-    -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
-    -DANDROID_ABI=arm64-v8a \
-    -DANDROID_PLATFORM=android-24 \
-    -DANDROID_STL=c++_shared \
-    -DLIBCIMBAR_SRC_PATH="$LIBCIMBAR_SRC" \
-    -DOPENCV_ANDROID_SDK_PATH="$OPENCV_ANDROID_SDK" \
-    -DCMAKE_BUILD_TYPE=Release \
-    -B "$BUILD_DIR/arm64-v8a"
-
-cmake --build "$BUILD_DIR/arm64-v8a" --parallel
+    cmake --build "$BUILD_DIR/$ABI" --parallel
+done
 
 echo ""
 echo "============================================================"
 echo " BUILD SUCCESSFUL"
 echo "============================================================"
+for ABI in $ABIS; do
+    echo ""
+    SO="$BUILD_DIR/$ABI/libcimbar_jni.so"
+    echo "Output: $SO"
+    if command -v readelf >/dev/null 2>&1 && [ -f "$SO" ]; then
+        echo "NEEDED dependencies:"
+        readelf -d "$SO" | grep NEEDED || true
+    fi
+done
 echo ""
-echo "Output: $BUILD_DIR/arm64-v8a/libcimbar_jni.so"
-echo ""
-echo "This library will be automatically included when building"
-echo "the Flutter Android app via the plugin's CMakeLists.txt."
+echo "Next: copy each .so into android/src/main/jniLibs/<abi>/"
+echo "      (the Flutter build merges them into the APK; no NDK needed)."
 echo ""
