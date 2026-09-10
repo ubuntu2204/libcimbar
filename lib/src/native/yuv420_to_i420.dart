@@ -37,7 +37,8 @@ class I420Frame {
 }
 
 /// Convert a YUV_420_888 frame to tightly-packed I420, optionally cropping
-/// to a centred square.
+/// to a centred square ([cropToSquare]) or to a target aspect ratio by
+/// trimming the top and bottom ([cropAspect]).
 ///
 /// Why I420: cimbar's native `get_rgb()` (see
 /// `cimbar_js/cimbar_recv_js.cpp`) maps format code 420 to
@@ -45,12 +46,20 @@ class I420Frame {
 /// YUV→RGB conversion inside OpenCV instead of doing a full-frame pass in
 /// Dart, which is several times more work per frame.
 ///
+/// [cropAspect] (width / height) keeps the FULL sensor width — which is
+/// where the horizontal field of view and the barcode's pixel budget live
+/// — and drops the surplus rows above and below. Unlike downscaling it
+/// touches no pixel values: the decoder still receives native sensor
+/// samples, which is what keeps the anchor scan sharp (interpolated
+/// frames measurably lose the anchors).
+///
 /// Returns null if the frame cannot be converted.
 I420Frame? yuv420ToI420(
   int width,
   int height,
   List<YuvPlane> planes, {
-  bool cropToSquare = true,
+  bool cropToSquare = false,
+  double cropAspect = 0,
 }) {
   if (planes.length < 3) return null;
   if (width <= 0 || height <= 0) return null;
@@ -67,6 +76,13 @@ I420Frame? yuv420ToI420(
     cropH = side;
     cropX = ((width - side) ~/ 2) & ~1;
     cropY = ((height - side) ~/ 2) & ~1;
+  } else if (cropAspect > 0) {
+    // Trim top/bottom only: keep the full width, centre the band.
+    final wanted = (width / cropAspect).round() & ~1;
+    if (wanted > 0 && wanted < height) {
+      cropH = wanted;
+      cropY = ((height - wanted) ~/ 2) & ~1;
+    }
   }
 
   // 4:2:0 -> chroma is half resolution in both directions.

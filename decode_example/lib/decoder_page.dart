@@ -97,6 +97,34 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
   /// 0 = idle (white), 1 = payload flowing (light blue), 2 = healthy (green).
   int _transferStatus = 0;
 
+  /// Aspect ratio (long side / short side, always >= 1) of the frame the
+  /// camera actually delivers. The viewfinder window follows it so the
+  /// whole captured frame stays visible — the field of view is then as
+  /// wide as the sensor allows instead of being cropped twice (once by the
+  /// capture, once by a hard-coded window shape).
+  double get _captureAspect {
+    final ctrl = _cameraController;
+    if (ctrl != null) {
+      final size = ctrl.value.previewSize;
+      if (size != null && size.width > 0 && size.height > 0) {
+        final a = size.width / size.height;
+        return a >= 1 ? a : 1 / a;
+      }
+    }
+    try {
+      final cam = _camera;
+      if (cam != null) {
+        final w = (cam as dynamic).videoWidth as int? ?? 0;
+        final h = (cam as dynamic).videoHeight as int? ?? 0;
+        if (w > 0 && h > 0) {
+          final a = w / h;
+          return a >= 1 ? a : 1 / a;
+        }
+      }
+    } catch (_) {}
+    return 4 / 3; // cfc's window shape, before the real size is known
+  }
+
   /// Guide color, mirroring cfc's drawGuidance() as it actually renders:
   /// cfc draws on an **RGBA** Mat (frame.rgba()), so its cv::Scalar is
   /// interpreted in R,G,B order — Scalar(255,244,94) shows as YELLOW, not
@@ -904,19 +932,17 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        // cfc's window rule (CameraBridgeViewBase mScale), adapted to the
-        // CURRENT orientation like the official web receiver: a 4:3 frame
-        // whose short side equals the view's short side, in the frame
-        // direction the camera itself delivers — landscape view gets a
-        // LANDSCAPE 4:3 window (1440x1080 on a 2412x1080 screen, matching
-        // the official app's bright window pixel-for-pixel), portrait view
-        // gets a PORTRAIT 3:4 window (1080x1440 on a 1080x2340 phone) so
-        // the window tracks the rotated preview instead of letterboxing a
-        // squat landscape window with giant top/bottom bars.
+        // The window tracks the CAMERA's frame aspect (whatever the device
+        // actually delivers after the top/bottom trim), filling the view's
+        // short side and centred — cfc's mScale rule, generalised. Showing
+        // the whole captured frame is what makes the field of view as
+        // large as the sensor allows; a fixed 4:3 window over a wider
+        // capture would silently hide the left/right margins.
+        final camAspect = _captureAspect; // >= 1, long side / short side
         final s = size.shortestSide;
         final portrait = size.height >= size.width;
-        final frameW = portrait ? s : s * 4 / 3;
-        final frameH = portrait ? s * 4 / 3 : s;
+        final frameW = portrait ? s : s * camAspect;
+        final frameH = portrait ? s * camAspect : s;
         final mScale = math.min(size.width / frameW, size.height / frameH);
         final drawW = frameW * mScale;
         final drawH = frameH * mScale;

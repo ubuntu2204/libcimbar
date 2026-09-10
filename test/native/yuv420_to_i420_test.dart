@@ -142,6 +142,55 @@ void main() {
           equals([10, 11, 12, 13]));
     });
 
+    test('aspect crop trims top/bottom and keeps the full width', () {
+      // 4:3-ish source (16x12) trimmed to 16:9 -> 16x9, centred.
+      const w = 16;
+      const h = 12;
+      final y = Uint8List(w * h);
+      for (var i = 0; i < y.length; i++) {
+        y[i] = i + 1; // row0 = 1..16, row1 = 17..32, ...
+      }
+      final u = Uint8List((w ~/ 2) * (h ~/ 2));
+      for (var i = 0; i < u.length; i++) {
+        u[i] = 200 + (i % 56);
+      }
+      final v = Uint8List((w ~/ 2) * (h ~/ 2));
+
+      final frame = yuv420ToI420(w, h, [
+        YuvPlane(bytes: y, rowStride: 16, pixelStride: 1),
+        YuvPlane(bytes: u, rowStride: 8, pixelStride: 1),
+        YuvPlane(bytes: v, rowStride: 8, pixelStride: 1),
+      ], cropAspect: 16 / 9);
+
+      expect(frame, isNotNull);
+      // Full width kept (horizontal FOV + barcode pixel budget).
+      expect(frame!.width, 16);
+      // 16 / (16/9) = 9 rows kept (forced even -> 8 by the &~1 mask).
+      expect(frame.height, inInclusiveRange(8, 9));
+      // Centred: the first kept row is not row 0 (top was trimmed).
+      expect(frame.bytes[0], isNot(1));
+      // Luma + half-resolution chroma planes.
+      expect(frame.bytes.length,
+          frame.width * frame.height + (frame.width ~/ 2) * (frame.height ~/ 2) * 2);
+    });
+
+    test('aspect crop is a no-op when the frame is already narrower', () {
+      const w = 16;
+      const h = 8; // 2:1 — already wider than 16:9
+      final y = Uint8List(w * h);
+      final u = Uint8List((w ~/ 2) * (h ~/ 2));
+      final v = Uint8List((w ~/ 2) * (h ~/ 2));
+
+      final frame = yuv420ToI420(w, h, [
+        YuvPlane(bytes: y, rowStride: 16, pixelStride: 1),
+        YuvPlane(bytes: u, rowStride: 8, pixelStride: 1),
+        YuvPlane(bytes: v, rowStride: 8, pixelStride: 1),
+      ], cropAspect: 16 / 9);
+
+      expect(frame!.width, 16);
+      expect(frame.height, 8); // nothing trimmed
+    });
+
     test('no crop keeps the full frame', () {
       const w = 8;
       const h = 4;

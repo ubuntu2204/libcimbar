@@ -144,21 +144,28 @@ class AndroidCameraCapture implements ICameraCapture {
 
   // ─── Internals ─────────────────────────────────────────────────
 
+  /// The decoded frame keeps its NATIVE sensor pixels: no downscaling
+  /// (interpolation measurably destroys the corner anchors), and the
+  /// top/bottom rows that carry no barcode are trimmed instead — see
+  /// [kCaptureAspect].
+  static const double kCaptureAspect = 16 / 9;
+
   /// Map a requested capture size onto the nearest plugin preset.
   ///
-  /// The official android decoder (cfc, `OpencvCameraView.bestCameraFrameSize`)
-  /// only accepts preview sizes whose **short** side is 960..1080, and falls
-  /// back to a plain "best fit" otherwise. 1080p is the ceiling here for the
-  /// same reason: the decoder only needs the barcode to span enough pixels
-  /// (~512 already decodes), while a 4K frame costs several times as much to
-  /// move across the JNI boundary and scan, for no decoding benefit.
-  ResolutionPreset _presetFor(int width, int height) {
-    final shortSide = width < height ? width : height;
-    if (shortSide >= 1000) return ResolutionPreset.veryHigh; // 1080p
-    if (shortSide >= 700) return ResolutionPreset.high; // 720p
-    if (shortSide >= 400) return ResolutionPreset.medium; // 480p
-    return ResolutionPreset.low;
-  }
+  /// MAXIMUM resolution is requested deliberately: the barcode's pixel
+  /// budget is what drives the decode rate (a 512px barcode decodes, a
+  /// 400px one does not), so more native pixels per frame beats a small
+  /// frame at a higher frame rate. The surplus top/bottom rows are trimmed
+  /// by [kCaptureAspect] rather than downscaled, which keeps the full
+  /// horizontal field of view AND full sensor sharpness.
+  ///
+  /// NOTE: `camera_android_camerax` only sets a 4:3 aspect strategy for
+  /// `ResolutionPreset.low`; every other preset is pinned to 16:9, which
+  /// crops the sensor vertically. `max` lets CameraX pick the highest
+  /// available resolution (on most phones the full 4:3 sensor), so the
+  /// vertical field of view follows the device instead of the plugin.
+  ResolutionPreset _presetFor(int width, int height) =>
+      ResolutionPreset.max;
 
   void _onCameraImage(CameraImage image) {
     final callback = _onFrame;
@@ -171,12 +178,11 @@ class AndroidCameraCapture implements ICameraCapture {
     }
     _lastDelivered = now;
 
-    // Full frame, always — the official pipeline (cfc's
-    // bestCameraFrameSize picks a preview whose short edge is 960..1080 and
-    // feeds every pixel to the Scanner). No centre crop: cropping throws
-    // away the region where the barcode may sit, and an off-centre barcode
-    // then costs whole frames (the anchors simply are not in the cropped
-    // image) — measured as a much lower decode rate than the official app.
+    // Full WIDTH, surplus rows trimmed — the official pipeline (cfc) feeds
+    // every pixel of its capture to the Scanner, and so do we. No centre
+    // crop (that was measured as a much lower decode rate: an off-centre
+    // barcode loses its anchors entirely), and no downscaling either —
+    // only the top/bottom band that carries no barcode is dropped.
     final converted = yuv420ToI420(
       image.width,
       image.height,
@@ -188,7 +194,7 @@ class AndroidCameraCapture implements ICameraCapture {
             pixelStride: p.bytesPerPixel ?? 1,
           ),
       ],
-      cropToSquare: false,
+      cropAspect: kCaptureAspect,
     );
     if (converted == null) return;
 
