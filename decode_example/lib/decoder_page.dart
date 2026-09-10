@@ -904,16 +904,22 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        // cfc's window rule (CameraBridgeViewBase mScale): a 4:3 frame
-        // whose short side equals the view's short side, scaled by
-        // min(viewW/frameW, viewH/frameH) and centered. On a landscape
-        // 2412x1080 screen this lands at 1440x1080 — matching the
-        // official app's bright window pixel-for-pixel.
+        // cfc's window rule (CameraBridgeViewBase mScale), adapted to the
+        // CURRENT orientation like the official web receiver: a 4:3 frame
+        // whose short side equals the view's short side, in the frame
+        // direction the camera itself delivers — landscape view gets a
+        // LANDSCAPE 4:3 window (1440x1080 on a 2412x1080 screen, matching
+        // the official app's bright window pixel-for-pixel), portrait view
+        // gets a PORTRAIT 3:4 window (1080x1440 on a 1080x2340 phone) so
+        // the window tracks the rotated preview instead of letterboxing a
+        // squat landscape window with giant top/bottom bars.
         final s = size.shortestSide;
-        final mScale =
-            math.min(size.width / (s * 4 / 3), size.height / s);
-        final drawW = s * 4 / 3 * mScale;
-        final drawH = s * mScale;
+        final portrait = size.height >= size.width;
+        final frameW = portrait ? s : s * 4 / 3;
+        final frameH = portrait ? s * 4 / 3 : s;
+        final mScale = math.min(size.width / frameW, size.height / frameH);
+        final drawW = frameW * mScale;
+        final drawH = frameH * mScale;
         final window = Rect.fromLTWH(
           (size.width - drawW) / 2,
           (size.height - drawH) / 2,
