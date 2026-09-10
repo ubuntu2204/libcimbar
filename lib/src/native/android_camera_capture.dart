@@ -35,13 +35,6 @@ class AndroidCameraCapture implements ICameraCapture {
   int _frameIntervalMs = 200;
   DateTime _lastDelivered = DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Square crop around the frame centre, applied in YUV space.
-  ///
-  /// The barcode has to occupy as many pixels as possible for the decoder's
-  /// anchors to resolve, so throwing away the letterboxed margins is worth
-  /// far more than keeping the full field of view.
-  bool _autoCropEnabled = true;
-
   // ─── ICameraCapture ────────────────────────────────────────────
 
   @override
@@ -80,23 +73,9 @@ class AndroidCameraCapture implements ICameraCapture {
       }
     }
 
-    // Honour the UI's target cap: asking for more pixels than we intend to
-    // decode just wastes capture time and memory.
-    var width = preferredWidth;
-    var height = preferredHeight;
-    final cap = _maxTargetSize;
-    if (cap != null) {
-      final longSide = width > height ? width : height;
-      if (longSide > cap) {
-        final scale = cap / longSide;
-        width = (width * scale).round();
-        height = (height * scale).round();
-      }
-    }
-
     final controller = CameraController(
       selected,
-      _presetFor(width, height),
+      _presetFor(preferredWidth, preferredHeight),
       enableAudio: false,
       // yuv420 keeps the plugin from doing its own (slower) conversions.
       imageFormatGroup: ImageFormatGroup.yuv420,
@@ -143,27 +122,12 @@ class AndroidCameraCapture implements ICameraCapture {
     _onFrame = null;
   }
 
-  // ─── Tuning, set dynamically by the decoder UI ─────────────────
-  //
-  // The UI assigns these through `as dynamic` (they are web-side concepts
-  // that the shared decoder page writes unconditionally), so they have to
-  // exist here or the writes silently no-op.
-
-  int? _maxTargetSize;
-
-  /// Upper bound for the decoded frame's long side, applied on next start.
-  set maxTargetSize(int? v) => _maxTargetSize = v;
-
-  /// Enable/disable the centred square crop.
-  set autoCropEnabled(bool v) => _autoCropEnabled = v;
-
-  /// Accepts the web-side `WebCaptureMode` enum without importing it (that
-  /// type only exists in the web build). "fit" keeps the whole frame;
-  /// anything else crops to a centred square.
-  set captureMode(dynamic mode) {
-    final name = mode?.toString().toLowerCase() ?? '';
-    _autoCropEnabled = name.contains('fit') ? false : true;
-  }
+  // ─── Tuning ─────────────────────────────────────────────────────
+  // NOTE: the former maxTargetSize / autoCropEnabled / captureMode
+  // setters (written via `as dynamic` by an older shared decoder page)
+  // are gone. The official-style pipeline needs none of them: the FULL
+  // frame goes to the decoder (cfc scans the whole frame for the corner
+  // anchors), and the resolution is fixed by [_presetFor].
 
   /// Grab a still picture for diagnostics (the counterpart of the web
   /// implementation's raw-frame dump).
@@ -207,6 +171,12 @@ class AndroidCameraCapture implements ICameraCapture {
     }
     _lastDelivered = now;
 
+    // Full frame, always — the official pipeline (cfc's
+    // bestCameraFrameSize picks a preview whose short edge is 960..1080 and
+    // feeds every pixel to the Scanner). No centre crop: cropping throws
+    // away the region where the barcode may sit, and an off-centre barcode
+    // then costs whole frames (the anchors simply are not in the cropped
+    // image) — measured as a much lower decode rate than the official app.
     final converted = yuv420ToI420(
       image.width,
       image.height,
@@ -218,7 +188,7 @@ class AndroidCameraCapture implements ICameraCapture {
             pixelStride: p.bytesPerPixel ?? 1,
           ),
       ],
-      cropToSquare: _autoCropEnabled,
+      cropToSquare: false,
     );
     if (converted == null) return;
 

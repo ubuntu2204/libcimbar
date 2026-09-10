@@ -840,56 +840,41 @@ class _DecoderPageState extends State<DecoderPage> {
     );
   }
 
-  /// Scanning frame overlay: dark surroundings with a clear center frame
-  /// and corner brackets colored by transfer health (see [_guideColor] —
-  /// the brackets turn light blue when payload starts flowing and green
-  /// when the transfer is healthy, exactly like cfc's drawGuidance).
+  /// Scanning overlay, official style (cfc's recv UI): the camera picture
+  /// fills the WHOLE screen — the decoder scans the full frame, so there is
+  /// no viewfinder box and no darkened margin to aim inside. The only
+  /// decoration is the guidance brackets at the screen corners, colored by
+  /// transfer health (see [_guideColor]), mirroring cfc's drawGuidance.
   /// [bottomInset] lifts the hint text above the floating control bar in
   /// the full-screen scanning layout.
   Widget _buildScanningOverlay({double bottomInset = 0}) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        // Square guide frame: 92% of the shorter dimension, no hard cap.
-        // The decoder scans the FULL frame (cfc-style), so this is purely
-        // a sizing hint: a barcode roughly filling the guide lands at
-        // ~800+ px in the 1080p decode input, comfortably above the
-        // anchor-detection floor.
-        final frameSize = (size.shortestSide * 0.92).clamp(150.0, 4096.0);
-        final frameLeft = (size.width - frameSize) / 2;
-        final frameTop = (size.height - frameSize) / 2;
-        final frameRect =
-            Rect.fromLTWH(frameLeft, frameTop, frameSize, frameSize);
 
         return Stack(
           children: [
-            // Dark overlay with a hole cut out for the frame
-            CustomPaint(
-              size: size,
-              painter: _DarkOverlayPainter(
-                frameRect: frameRect,
-                color: Colors.black.withValues(alpha: 0.6),
-              ),
-            ),
-            // Corner brackets — colored by transfer health (cfc-style)
+            // Corner guidance brackets — colored by transfer health
+            // (cfc drawGuidance style). Full-frame scanning means these
+            // are pure status feedback, not a sizing constraint.
             CustomPaint(
               size: size,
               painter: _CornerBracketsPainter(
-                frameRect: frameRect,
                 color: _guideColor,
-                bracketLength: frameSize * 0.15,
+                bracketLength: (size.shortestSide * 0.06)
+                    .clamp(28.0, 96.0),
                 strokeWidth: 3.0,
+                inset: size.shortestSide * 0.03,
               ),
             ),
-            // Scanning hint text pinned to the bottom of the preview (the
-            // enlarged frame leaves no room below it). Color follows the
-            // guide so the user's eye is drawn to the state change.
+            // Scanning hint pinned to the bottom of the preview. Color
+            // follows the guide so the user's eye catches the state change.
             Positioned(
               left: 0,
               right: 0,
               bottom: 10 + bottomInset,
               child: Text(
-                '将整个条码放入取景框内（四个角都可见）',
+                '对准 cimbar 条码（四个角都可见）',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: _guideColor.withValues(alpha: 0.9),
@@ -954,43 +939,24 @@ class _DecoderPageState extends State<DecoderPage> {
 
 // ─── Scanning frame painters ────────────────────────────────────
 
-/// Draws a dark overlay with a rectangular hole for the scanning frame.
-class _DarkOverlayPainter extends CustomPainter {
-  final Rect frameRect;
-  final Color color;
-
-  _DarkOverlayPainter({required this.frameRect, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
-
-    // Draw the dark overlay
-    final path = Path()
-      ..addRect(fullRect)
-      ..addRRect(RRect.fromRectAndRadius(frameRect, const Radius.circular(8)))
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_DarkOverlayPainter old) =>
-      old.frameRect != frameRect || old.color != color;
-}
-
-/// Draws corner brackets at the four corners of the scanning frame.
+/// Draws the guidance brackets at the four corners of the SCREEN —
+/// cfc's drawGuidance (jni.cpp) marks the decode area the same way, with
+/// the bracket color carrying the transfer-health state (white/yellow/
+/// green). Full-frame scanning means no viewfinder box: the brackets are
+/// status feedback, not an aiming constraint.
 class _CornerBracketsPainter extends CustomPainter {
-  final Rect frameRect;
   final Color color;
   final double bracketLength;
   final double strokeWidth;
 
+  /// Distance from each screen edge to the bracket.
+  final double inset;
+
   _CornerBracketsPainter({
-    required this.frameRect,
     required this.color,
     required this.bracketLength,
     required this.strokeWidth,
+    required this.inset,
   });
 
   @override
@@ -1002,58 +968,28 @@ class _CornerBracketsPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     final l = bracketLength;
-    const r = 8.0; // corner radius offset
+    final ox = inset;
+    final oy = inset;
+    final w = size.width;
+    final h = size.height;
 
-    // Top-left
-    canvas.drawLine(
-      Offset(frameRect.left - r, frameRect.top + l),
-      Offset(frameRect.left - r, frameRect.top - r),
-      paint,
-    );
-    canvas.drawLine(
-      Offset(frameRect.left - r, frameRect.top - r),
-      Offset(frameRect.left + l, frameRect.top - r),
-      paint,
-    );
+    void corner(Offset a, Offset corner, Offset b) {
+      canvas.drawLine(a, corner, paint);
+      canvas.drawLine(corner, b, paint);
+    }
 
-    // Top-right
-    canvas.drawLine(
-      Offset(frameRect.right + r, frameRect.top + l),
-      Offset(frameRect.right + r, frameRect.top - r),
-      paint,
-    );
-    canvas.drawLine(
-      Offset(frameRect.right + r, frameRect.top - r),
-      Offset(frameRect.right - l, frameRect.top - r),
-      paint,
-    );
-
-    // Bottom-left
-    canvas.drawLine(
-      Offset(frameRect.left - r, frameRect.bottom - l),
-      Offset(frameRect.left - r, frameRect.bottom + r),
-      paint,
-    );
-    canvas.drawLine(
-      Offset(frameRect.left - r, frameRect.bottom + r),
-      Offset(frameRect.left + l, frameRect.bottom + r),
-      paint,
-    );
-
-    // Bottom-right
-    canvas.drawLine(
-      Offset(frameRect.right + r, frameRect.bottom - l),
-      Offset(frameRect.right + r, frameRect.bottom + r),
-      paint,
-    );
-    canvas.drawLine(
-      Offset(frameRect.right + r, frameRect.bottom + r),
-      Offset(frameRect.right - l, frameRect.bottom + r),
-      paint,
-    );
+    // Top-left / top-right / bottom-left / bottom-right
+    corner(Offset(ox, oy + l), Offset(ox, oy), Offset(ox + l, oy));
+    corner(Offset(w - ox - l, oy), Offset(w - ox, oy), Offset(w - ox, oy + l));
+    corner(Offset(ox, h - oy - l), Offset(ox, h - oy), Offset(ox + l, h - oy));
+    corner(Offset(w - ox - l, h - oy), Offset(w - ox, h - oy),
+        Offset(w - ox, h - oy - l));
   }
 
   @override
   bool shouldRepaint(_CornerBracketsPainter old) =>
-      old.frameRect != frameRect || old.color != color;
+      old.color != color ||
+      old.bracketLength != bracketLength ||
+      old.inset != inset ||
+      old.strokeWidth != strokeWidth;
 }
