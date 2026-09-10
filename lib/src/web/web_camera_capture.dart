@@ -306,6 +306,11 @@ class WebCameraCapture implements ICameraCapture {
   /// Counts delivered frames (for throttled diagnostics).
   int _frameCounter = 0;
 
+  /// Per-frame logging, enabled only in the E2E/headless mode the
+  /// benchmarks drive (`?autostart=1`) — see the frame log above.
+  static final bool _e2eLogging =
+      Uri.base.queryParameters.containsKey('autostart');
+
   Future<void> _tick() async {
     if (_busy) return;
     _busy = true;
@@ -443,7 +448,11 @@ class WebCameraCapture implements ICameraCapture {
       }
 
       _frameCounter++;
-      if (_frameCounter % 50 == 1) {
+      // E2E mode (?autostart=1): log EVERY frame — the benchmark
+      // (test/e2e/compare_web.py) counts delivered frames from these logs,
+      // exactly like the official receiver's per-rVFC 'crosshair offsets'
+      // line. Normal use keeps the 1-in-50 sampling to avoid console spam.
+      if (_frameCounter % 50 == 1 || _e2eLogging) {
         debugPrint('[Camera] frame #$_frameCounter via VideoFrame: '
             '$format ${w}x$h -> $outFormat (${payload.length}B)');
       }

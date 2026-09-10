@@ -116,6 +116,8 @@ def summarize_official(logs, elapsed):
     payload = 0
     fed = 0
     progress_last = ''
+    first_frame_at = None
+    last_frame_at = None
     for t, text in logs:
         m = re.search(r'on decode got res (\d+)', text)
         if m:
@@ -126,15 +128,25 @@ def summarize_official(logs, elapsed):
                 complete_at = t
         if 'crosshair offsets now' in text:
             fed += 1
+            if first_frame_at is None:
+                first_frame_at = t
+            if complete_at is None or t <= complete_at:
+                last_frame_at = t
         m = re.search(r'progress!!!!(.+)', text)
         if m:
             progress_last = m.group(1).strip()
+    capture_fps = None
+    if first_frame_at is not None and last_frame_at is not None \
+            and fed > 1 and last_frame_at > first_frame_at:
+        capture_fps = fed / (last_frame_at - first_frame_at)
     return {
         'completed': complete_at is not None,
         'complete_at': complete_at,
         'first_payload_at': first_payload_at,
         'payload_frames': payload,
         'frames_fed': fed,
+        'first_frame_at': first_frame_at,
+        'capture_fps': capture_fps,
         'last_progress': progress_last,
         'elapsed': elapsed,
     }
@@ -145,6 +157,8 @@ def summarize_app(logs, elapsed):
     first_payload_at = None
     payload = 0
     fed_max = 0
+    first_frame_at = None
+    last_frame_at = None
     for t, text in logs:
         m = re.search(r'fountain_decode => (\d+)', text)
         if m and int(m.group(1)) > 0 and complete_at is None:
@@ -156,12 +170,25 @@ def summarize_app(logs, elapsed):
         m = re.search(r'\[Camera\] frame #(\d+)', text)
         if m:
             fed_max = max(fed_max, int(m.group(1)))
+            if first_frame_at is None:
+                first_frame_at = t
+            # only count frames before completion for the rate estimate
+            if complete_at is None or t <= complete_at:
+                last_frame_at = t
+    # E2E mode logs every frame, so fed_max is EXACT. Measure the real
+    # capture rate from the per-frame timestamps (frame #1 .. last frame).
+    capture_fps = None
+    if first_frame_at is not None and last_frame_at is not None \
+            and fed_max > 1 and last_frame_at > first_frame_at:
+        capture_fps = (fed_max - 1) / (last_frame_at - first_frame_at)
     return {
         'completed': complete_at is not None,
         'complete_at': complete_at,
         'first_payload_at': first_payload_at,
         'payload_frames': payload,
-        'frames_fed': fed_max,  # sampled every 50 → this is the exact max
+        'frames_fed': fed_max,
+        'first_frame_at': first_frame_at,
+        'capture_fps': capture_fps,
         'last_progress': '',
         'elapsed': elapsed,
     }
@@ -251,9 +278,12 @@ def main() -> int:
         for i, s in enumerate(runs, 1):
             ca = f'{s["complete_at"]:.1f}s' if s['complete_at'] else '—'
             fp = f'{s["first_payload_at"]:.1f}s' if s['first_payload_at'] else '—'
+            ff = f'{s["first_frame_at"]:.1f}s' if s['first_frame_at'] else '—'
+            cps = f'{s["capture_fps"]:.1f}' if s['capture_fps'] else '—'
             rate = (f'{s["payload_frames"] / s["frames_fed"] * 100:.0f}%'
                     if s['frames_fed'] else '—')
             print(f'{name:>8} run{i}: {"DECODED" if s["completed"] else "FAILED"} | '
+                  f'start {ff:>5} | capture {cps:>4}fps | '
                   f'1st payload {fp:>6} | complete@ {ca:>6} | '
                   f'payload {s["payload_frames"]:>3}/{s["frames_fed"]:>4} fed '
                   f'({rate})'
