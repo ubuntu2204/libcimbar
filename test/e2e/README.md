@@ -92,11 +92,13 @@ official's Auto mode only tries modeB on 1 of every 4 frames until it
 locks. The remaining total-time gap is pure dart2js startup, which the
 camera prewarm already overlaps where possible.
 
-Architecture parity with recv.html (see `decode_worker.js` +
-`decode_worker_pool.dart`): 6 parallel Web Workers (scales with
-`hardwareConcurrency`, official hardcodes 4) each run their own wasm
-instance for scan/extract/decode, with zero-copy buffer transfer; the
-main thread keeps the fountain sink, reassembly, and capture (rVFC).
+Architecture parity with recv.html (the app ships the OFFICIAL
+`recv-worker.js` verbatim — see `decode_worker_pool.dart`): 4 parallel
+Web Workers (recv.html's hardcoded `Recv.init_ww(4)` count) each run
+their own wasm instance for scan/extract/decode over the official
+message protocol (`type:'proc'` / `{mode, buff}` / `{res,...}`), with
+zero-copy buffer transfer; the main thread keeps the fountain sink,
+reassembly, and capture (rVFC).
 
 Standalone use against an already-running app:
 

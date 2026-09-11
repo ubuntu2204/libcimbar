@@ -67,6 +67,15 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     }
     if (_ready) {
       _allocateBuffers();
+      // Official recv.html order: Recv.init_ww(4) runs BEFORE the camera
+      // starts, so the workers' wasm instances load in parallel with the
+      // camera warmup (and with index.html's prewarmed stream).
+      try {
+        _pool = DecodeWorkerPool();
+      } catch (e) {
+        debugPrint('[Decoder] worker pool unavailable: $e');
+        _poolDisabled = true;
+      }
     }
   }
 
@@ -142,11 +151,9 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     }
     _modeVal = config.modeValue;
     _autoMode = config.autoDetect;
-    // The workers each hold their own wasm instance: their Config (which
-    // sizes the scan output buffers) must follow the mode too. No bounce
-    // needed there — workers keep no fountain/sink state. In Auto the
-    // workers get their (rotating) mode with every 'dec' message anyway.
-    _pool?.configure(modeVal);
+    // No separate worker notification: the official protocol has no cfg
+    // message — every 'proc' message carries the mode and the worker
+    // configures its own wasm per frame (recv.js / recv-worker.js).
   }
 
   /// Active mode value (for [resetStreams]'s bounce trick).
@@ -235,15 +242,15 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       if (_autoMode) {
         // First frame with payload locks the mode — recv.js setMode():
         // apply it to the MAIN-thread wasm (sink reset if it changes —
-        // still empty pre-lock), resize the chunk buffer (Sink.allocate)
-        // and pin every future frame (workers get it via configure too).
+        // still empty pre-lock) and resize the chunk buffer
+        // (Sink.allocate). Future frames carry it to the workers on
+        // their 'proc' messages.
         _autoMode = false;
         if (_modeVal != scanMode) {
           cimbardConfigureDecode(scanMode.toJS);
           _ensureDecodeBuffer();
           _modeVal = scanMode;
         }
-        _pool?.configure(scanMode);
         detectedMode = scanMode;
       }
       if (bytesDecoded > _decodeBufSize || workerResult.bytes == null) {
