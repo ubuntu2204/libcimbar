@@ -26,6 +26,15 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   /// can bounce it (see there).
   int _modeVal = 68;
 
+  /// Official Auto mode (recv.js `modeVals` rotation; the glue equivalent
+  /// of cfc's modeVal=0, because the cimbard C API clamps
+  /// `cimbard_configure_decode(0)` to 68): rotate the scan mode every
+  /// frame until one yields payload, then LOCK. Same mechanism, same
+  /// place as the official web receiver — in the caller.
+  static const List<int> _autoModeVals = [66, 68, 67, 4];
+  bool _autoMode = false;
+  int _autoCounter = 0;
+
   /// Pre-allocated decode buffer (sized by cimbard_get_bufsize).
   Pointer<Uint8>? _decodeBuffer;
   int _decodeBufferSize = 0;
@@ -48,6 +57,17 @@ class CimbarDecoderFfi implements ICimbarDecoder {
 
     _decompressBufferSize = _native.decompressBufsize;
     _decompressBuffer = calloc<Uint8>(_decompressBufferSize);
+  }
+
+  /// Grow the decode buffer if the (newly configured) mode needs more
+  /// than the current allocation — the official Sink.allocate() rule.
+  void _ensureDecodeBuffer() {
+    final needed = _native.decodeBufsize;
+    if (needed > _decodeBufferSize) {
+      if (_decodeBuffer != null) calloc.free(_decodeBuffer!);
+      _decodeBufferSize = needed;
+      _decodeBuffer = calloc<Uint8>(_decodeBufferSize);
+    }
   }
 
   @override
@@ -76,6 +96,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       throw StateError('cimbard_configure_decode failed: $result');
     }
     _modeVal = modeVal;
+    _autoMode = config.autoDetect;
   }
 
   /// Discard ALL accumulated fountain streams.
@@ -101,6 +122,20 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   }) async {
     _checkReady();
 
+    // Official Auto: rotate the scan mode per frame (recv.js:
+    // `mode = _mode || modeVals[_counter % modeVals.length]`).
+    // configure_decode applies Config::update and — on change — resets the
+    // fountain sink. That reset is harmless pre-lock (a wrong-mode scan
+    // never yields payload, so the sink is still empty) and stops
+    // happening entirely once the mode locks below.
+    int? detectedMode;
+    int scanMode = _modeVal;
+    if (_autoMode) {
+      scanMode = _autoModeVals[_autoCounter++ % _autoModeVals.length];
+      _native.configureDecode(scanMode);
+      _ensureDecodeBuffer();
+    }
+
     // Copy image data to native buffer
     final imgBuffer = calloc<Uint8>(imageData.length);
     try {
@@ -124,6 +159,15 @@ class CimbarDecoderFfi implements ICimbarDecoder {
 
       if (bytesDecoded == 0) {
         return DecodeResult.inProgress(progress: _progress);
+      }
+
+      if (_autoMode && bytesDecoded > 0) {
+        // First frame with payload locks the mode — recv.js setMode().
+        // The scan above already applied it (Config::update), so the sink
+        // is created lazily with the detected mode's chunk size.
+        _autoMode = false;
+        _modeVal = scanMode;
+        detectedMode = scanMode;
       }
 
       // Step 2: Feed decoded chunks into the fountain decoder.
@@ -157,6 +201,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
           framesDecoded: _framesProcessed,
           frameBytesDecoded: bytesDecoded,
           frameCapacity: _decodeBufferSize,
+          detectedMode: detectedMode,
         );
       }
 
@@ -172,6 +217,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         filename: filename,
         data: data ?? Uint8List(0),
         framesDecoded: _framesProcessed,
+        detectedMode: detectedMode,
       );
     } finally {
       calloc.free(imgBuffer);

@@ -42,6 +42,11 @@ class DecodeResult {
   /// "perfect frame" test (`decodeRes >= capacity * 0.7`).
   final int frameCapacity;
 
+  /// Mode value the Auto rotation locked onto on THIS frame (recv.js
+  /// `setMode` / cfc `detected_mode`). Null = no lock happened; non-null
+  /// means every following frame is scanned with this mode.
+  final int? detectedMode;
+
   const DecodeResult({
     this.fileId,
     this.filename = '',
@@ -53,6 +58,7 @@ class DecodeResult {
     this.estimatedTotalFrames,
     this.frameBytesDecoded = 0,
     this.frameCapacity = 0,
+    this.detectedMode,
   });
 
   /// Create a result indicating an error occurred.
@@ -71,6 +77,7 @@ class DecodeResult {
     int? estimatedTotalFrames,
     int frameBytesDecoded = 0,
     int frameCapacity = 0,
+    int? detectedMode,
   }) =>
       DecodeResult(
         progress: progress,
@@ -78,6 +85,7 @@ class DecodeResult {
         estimatedTotalFrames: estimatedTotalFrames,
         frameBytesDecoded: frameBytesDecoded,
         frameCapacity: frameCapacity,
+        detectedMode: detectedMode,
       );
 
   /// Create a completed result with the recovered file data.
@@ -86,6 +94,7 @@ class DecodeResult {
     required String filename,
     required Uint8List data,
     int framesDecoded = 0,
+    int? detectedMode,
   }) =>
       DecodeResult(
         fileId: fileId,
@@ -94,6 +103,7 @@ class DecodeResult {
         progress: 1.0,
         isComplete: true,
         framesDecoded: framesDecoded,
+        detectedMode: detectedMode,
       );
 
   @override

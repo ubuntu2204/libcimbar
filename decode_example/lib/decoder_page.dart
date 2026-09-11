@@ -31,10 +31,11 @@ const int kPreferredCameraHeight = 1080;
 /// (roughly) linearly with good frames per second, so sampling at 5 fps
 /// made transfers take 3x as long as the official apps.
 ///
-/// This is a REQUEST, not a guarantee: both captures have backpressure
-/// (web drops ticks while busy, Android's throttle is a minimum gap), so
-/// when a frame takes longer than the interval to decode, the effective
-/// rate settles at whatever the decoder can sustain.
+/// This is a REQUEST, not a guarantee: the captures have backpressure —
+/// web drops ticks while busy; Android (cfc-verbatim) forwards every
+/// camera frame and the newest-wins slot drops whatever the decoder
+/// cannot keep up with — so the effective rate settles at whatever the
+/// decoder can sustain.
 const int kCaptureFps = 15;
 
 /// Decoder page — receive cimbar barcodes via camera and decode them.
@@ -73,7 +74,14 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
   CimbarConfig _config = const CimbarConfig(
     mode: CimbarMode.modeB,
     compressionLevel: 16,
+    // Official default (recv.html / cfc): Auto — rotate [66,68,67,4] per
+    // frame and lock on the first frame that yields payload.
+    autoDetect: true,
   );
+
+  /// Mode the Auto rotation locked onto (recv.js setMode / cfc
+  /// detected_mode). Null while still rotating.
+  int? _detectedMode;
 
   // Decode result
   Uint8List? _recoveredData;
@@ -277,6 +285,7 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
       _isCameraActive = true;
       _isDecoding = true;
       _statusMessage = '摄像头已开启，请对准 cimbar 条码…';
+      _detectedMode = null;
       _framesProcessed = 0;
       _callCount = 0;
       _decodedFrames = 0;
@@ -449,6 +458,8 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
       }
 
       _progress = result.progress;
+      final detected = result.detectedMode;
+      if (detected != null) _detectedMode = detected;
 
       if (result.isComplete) {
         _recoveredData = result.data;
@@ -524,40 +535,79 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     );
   }
 
+  /// Chip/menu label — recv.html semantics: Auto until a mode locks, then
+  /// "Auto → <detected>"; a manual selection shows the mode outright.
+  String get _modeLabel {
+    if (!_config.autoDetect) return _config.mode.name;
+    if (_detectedMode != null) {
+      return 'Auto → ${CimbarMode.fromValue(_detectedMode!).name}';
+    }
+    return 'Auto（检测中）';
+  }
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       title: const Text('libcimbar 解码器'),
       actions: [
-        // Mode selector
-        PopupMenuButton<CimbarMode>(
+        // Mode selector — recv.html's Auto + per-mode entries.
+        PopupMenuButton<Object>(
           icon: const Icon(Icons.settings),
           tooltip: '条码模式',
-          onSelected: (mode) async {
-            _config = _config.copyWith(mode: mode);
+          onSelected: (sel) async {
+            setState(() {
+              _detectedMode = null;
+              if (sel is CimbarMode) {
+                _config = _config.copyWith(mode: sel, autoDetect: false);
+              } else {
+                // Official Auto: rotate [66,68,67,4], lock on first payload.
+                _config = _config.copyWith(autoDetect: true);
+              }
+            });
             await _decoder?.configure(_config);
           },
-          itemBuilder: (_) => CimbarMode.values
-              .map((m) => PopupMenuItem(
-                    value: m,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(m.name,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w600)),
-                        Text(
-                          _modeDescription(m),
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurface
-                                  .withValues(alpha: 0.7)),
-                        ),
-                      ],
-                    ),
-                  ))
-              .toList(),
+          itemBuilder: (_) => [
+            PopupMenuItem<Object>(
+              value: 'auto',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Auto（官方默认）',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    '每帧轮换 66/68/67/4，命中即锁定',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.7)),
+                  ),
+                ],
+              ),
+            ),
+            ...CimbarMode.values.map((m) => PopupMenuItem<Object>(
+                  value: m,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(m.name,
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)),
+                      Text(
+                        _modeDescription(m),
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.7)),
+                      ),
+                    ],
+                  ),
+                )),
+          ],
         ),
       ],
     );
@@ -611,7 +661,7 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
                           Icons.settings_input_antenna,
                           size: 16,
                         ),
-                        label: Text('模式：${_config.mode.name}'),
+                        label: Text('模式：$_modeLabel'),
                       ),
                       if (_framesProcessed > 0)
                         Chip(

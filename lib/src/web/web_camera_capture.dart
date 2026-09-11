@@ -42,6 +42,12 @@ external JSObject _newObject();
 @JS('window.matchMedia')
 external JSObject _matchMedia(JSString query);
 
+@JS('navigator.userAgent')
+external JSString get _userAgent;
+
+@JS('navigator.maxTouchPoints')
+external JSNumber? get _maxTouchPoints;
+
 // Promise → Future bridge
 Future<JSAny?> _jsAwait(JSPromise<JSAny?> promise) {
   final completer = Completer<JSAny?>();
@@ -392,6 +398,71 @@ class WebCameraCapture implements ICameraCapture {
   /// Counts delivered frames (for throttled diagnostics).
   int _frameCounter = 0;
 
+  // ─── Watchman (recv.js watch_for_camera_pause, verbatim semantics) ──
+  //
+  // iOS Safari silently suspends camera capture (tab switch, app
+  // background, orientation change) and rVFC then stops firing without
+  // any error. The official receiver runs a 1s watchdog that re-runs
+  // getUserMedia when the frame counter stops advancing — iOS only,
+  // "since desktop behavior is weird" (their comment).
+
+  Timer? _watchmanTimer;
+  int _watchmanLastSeen = 1; // can't restart if we never started
+  bool _watchmanRestarting = false;
+
+  /// recv.js isIOS(): UA regex + iPadOS desktop-UA quirk (Macintosh with
+  /// a touchscreen).
+  bool _isIOS() {
+    try {
+      final ua = _userAgent.toDart;
+      final isIOS =
+          RegExp(r'iPad|iPhone|iPod').hasMatch(ua) && !ua.contains('MSStream');
+      final touch = _maxTouchPoints?.toDartInt ?? 0;
+      final isAppleDevice = ua.contains('Macintosh') && touch >= 1;
+      return isIOS || isAppleDevice;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _startWatchman() {
+    if (_watchmanTimer != null || !_isIOS()) return;
+    debugPrint('[Camera] watchman armed (iOS camera-pause watchdog, '
+        'recv.js watch_for_camera_pause)');
+    _watchmanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!_streaming) return;
+      // Still making progress — nothing to do.
+      if (_frameCounter > _watchmanLastSeen) {
+        _watchmanLastSeen = _frameCounter;
+        return;
+      }
+      // Stuck — re-acquire the camera, like recv.js restart_paused_camera.
+      _restartPausedCamera();
+    });
+  }
+
+  Future<void> _restartPausedCamera() async {
+    final video = _video;
+    if (video == null || _watchmanRestarting) return;
+    _watchmanRestarting = true;
+    try {
+      debugPrint('[Camera] watchman: frame counter stalled at '
+          '$_frameCounter — re-running getUserMedia');
+      final constraints = _buildConstraints(1920, 1080);
+      final stream = await _jsAwait(_getUserMedia(constraints)) as JSObject?;
+      if (stream == null || !_streaming) return;
+      _stream = stream;
+      _setProp(video, 'srcObject', stream);
+      final playFn = _reflectGet(video, 'play'.toJS) as JSFunction?;
+      playFn?.callAsFunction(video);
+      _watchmanLastSeen = _frameCounter;
+    } catch (e) {
+      debugPrint('[Camera] watchman restart failed: $e');
+    } finally {
+      _watchmanRestarting = false;
+    }
+  }
+
   /// Per-frame logging, enabled only in the E2E/headless mode the
   /// benchmarks drive (`?autostart=1`) — see the frame log above.
   static final bool _e2eLogging =
@@ -402,6 +473,9 @@ class WebCameraCapture implements ICameraCapture {
     _busy = true;
     try {
       await _captureFrame();
+      // recv.js watch_for_camera_pause: arm after the FIRST successful
+      // frame.
+      if (_frameCounter == 1) _startWatchman();
     } finally {
       _busy = false;
     }
@@ -690,6 +764,7 @@ class WebCameraCapture implements ICameraCapture {
 
     _deliveredWidth = cw;
     _deliveredHeight = ch;
+    _frameCounter++;
     _callback!(CameraFrame(
       data: rgbPixels,
       width: cw,
@@ -788,6 +863,8 @@ class WebCameraCapture implements ICameraCapture {
   Future<void> stop() async {
     _frameTimer?.cancel();
     _frameTimer = null;
+    _watchmanTimer?.cancel();
+    _watchmanTimer = null;
     // Breaks the rVFC chain too: the callback checks _streaming before
     // rescheduling (see _scheduleNextRvfc).
     _streaming = false;

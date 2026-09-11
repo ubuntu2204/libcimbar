@@ -7,6 +7,13 @@ class CimbarConfig {
   /// Encoding mode identifier.
   final CimbarMode mode;
 
+  /// Decoder-only: run the official Auto mode — every frame is scanned
+  /// against [66, 68, 67, 4] in turn (recv.js's `modeVals` rotation; the
+  /// glue-level equivalent of cfc's modeVal=0, because the cimbard C API
+  /// clamps `cimbard_configure_decode(0)` to 68) and the mode LOCKS on
+  /// the first frame that yields fountain payload.
+  final bool autoDetect;
+
   /// Zstd compression level (0–22). 0 = no compression.
   final int compressionLevel;
 
@@ -25,6 +32,7 @@ class CimbarConfig {
 
   const CimbarConfig({
     this.mode = CimbarMode.modeB,
+    this.autoDetect = false,
     this.compressionLevel = 16,
     this.eccBytes = 30,
     this.fps = 15,
@@ -36,6 +44,7 @@ class CimbarConfig {
 
   CimbarConfig copyWith({
     CimbarMode? mode,
+    bool? autoDetect,
     int? compressionLevel,
     int? eccBytes,
     int? fps,
@@ -43,6 +52,7 @@ class CimbarConfig {
   }) {
     return CimbarConfig(
       mode: mode ?? this.mode,
+      autoDetect: autoDetect ?? this.autoDetect,
       compressionLevel: compressionLevel ?? this.compressionLevel,
       eccBytes: eccBytes ?? this.eccBytes,
       fps: fps ?? this.fps,

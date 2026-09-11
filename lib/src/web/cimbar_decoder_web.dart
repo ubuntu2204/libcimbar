@@ -104,6 +104,19 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         'runtimeType=${_decompressBufPtr.runtimeType}');
   }
 
+  /// Grow the main-thread chunk buffer if the (newly locked) mode needs
+  /// more than the current allocation — the official Sink.allocate() rule.
+  void _ensureDecodeBuffer() {
+    final module = cimbarModule!;
+    final needed = jsNumberToInt(cimbardGetBufsize());
+    if (needed > _decodeBufSize) {
+      if (_decodeBufPtr != 0) module.deallocate(_decodeBufPtr);
+      _decodeBufSize = needed;
+      _decodeBufPtr = module.allocate(_decodeBufSize);
+      debugPrint('[Decoder] decode buffer resized to $_decodeBufSize');
+    }
+  }
+
   @override
   bool get isReady => _ready;
 
@@ -128,14 +141,27 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       throw StateError('cimbard_configure_decode failed: $result');
     }
     _modeVal = config.modeValue;
+    _autoMode = config.autoDetect;
     // The workers each hold their own wasm instance: their Config (which
     // sizes the scan output buffers) must follow the mode too. No bounce
-    // needed there — workers keep no fountain/sink state.
+    // needed there — workers keep no fountain/sink state. In Auto the
+    // workers get their (rotating) mode with every 'dec' message anyway.
     _pool?.configure(modeVal);
   }
 
   /// Active mode value (for [resetStreams]'s bounce trick).
   int _modeVal = 68;
+
+  /// Official Auto mode — recv.js's `modeVals` rotation ([66, 68, 67, 4]),
+  /// locked on the first frame that yields payload (recv.js `setMode`).
+  /// Exactly like the official receiver, the rotation only touches the
+  /// WORKER wasms (they configure per 'dec' message); the main-thread
+  /// wasm learns the detected mode at lock time, right before its first
+  /// fountain_decode — so the sink is always created with the right
+  /// chunk size.
+  static const List<int> _autoModeVals = [66, 68, 67, 4];
+  bool _autoMode = false;
+  int _autoCounter = 0;
 
   /// Discard ALL accumulated fountain streams.
   ///
@@ -165,6 +191,16 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     _checkReady();
     final module = cimbarModule!;
 
+    // Official Auto: rotate the scan mode per frame (recv.js:
+    // `mode = _mode || modeVals[_counter % modeVals.length]`). Workers
+    // receive the mode with every 'dec' message and configure their own
+    // wasm (recv-worker.js does exactly the same per 'proc' message).
+    int? detectedMode;
+    int scanMode = _modeVal;
+    if (_autoMode) {
+      scanMode = _autoModeVals[_autoCounter++ % _autoModeVals.length];
+    }
+
     // ── Worker path (official recv.html architecture) ─────────────
     // The heavy scan/extract/decode runs in parallel Web Workers, each
     // with its own wasm instance; this thread only does the fountain
@@ -172,7 +208,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     // (spawn failed / not yet initialized / post failed) — in that case
     // imageData is still valid and the main-thread fallback runs.
     final workerResult =
-        await _tryWorkerDecode(imageData, width, height, format);
+        await _tryWorkerDecode(imageData, width, height, format, scanMode);
     if (workerResult != null) {
       // NOTE: the pixel buffer was TRANSFERRED to the worker — imageData
       // must not be touched past this point.
@@ -196,6 +232,20 @@ class CimbarDecoderFfi implements ICimbarDecoder {
             '$report');
         return DecodeResult.inProgress(progress: _progress);
       }
+      if (_autoMode) {
+        // First frame with payload locks the mode — recv.js setMode():
+        // apply it to the MAIN-thread wasm (sink reset if it changes —
+        // still empty pre-lock), resize the chunk buffer (Sink.allocate)
+        // and pin every future frame (workers get it via configure too).
+        _autoMode = false;
+        if (_modeVal != scanMode) {
+          cimbardConfigureDecode(scanMode.toJS);
+          _ensureDecodeBuffer();
+          _modeVal = scanMode;
+        }
+        _pool?.configure(scanMode);
+        detectedMode = scanMode;
+      }
       if (bytesDecoded > _decodeBufSize || workerResult.bytes == null) {
         // Chunk payload bigger than our main-thread buffer cannot happen
         // with matching modes — but never write past the allocation.
@@ -208,10 +258,17 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       final heap = module.heapU8.toDart;
       heap.setRange(
           _decodeBufPtr, _decodeBufPtr + bytesDecoded, workerResult.bytes!);
-      return _fountainStep(bytesDecoded);
+      return _fountainStep(bytesDecoded, detectedMode: detectedMode);
     }
 
     // ── Main-thread fallback (pre-worker path) ─────────────────────
+    // In Auto, apply the rotated mode here too (same reset-safety as the
+    // FFI decoder: pre-lock the sink is empty, post-lock there is no
+    // rotation).
+    if (_autoMode) {
+      cimbardConfigureDecode(scanMode.toJS);
+      _ensureDecodeBuffer();
+    }
     // Copy image data to WASM heap
     final imgPtr = module.allocate(imageData.length);
     try {
@@ -250,7 +307,14 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       _diag('scan_extract_decode => $bytesDecoded bytes — ${_readReport()}',
           force: true);
 
-      return await _fountainStep(bytesDecoded);
+      if (_autoMode) {
+        // First frame with payload locks the mode (recv.js setMode).
+        _autoMode = false;
+        _modeVal = scanMode;
+        detectedMode = scanMode;
+      }
+
+      return await _fountainStep(bytesDecoded, detectedMode: detectedMode);
     } catch (e, stack) {
       debugPrint('[Decoder] decodeFrame FAILED: $e');
       debugPrint('[Decoder] stack:\n$stack');
@@ -263,7 +327,8 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   /// Shared tail of both decode paths: feed the scan's chunk output into
   /// the main-thread fountain sink, parse the real progress, and finish
   /// the file when the sink reports completion.
-  Future<DecodeResult> _fountainStep(int bytesDecoded) async {
+  Future<DecodeResult> _fountainStep(int bytesDecoded,
+      {int? detectedMode}) async {
     // Feed into the fountain decoder. scan_extract_decode returns
     // buffers_in_use * fountain_chunk_size, i.e. the value is ALREADY
     // chunk-aligned for the active mode — pass it through verbatim.
@@ -300,6 +365,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         progress: _progress,
         frameBytesDecoded: bytesDecoded,
         frameCapacity: _decodeBufSize,
+        detectedMode: detectedMode,
       );
     }
 
@@ -314,6 +380,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       fileId: fileId,
       filename: filename,
       data: data ?? Uint8List(0),
+      detectedMode: detectedMode,
     );
   }
 
@@ -325,8 +392,8 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   /// Hand one frame to the decode worker pool. Returns null when the pool
   /// did NOT take the frame (unavailable / not initialized / post failed)
   /// — the caller then decodes it on the main thread.
-  Future<WorkerDecodeResult?> _tryWorkerDecode(
-      Uint8List imageData, int width, int height, CimbarImageFormat format) async {
+  Future<WorkerDecodeResult?> _tryWorkerDecode(Uint8List imageData, int width,
+      int height, CimbarImageFormat format, int modeVal) async {
     if (_poolDisabled) return null;
     final DecodeWorkerPool pool;
     try {
@@ -341,7 +408,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       return null;
     }
     try {
-      return await pool.decode(imageData, width, height, format.value, _modeVal);
+      return await pool.decode(imageData, width, height, format.value, modeVal);
     } catch (e) {
       debugPrint('[Decoder] worker decode failed: $e');
       return null;

@@ -28,15 +28,19 @@ import io.flutter.view.TextureRegistry
  *    wins. On this device that is 1440x1080 — the sensor's native 4:3
  *    with the FULL vertical field of view, exactly the frame the official
  *    app decodes. No 16:9 crop anywhere.
- *  - NV21 preview format + CONTINUOUS_VIDEO focus + double-buffered
- *    `setPreviewCallbackWithBuffer` (copied from cfc's initializeCamera).
+ *  - NV21 preview format + CONTINUOUS_VIDEO focus + setRecordingHint(true)
+ *    + double-buffered `setPreviewCallbackWithBuffer` (copied from cfc's
+ *    initializeCamera).
  *  - Preview is rendered onto a FLUTTER texture (SurfaceTexture from the
  *    TextureRegistry), the equivalent of cfc drawing its camera Mat into
  *    its own view — Dart letterboxes/rotates it with its own widgets.
  *
- * Frames are throttled to [FRAME_INTERVAL_MS] (official apps decode every
- * camera frame; the Dart decoder needs a bounded rate) and shipped to Dart
- * over the frames EventChannel as raw NV21 byte arrays.
+ * EVERY camera frame is shipped to Dart over the frames EventChannel as a
+ * raw NV21 byte array — no throttle, exactly like cfc handing every
+ * preview frame to its decoder thread. The "busy → drop" rule lives on
+ * the Dart side (CfcCameraCapture): while a decode runs, newer frames
+ * overwrite the pending slot and older ones are dropped — the same
+ * newest-wins rule as cfc's double-buffered mFrameChain.
  *
  * NOTE: `setDisplayOrientation` is deliberately NOT called. For
  * SurfaceTextures it only encodes a transform matrix that the Flutter
@@ -57,9 +61,6 @@ class CfcCameraHandler(
 
         private const val TAG = "CfcCamera"
 
-        /// Official cadence (recv.js frameRate ideal:15 / cfc every frame).
-        private const val FRAME_INTERVAL_MS = 66L
-
         private const val PERMISSION_REQUEST_CODE = 9001
     }
 
@@ -69,7 +70,6 @@ class CfcCameraHandler(
     private var frameWidth = 0
     private var frameHeight = 0
     private var frameRotation = 0
-    private var lastFrameAt = 0L
     private var pendingOpenResult: MethodChannel.Result? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -175,11 +175,18 @@ class CfcCameraHandler(
 
             val params = cam.parameters
             // cfc bestCameraFrameSize: short side 960..1080, smallest width.
-            // Surface bounds = the display in its CURRENT orientation, like
-            // cfc's view bounds.
+            // cfc is LANDSCAPE-LOCKED, so its surface bounds are always
+            // (longSide x shortSide) and the size pick never depends on the
+            // transient orientation. Feed the same long/short pair here:
+            // with portrait bounds (e.g. 1080x2340) the primary loop would
+            // REJECT 1440x1080 (width 1440 > 1080) and fall back to OpenCV's
+            // "largest that fits" (~1 Mpx) — an upscaled, blurry preview and
+            // a lower-resolution decode input than the official app.
             val dm = activity.resources.displayMetrics
+            val surfaceW = maxOf(dm.widthPixels, dm.heightPixels)
+            val surfaceH = minOf(dm.widthPixels, dm.heightPixels)
             val frameSize = bestCameraFrameSize(
-                params.supportedPreviewSizes, dm.widthPixels, dm.heightPixels,
+                params.supportedPreviewSizes, surfaceW, surfaceH,
             ) ?: run {
                 cam.release()
                 Log.e(TAG, "open: no suitable preview size")
@@ -194,14 +201,28 @@ class CfcCameraHandler(
                     Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO)) {
                 params.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO
             }
+            // cfc (OpenCV's JavaCameraView): setRecordingHint(true) on
+            // ICS+, except the GT-I9100 quirk. Hints the HAL that this
+            // session is video-class.
+            if (android.os.Build.VERSION.SDK_INT >= 14 &&
+                android.os.Build.MODEL != "GT-I9100") {
+                params.setRecordingHint(true)
+            }
             cam.parameters = params
 
-            frameWidth = frameSize.width
-            frameHeight = frameSize.height
+            // cfc re-reads the applied size from the HAL (it may clamp the
+            // request) — report what is really streaming.
+            frameWidth = cam.parameters.previewSize.width
+            frameHeight = cam.parameters.previewSize.height
 
             // Preview on a FLUTTER texture (cfc draws its camera Mat into
             // its own view; we hand the SurfaceTexture to Flutter).
             val entry = textureRegistry.createSurfaceTexture()
+            // Size the consumer buffers to the actual preview — the
+            // SurfaceTexture default is 1x1 and producers are not obliged to
+            // honor our size unless told (the Flutter camera plugin does the
+            // same right after setPreviewTexture).
+            entry.surfaceTexture().setDefaultBufferSize(frameWidth, frameHeight)
             cam.setPreviewTexture(entry.surfaceTexture())
             cam.startPreview()
             Log.i(TAG, "open: preview started, textureId=${entry.id()}")
@@ -248,11 +269,12 @@ class CfcCameraHandler(
         "rotation" to frameRotation,
     )
 
-    /// Throttle to the official cadence, then ship the NV21 frame.
+    /// Ship the NV21 frame — EVERY camera frame, no throttle: cfc hands
+    /// every preview frame to its decoder. The "busy → drop" behaviour
+    /// lives on the Dart side (CfcCameraCapture's newest-wins slot), the
+    /// equivalent of cfc's CameraWorker only ever taking the latest
+    /// mFrameChain entry.
     private fun pushFrame(data: ByteArray) {
-        val now = System.currentTimeMillis()
-        if (now - lastFrameAt < FRAME_INTERVAL_MS) return
-        lastFrameAt = now
         frameSink?.success(data)
     }
 

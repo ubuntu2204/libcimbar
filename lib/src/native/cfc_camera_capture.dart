@@ -21,6 +21,14 @@ import 'yuv420_to_i420.dart';
 /// with only the top/bottom band trimmed to the 4:3 decode shape. Pixels
 /// are never resampled.
 ///
+/// Backpressure is cfc's, verbatim in spirit: the Kotlin side forwards
+/// EVERY camera frame (no throttle), and while the decoder is chewing on
+/// one frame the newest arrival simply OVERWRITES the pending slot —
+/// older frames are dropped, never queued, and the decode rate settles at
+/// whatever the decoder sustains. That is exactly cfc's CameraWorker +
+/// double-buffered mFrameChain: the worker always takes the latest
+/// completed frame and anything faster than it is lost.
+///
 /// The preview is the camera's own SurfaceTexture exposed as a Flutter
 /// texture: `textureId` for the Texture widget, `rotation` for the
 /// RotatedBox that orients it (cfc rotates via OpenCV's frameRotation).
@@ -29,8 +37,10 @@ class CfcCameraCapture implements ICameraCapture {
   static const EventChannel _frames =
       EventChannel('libcimbar/cfc_camera/frames');
 
-  /// Frame cadence, the official 15 fps.
-  static const int frameIntervalMs = 66;
+  /// Kept for the [ICameraCapture.start] signature only — cfc has no
+  /// cadence knob and neither do we: every frame is forwarded, and the
+  /// decoder's throughput is the only pacing (busy → drop newest-wins).
+  static const int frameIntervalMs = 0;
 
   /// Aspect (long side / short side) trimmed to — the official 4:3 shape.
   static const double decodeAspect = 4 / 3;
@@ -48,7 +58,14 @@ class CfcCameraCapture implements ICameraCapture {
   bool _streaming = false;
   StreamSubscription? _frameSub;
   CameraFrameCallback? _onFrame;
-  DateTime _lastFrame = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// The newest undecoded frame — cfc's double-buffered `mFrameChain`
+  /// slot. While a decode is running, the camera keeps overwriting this
+  /// and older frames are DROPPED (never queued): the newest always wins.
+  Uint8List? _pendingNv21;
+
+  /// Guards the one-decode-at-a-time pump.
+  bool _pumpScheduled = false;
 
   @override
   bool get isSupported => Platform.isAndroid;
@@ -71,6 +88,8 @@ class CfcCameraCapture implements ICameraCapture {
     int preferredHeight = 1080,
     int frameIntervalMs = frameIntervalMs,
   }) async {
+    // frameIntervalMs is deliberately ignored — cfc decodes every frame
+    // it can and drops the rest (see the class doc).
     if (_streaming) return;
     final res =
         await _channel.invokeMethod<Map<Object?, Object?>>('open');
@@ -94,13 +113,27 @@ class CfcCameraCapture implements ICameraCapture {
 
   void _onNativeFrame(dynamic raw) {
     if (raw is! Uint8List || frameWidth <= 0 || frameHeight <= 0) return;
-    // Throttle to the official cadence.
-    final now = DateTime.now();
-    if (now.difference(_lastFrame).inMilliseconds < frameIntervalMs) return;
-    _lastFrame = now;
+    // Newest-wins: store the frame and schedule one decode if none is
+    // queued/running. Frames arriving while a decode blocks this isolate
+    // just overwrite the slot — cfc's CameraWorker takes the latest
+    // mFrameChain entry and the older one is lost, never queued.
+    _pendingNv21 = raw;
+    if (_pumpScheduled) return;
+    _pumpScheduled = true;
+    scheduleMicrotask(_pumpLatest);
+  }
 
+  /// The CameraWorker loop, Dart edition: take the newest frame, convert
+  /// to I420, hand it to the decoder. The decode (synchronous FFI) blocks
+  /// the isolate for its full duration; frames arriving in that window
+  /// only overwrite [_pendingNv21], so the effective decode rate is
+  /// whatever the decoder sustains — everything faster is dropped.
+  void _pumpLatest() {
+    _pumpScheduled = false;
+    final raw = _pendingNv21;
     final cb = _onFrame;
-    if (cb == null) return;
+    if (raw == null || cb == null) return;
+    _pendingNv21 = null;
 
     // NV21 = Y plane (w*h) + interleaved VU chroma (w*h/2). Wrap as the
     // three planes yuv420ToI420 expects: U is the VU data offset by one
@@ -131,7 +164,7 @@ class CfcCameraCapture implements ICameraCapture {
       width: converted.width,
       height: converted.height,
       format: 'yuv420',
-      timestampUs: now.microsecondsSinceEpoch,
+      timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
   }
 
