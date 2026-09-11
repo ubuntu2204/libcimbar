@@ -152,3 +152,11 @@ class CfcCameraCapture implements ICameraCapture {
   @override
   Future<void> dispose() => stop();
 }
+
+/// The single spelling `cimbar_platform.dart` instantiates.
+///
+/// That file is compiled once per target, so it can only name ONE type. The
+/// conditional import decides what this resolves to — this cfc-style capture
+/// (Camera1 + `bestCameraFrameSize`) on native, the getUserMedia one on web —
+/// and both sides export it under this alias so every target compiles.
+typedef PlatformCameraCapture = CfcCameraCapture;

@@ -3,7 +3,6 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
@@ -19,7 +18,8 @@ import 'package:libcimbar/src/native/wasm_diagnostics_stub.dart'
 /// than ~1080p — the Scanner searches the full frame for anchors and the
 /// Deskewer's homography normalises the barcode to its fixed size. Both
 /// the web capture (getUserMedia `ideal`) and the Android capture
-/// (ResolutionPreset mapping) treat this as a request, not a guarantee.
+/// (cfc picks its own preview size) treat this as a request, not a
+/// guarantee.
 const int kPreferredCameraWidth = 1920;
 const int kPreferredCameraHeight = 1080;
 
@@ -42,7 +42,8 @@ const int kCaptureFps = 15;
 /// Minimal, official-style flow: scan → decode → save.
 ///
 /// Supported platforms:
-/// - **Android**: Uses the device camera via camera plugin
+/// - **Android**: Uses the device camera via the cfc viewfinder port
+///   (Camera1 + SurfaceTexture preview — no camera plugin)
 /// - **Web (WASM)**: Uses getUserMedia for camera access
 ///
 /// The decoder processes each camera frame, feeding it into the
@@ -793,19 +794,6 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     return null;
   }
 
-  /// The `camera` plugin controller behind the capture (Android/iOS only).
-  ///
-  /// Returns null on web, where the preview is an HtmlElementView instead.
-  CameraController? get _cameraController {
-    try {
-      final cam = _camera;
-      if (cam != null) {
-        return (cam as dynamic).controller as CameraController?;
-      }
-    } catch (_) {}
-    return null;
-  }
-
   /// The Flutter texture id of the CfcCameraCapture preview (Android),
   /// or null when another capture backend is active.
   int? get _cfcTextureId {
@@ -871,34 +859,6 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
               ),
             ),
           ),
-          _buildScanningOverlay(),
-        ],
-      );
-      if (fullBleed) return stack;
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: stack,
-      );
-    }
-
-    // Android/iOS: the `camera` plugin preview. Without this the user is
-    // scanning blind — the stream runs and frames decode, but nothing on
-    // screen shows where the camera is pointing.
-    final ctrl = _cameraController;
-    if (_isCameraActive && ctrl != null && ctrl.value.isInitialized) {
-      final stack = Stack(
-        fit: StackFit.expand,
-        children: [
-          // Black behind the preview (letterboxing when the camera aspect
-          // ratio does not match the screen).
-          const ColoredBox(color: Colors.black),
-          // CameraPreview keeps the camera's aspect ratio itself, but ONLY
-          // when it is not given tight constraints: AspectRatio falls back to
-          // the constraints' biggest size when they are tight, and
-          // StackFit.expand hands tight constraints to every child — which is
-          // why the picture came out vertically stretched. Align() loosens
-          // the constraints again so the texture keeps its real shape.
-          Align(alignment: Alignment.center, child: CameraPreview(ctrl)),
           _buildScanningOverlay(),
         ],
       );

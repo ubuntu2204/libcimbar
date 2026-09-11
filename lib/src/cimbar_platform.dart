@@ -15,7 +15,7 @@ import 'interfaces/image_compressor_interface.dart';
 import 'impl/avif_compressor.dart';
 import 'impl/windows_screen_capture.dart'
     if (dart.library.js_interop) 'web/screen_capture_stub.dart';
-import 'native/android_camera_capture.dart'
+import 'native/cfc_camera_capture.dart'
     if (dart.library.js_interop) 'web/web_camera_capture.dart';
 
 // Conditional imports — resolved at compile time:
@@ -43,7 +43,7 @@ import 'ffi/cimbar_decoder_ffi.dart'
 /// |----------------|---------------|---------|----------------|
 /// | Encoder        | FFI           | --      | --             |
 /// | Decoder        | FFI           | FFI     | WASM           |
-/// | Camera Capture | --            | plugin  | getUserMedia   |
+/// | Camera Capture | --            | cfc     | getUserMedia   |
 ///
 /// `createScreenCapture()` and `createImageCompressor()` still exist, but the
 /// example apps no longer use them (no Alt+A screenshot / AVIF workflow).
@@ -120,7 +120,7 @@ class CimbarPlatform {
   /// Create a camera capture implementation (Web and Android only).
   Future<ICameraCapture> createCameraCapture() async {
     // PlatformCameraCapture is a typedef that the conditional import resolves
-    // per target — web: getUserMedia, native: the `camera` plugin.
+    // per target — web: getUserMedia, native: the cfc-style capture.
     if (kIsWeb) {
       return PlatformCameraCapture();
     }
@@ -147,6 +147,6 @@ class CimbarPlatform {
 // Camera capture stubs (Web + Android)
 // =================================================================
 
-// (The former `_AndroidCameraCapture` stub is gone — Android/iOS now use
-// [AndroidCameraCapture], which is a real implementation on top of the
-// `camera` plugin.)
+// (The former `_AndroidCameraCapture` stub is long gone — Android now uses
+// [CfcCameraCapture], a complete port of the official cfc viewfinder
+// (Camera1 + bestCameraFrameSize) with no `camera` plugin involved.)
