@@ -172,6 +172,18 @@ class WebCameraCapture implements ICameraCapture {
   int get videoWidth => _videoWidth;
   int get videoHeight => _videoHeight;
 
+  /// Aspect (long side / short side, >= 1) of the frame handed to the
+  /// decoder. The web pipeline scans the FULL frame (no trimming), so this
+  /// is the camera's own aspect — the counterpart of
+  /// `AndroidCameraCapture.decodedAspect`.
+  double get decodedAspect {
+    if (_videoWidth > 0 && _videoHeight > 0) {
+      final a = _videoWidth / _videoHeight;
+      return a >= 1 ? a : 1 / a;
+    }
+    return 4 / 3; // cfc's window shape before the real size is known
+  }
+
   /// Dimensions of the frame handed to the decoder. Native resolution on
   /// the VideoFrame path; the (possibly downscaled) canvas size on the
   /// fallback path. 0 until the first frame is delivered.

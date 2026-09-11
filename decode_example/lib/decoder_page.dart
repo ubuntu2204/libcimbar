@@ -103,23 +103,13 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
   /// wide as the sensor allows instead of being cropped twice (once by the
   /// capture, once by a hard-coded window shape).
   double get _captureAspect {
-    final ctrl = _cameraController;
-    if (ctrl != null) {
-      final size = ctrl.value.previewSize;
-      if (size != null && size.width > 0 && size.height > 0) {
-        final a = size.width / size.height;
-        return a >= 1 ? a : 1 / a;
-      }
-    }
+    // What the DECODER receives (after the 4:3 trim on Android), not the
+    // raw capture size — the window must show exactly the scanned area.
     try {
       final cam = _camera;
       if (cam != null) {
-        final w = (cam as dynamic).videoWidth as int? ?? 0;
-        final h = (cam as dynamic).videoHeight as int? ?? 0;
-        if (w > 0 && h > 0) {
-          final a = w / h;
-          return a >= 1 ? a : 1 / a;
-        }
+        final a = (cam as dynamic).decodedAspect as double?;
+        if (a != null && a > 0) return a;
       }
     } catch (_) {}
     return 4 / 3; // cfc's window shape, before the real size is known

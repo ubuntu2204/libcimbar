@@ -174,9 +174,37 @@ void main() {
           frame.width * frame.height + (frame.width ~/ 2) * (frame.height ~/ 2) * 2);
     });
 
-    test('aspect crop is a no-op when the frame is already narrower', () {
+    test('aspect crop trims left/right when the frame is too wide', () {
+      // cfc's shape: a 16:9 capture (1920x1080) trimmed to the official
+      // 4:3 frame -> 1440x1080, FULL HEIGHT kept, margins on the sides.
+      const w = 192;
+      const h = 108;
+      final y = Uint8List(w * h);
+      for (var i = 0; i < y.length; i++) {
+        y[i] = i % 251;
+      }
+      final u = Uint8List((w ~/ 2) * (h ~/ 2));
+      final v = Uint8List((w ~/ 2) * (h ~/ 2));
+
+      final frame = yuv420ToI420(w, h, [
+        YuvPlane(bytes: y, rowStride: 192, pixelStride: 1),
+        YuvPlane(bytes: u, rowStride: 96, pixelStride: 1),
+        YuvPlane(bytes: v, rowStride: 96, pixelStride: 1),
+      ], cropAspect: 4 / 3);
+
+      expect(frame, isNotNull);
+      // Full height preserved (that is the point — cfc's window is full
+      // height with side margins).
+      expect(frame!.height, 108);
+      // Width trimmed to height * 4/3 = 144.
+      expect(frame.width, 144);
+      expect(frame.bytes.length,
+          144 * 108 + (144 ~/ 2) * (108 ~/ 2) * 2);
+    });
+
+    test('aspect crop is a no-op when the frame already matches', () {
       const w = 16;
-      const h = 8; // 2:1 — already wider than 16:9
+      const h = 9; // exactly 16:9
       final y = Uint8List(w * h);
       final u = Uint8List((w ~/ 2) * (h ~/ 2));
       final v = Uint8List((w ~/ 2) * (h ~/ 2));
@@ -188,7 +216,7 @@ void main() {
       ], cropAspect: 16 / 9);
 
       expect(frame!.width, 16);
-      expect(frame.height, 8); // nothing trimmed
+      expect(frame.height, 9); // nothing trimmed
     });
 
     test('no crop keeps the full frame', () {

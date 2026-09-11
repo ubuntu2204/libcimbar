@@ -77,11 +77,23 @@ I420Frame? yuv420ToI420(
     cropX = ((width - side) ~/ 2) & ~1;
     cropY = ((height - side) ~/ 2) & ~1;
   } else if (cropAspect > 0) {
-    // Trim top/bottom only: keep the full width, centre the band.
-    final wanted = (width / cropAspect).round() & ~1;
-    if (wanted > 0 && wanted < height) {
-      cropH = wanted;
-      cropY = ((height - wanted) ~/ 2) & ~1;
+    // Trim to the target aspect, centred, on whichever side carries the
+    // surplus:
+    //   taller than target (portrait capture) -> trim TOP/BOTTOM
+    //   wider  than target (16:9 capture, 4:3 target) -> trim LEFT/RIGHT
+    // cfc's OpenCV letterbox does the same thing visually, and ending up
+    // with its 4:3 1440x1080 frame is the point: full height, margins on
+    // the sides, no resampling anywhere.
+    var wantedH = (width / cropAspect).round();
+    if (wantedH > 0 && wantedH < height) {
+      cropH = wantedH & ~1;
+      cropY = ((height - cropH) ~/ 2) & ~1;
+    } else {
+      final wantedW = (height * cropAspect).round() & ~1;
+      if (wantedW > 0 && wantedW < width) {
+        cropW = wantedW;
+        cropX = ((width - cropW) ~/ 2) & ~1;
+      }
     }
   }
 

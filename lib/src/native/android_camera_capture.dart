@@ -144,28 +144,27 @@ class AndroidCameraCapture implements ICameraCapture {
 
   // ─── Internals ─────────────────────────────────────────────────
 
-  /// The decoded frame keeps its NATIVE sensor pixels: no downscaling
-  /// (interpolation measurably destroys the corner anchors), and the
-  /// top/bottom rows that carry no barcode are trimmed instead — see
-  /// [kCaptureAspect].
-  static const double kCaptureAspect = 16 / 9;
+  /// The frame handed to the decoder is trimmed to the OFFICIAL frame
+  /// shape — cfc's `bestCameraFrameSize` lands on a 4:3 frame with a
+  /// 960..1080 short side (1440x1080 on this device), i.e. full height
+  /// with margins on the sides.
+  ///
+  /// Pixels are never resampled: interpolation measurably destroys the
+  /// corner anchors, so the surplus is cut away instead of scaled.
+  static const double kCaptureAspect = 4 / 3;
+
+  /// The decoded frame, for the viewfinder window (which must show exactly
+  /// what the decoder receives).
+  double get decodedAspect => kCaptureAspect;
 
   /// Map a requested capture size onto the nearest plugin preset.
   ///
-  /// MAXIMUM resolution is requested deliberately: the barcode's pixel
-  /// budget is what drives the decode rate (a 512px barcode decodes, a
-  /// 400px one does not), so more native pixels per frame beats a small
-  /// frame at a higher frame rate. The surplus top/bottom rows are trimmed
-  /// by [kCaptureAspect] rather than downscaled, which keeps the full
-  /// horizontal field of view AND full sensor sharpness.
-  ///
-  /// NOTE: `camera_android_camerax` only sets a 4:3 aspect strategy for
-  /// `ResolutionPreset.low`; every other preset is pinned to 16:9, which
-  /// crops the sensor vertically. `max` lets CameraX pick the highest
-  /// available resolution (on most phones the full 4:3 sensor), so the
-  /// vertical field of view follows the device instead of the plugin.
+  /// veryHigh = 1920x1080, the preset whose short side (1080) matches the
+  /// official decoder's 960..1080 window. The capture itself is 16:9 (the
+  /// plugin pins every preset but `low` to 16:9), so [kCaptureAspect]
+  /// trims it back to the official 4:3 shape afterwards.
   ResolutionPreset _presetFor(int width, int height) =>
-      ResolutionPreset.max;
+      ResolutionPreset.veryHigh;
 
   void _onCameraImage(CameraImage image) {
     final callback = _onFrame;
