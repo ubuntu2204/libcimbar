@@ -970,73 +970,117 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     );
   }
 
-  /// Scanning overlay with cfc's EXACT window geometry (measured against
-  /// a real cfc screenshot): a 4:3 window filling the view's short side,
-  /// centered, with OPAQUE black letterbox bars on the remaining sides;
-  /// guidance brackets at the WINDOW corners in cfc's drawGuidance
-  /// proportions (black outline under the white/yellow/green state
-  /// color); hint text at the window's bottom edge.
+  /// (image_size_x + 16) / (image_size_y + 16) — recv.js
+  /// _getModeAspectRatio. The viewfinder window takes this SHAPE (B is a
+  /// square; Bm/Bu are wider), unlike the full-frame decode input.
+  double get _modeAspect {
+    final m = _config.autoDetect ? (_detectedMode ?? 0) : _config.mode.value;
+    return switch (m) {
+      67 => 1.413, // Bm
+      66 => 1.1516, // Bu
+      _ => 1.0, // B, 4C, auto-rotating
+    };
+  }
+
+  /// Aspect (w/h) of the DISPLAYED video rect — the viewfinder window is
+  /// positioned inside it. Web: the <video> element's real dimensions
+  /// (object-fit:contain within the view). Android: the same formula the
+  /// cfc preview branch uses for its AspectRatio box.
+  double get _displayAspect {
+    if (kIsWeb) {
+      try {
+        final cam = _camera as dynamic;
+        final w = cam.videoWidth as int?;
+        final h = cam.videoHeight as int?;
+        if (w != null && h != null && w > 0 && h > 0) return w / h;
+      } catch (_) {}
+    }
+    final portrait =
+        MediaQuery.of(context).size.height >= MediaQuery.of(context).size.width;
+    return portrait ? 1 / _captureAspect : _captureAspect;
+  }
+
+  /// Viewfinder overlay — the official receivers' geometry, on both
+  /// platforms:
   ///
-  /// The Scanner still searches the FULL camera frame — the bars are
-  /// presentation only, exactly like cfc (whose OpenCV mScale letterbox
-  /// affects drawing, never the decode input). A barcode just outside
-  /// the window still decodes.
+  /// - The WINDOW is the largest modeAspect rect inscribed in the
+  ///   DISPLAYED video rect: recv.js _updateCrosshairPositions (crosshair
+  ///   offsets = video rect vs modeAspect) and — the same rule — cfc's
+  ///   drawGuidance, whose xextra/yextra push the brackets to the central
+  ///   short-side square of the frame Mat. One closed-form expression
+  ///   reproduces both: winW = min(vidW, vidH * modeAspect).
+  /// - The picture OUTSIDE the window stays fully visible — neither
+  ///   official app masks the camera content (the black bars around the
+  ///   video are just screen letterbox). The Scanner still searches the
+  ///   FULL frame; the window marks where the barcode fits, nothing more.
+  /// - The MARKERS differ per official app: web = two crosshair L-corners
+  ///   (top-right + bottom-left; recv.html), native = cfc's four guidance
+  ///   brackets + hint text (jni.cpp drawGuidance).
   Widget _buildScanningOverlay() {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = constraints.biggest;
-        // The window tracks the CAMERA's frame aspect (whatever the device
-        // actually delivers after the top/bottom trim), filling the view's
-        // short side and centred — cfc's mScale rule, generalised. Showing
-        // the whole captured frame is what makes the field of view as
-        // large as the sensor allows; a fixed 4:3 window over a wider
-        // capture would silently hide the left/right margins.
-        final camAspect = _captureAspect; // >= 1, long side / short side
-        final s = size.shortestSide;
-        final portrait = size.height >= size.width;
-        final frameW = portrait ? s : s * camAspect;
-        final frameH = portrait ? s * camAspect : s;
-        final mScale = math.min(size.width / frameW, size.height / frameH);
-        final drawW = frameW * mScale;
-        final drawH = frameH * mScale;
+
+        // The displayed video rect (contain within the view).
+        final dispAspect = _displayAspect; // w/h, may be < 1 (portrait web)
+        final viewAspect = size.width / size.height;
+        double vidW = size.width, vidH = size.height;
+        if (dispAspect > viewAspect) {
+          vidH = vidW / dispAspect; // bars top/bottom
+        } else {
+          vidW = vidH * dispAspect; // bars left/right
+        }
+        final vidLeft = (size.width - vidW) / 2;
+        final vidTop = (size.height - vidH) / 2;
+
+        // Largest modeAspect rect inscribed in the video rect, centred
+        // (recv.js crosshair rule / cfc's central square).
+        final ma = _modeAspect;
+        final winW = math.min(vidW, vidH * ma);
+        final winH = winW / ma;
         final window = Rect.fromLTWH(
-          (size.width - drawW) / 2,
-          (size.height - drawH) / 2,
-          drawW,
-          drawH,
+          vidLeft + (vidW - winW) / 2,
+          vidTop + (vidH - winH) / 2,
+          winW,
+          winH,
         );
 
         return Stack(
           children: [
-            // Opaque black outside the window — cfc's bars are pure black
-            // (nothing is drawn there at all), which is what makes the
-            // window read as crisp and full-size.
-            CustomPaint(
-              size: size,
-              painter: _DarkOverlayPainter(frameRect: window),
-            ),
-            // Guidance brackets at the WINDOW corners, cfc drawGuidance
-            // proportions, black outline under the status color.
-            CustomPaint(
-              size: size,
-              painter: _CornerBracketsPainter(
-                frameRect: window,
-                color: _guideColor,
+            if (kIsWeb)
+              // recv.html crosshairs: two L-corners on the window's
+              // top-right / bottom-left diagonal, white/yellow/green.
+              CustomPaint(
+                size: size,
+                painter: _CrosshairPainter(
+                  frameRect: window,
+                  color: _guideColor,
+                ),
+              )
+            else ...[
+              // cfc drawGuidance: four brackets at the window corners,
+              // black outline under the status color.
+              CustomPaint(
+                size: size,
+                painter: _CornerBracketsPainter(
+                  frameRect: window,
+                  color: _guideColor,
+                ),
               ),
-            ),
-            // Hint at the bottom edge of the window, colored by state.
-            Positioned(
-              left: window.left,
-              width: window.width,
-              bottom: size.height - window.bottom + 14,
-              child: Text(
-                '对准 cimbar 条码（四个角都可见）',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: _guideColor.withValues(alpha: 0.9),
-                    ),
+              // Hint at the bottom edge of the window, colored by state.
+              Positioned(
+                left: window.left,
+                width: window.width,
+                bottom: size.height - window.bottom + 14,
+                child: Text(
+                  '对准 cimbar 条码（四个角都可见）',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: _guideColor.withValues(alpha: 0.9),
+                      ),
+                ),
               ),
-            ),
+            ],
           ],
         );
       },
@@ -1096,32 +1140,69 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
 
 // ─── Scanning frame painters ────────────────────────────────────
 
-/// Opaque black outside the 4:3 window, square corners — a pixel-for-
-/// pixel match of cfc's OpenCV letterbox bars (pure black, sharp edges).
-/// The dimmed regions still go to the Scanner; only the eye is guided.
-class _DarkOverlayPainter extends CustomPainter {
+/// The official WEB receiver's viewfinder markers (recv.html crosshair1/
+/// crosshair2): two small L-corners at the window's TOP-RIGHT and
+/// BOTTOM-LEFT diagonals — deliberately NOT a full border. Each leg is
+/// 5% of the window's short side, a 5px status-color line
+/// (`border: 5px groove`) with a 4px #555 edge under it
+/// (`box-shadow: inset 0 0 0 4px #555`). The color follows the same
+/// white/yellow/green state machine as cfc's brackets
+/// (.crosshairs / .scanning_xhairs / .active_xhairs).
+class _CrosshairPainter extends CustomPainter {
   final Rect frameRect;
+  final Color color;
 
-  _DarkOverlayPainter({required this.frameRect});
+  _CrosshairPainter({required this.frameRect, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black;
-    final path = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..addRect(frameRect)
-      ..fillType = PathFillType.evenOdd;
-    canvas.drawPath(path, paint);
+    final len = math.min(frameRect.width, frameRect.height) * 0.05;
+    const stroke = 5.0;
+    const shadow = 4.0;
+    final shadowPaint = Paint()
+      ..color = const Color(0xFF555555)
+      ..strokeWidth = stroke + shadow * 2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.butt;
+    final colorPaint = Paint()
+      ..color = color
+      ..strokeWidth = stroke
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.butt;
+
+    // Lines are centred on their path; inset by half a stroke so the
+    // OUTER edge of the color line sits exactly on the window edge (the
+    // crosshair divs in recv.html are positioned the same way).
+    final l = frameRect.left + stroke / 2;
+    final t = frameRect.top + stroke / 2;
+    final r = frameRect.right - stroke / 2;
+    final b = frameRect.bottom - stroke / 2;
+
+    // crosshair1: top-right corner (border-top + border-right).
+    final trPath = Path()
+      ..moveTo(r - len, t)
+      ..lineTo(r, t)
+      ..lineTo(r, t + len);
+    // crosshair2: bottom-left corner (border-left + border-bottom).
+    final blPath = Path()
+      ..moveTo(l, b - len)
+      ..lineTo(l, b)
+      ..lineTo(l + len, b);
+
+    canvas.drawPath(trPath, shadowPaint);
+    canvas.drawPath(blPath, shadowPaint);
+    canvas.drawPath(trPath, colorPaint);
+    canvas.drawPath(blPath, colorPaint);
   }
 
   @override
-  bool shouldRepaint(_DarkOverlayPainter old) =>
-      old.frameRect != frameRect;
+  bool shouldRepaint(_CrosshairPainter old) =>
+      old.frameRect != frameRect || old.color != color;
 }
 
-/// Guidance brackets at the four corners of the 4:3 window, in cfc's
-/// drawGuidance proportions (jni.cpp): with `minsz` the window's short
-/// side,
+/// Guidance brackets at the four corners of the viewfinder window, in
+/// cfc's drawGuidance proportions (jni.cpp): with `minsz` the window's
+/// short side,
 ///   stroke   = minsz >> 7      (~8px at 1080)
 ///   outline  = stroke + minsz >> 8
 ///   length   = stroke << 3     (~68px)
