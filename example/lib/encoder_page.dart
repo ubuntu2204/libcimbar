@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -7,10 +8,22 @@ import 'package:window_manager/window_manager.dart';
 
 import 'core/window_display.dart';
 
-/// Encoder page (Windows / Linux) — minimal, official-style flow:
+/// Encoder page (Windows / Linux) — a port of the official encoder UI
+/// (`third_party/libcimbar/web/index.html` + `send.js`), minus the web-only
+/// bits:
 ///
-///   pick a file → encode to cimbar frames → display them full-size,
-///   looping at the configured fps with the upstream display nudge.
+///   * one-step flow: picking a file starts encoding immediately and the
+///     barcode starts playing (official `importFile` → `Report.setActive`);
+///   * the barcode plays from an *infinite* fountain stream, one frame
+///     produced per tick ([ICimbarEncoder.nextFrame]), exactly like
+///     upstream `send.js nextFrame()`;
+///   * Mode buttons B / Bm / Bu / 4C (official nav `modesel` row) — a mode
+///     switch reconfigures the encoder and clears the current stream, the
+///     way `cimbare_configure` throws out an incompatible stream;
+///   * Framerate slider 5–20 step 5, default 15 (official range input);
+///   * press-and-hold on the barcode pauses playback for 15 frames — the
+///     official `Send.togglePause` autofocus cooldown, fired on
+///     touchstart/touchend upstream.
 ///
 /// All real logic (encoding, frame playback, shake) lives in the
 /// `libcimbar` package; this page only wires it to buttons and status text.
@@ -31,24 +44,37 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
   // Windows starts windowed (still topmost); Linux starts in cover mode
   // (fullscreen layer) — see main.dart — so the toggle state must match.
   bool _coveringTaskbar = !kIsWeb && Platform.isLinux;
+
+  // Official `Report.setActive` state: a fountain stream is ready and the
+  // barcode is on screen.
+  bool _hasStream = false;
+  // The player runs unless paused (official `Send.isPaused`).
+  bool _playerPlaying = false;
+
   String _statusMessage = '初始化中…';
 
-  CimbarConfig _config = const CimbarConfig(
-    mode: CimbarMode.modeB,
-    compressionLevel: 16,
-    fps: 15,
-  );
+  // Official defaults: mode B (68), compression = Config default (16),
+  // fps = 15 — see send.cpp options and send.js _interval = 66.
+  CimbarConfig _config = const CimbarConfig();
 
-  /// Range of supported display rates.
-  static const int _minFps = 1;
-  static const int _maxFps = 60;
+  /// Official framerate range: `index.html` uses min=5 max=20 step=5.
+  static const int _minFps = 5;
+  static const int _maxFps = 20;
+  static const int _fpsStep = 5;
 
-  // Encode input / output
+  // Encode input
   CimbarInputFile? _inputFile;
-  List<CimbarFrame> _frames = [];
 
-  // Frame counter (displayed under the player)
+  // Displayed frame counter ("第 N 帧").
   int _currentFrameIndex = 0;
+
+  // Bumped on every new encode so the player restarts its shake/loop state.
+  int _streamKey = 0;
+
+  // Official pause cooldown: togglePause(true) stalls rendering for 15
+  // frames so the camera can refocus, then playback resumes by itself.
+  Timer? _pauseCooldown;
+  static const int _pauseCooldownFrames = 15;
 
   @override
   void initState() {
@@ -72,8 +98,13 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
   /// Toggle between covering the taskbar (topmost, full-screen size) and a
   /// normal centered windowed size. Both stay topmost (above the taskbar);
   /// neither uses fullscreen mode.
+  ///
+  /// This is this app's analogue of the official `Main.toggleFullscreen`
+  /// (which also fires `togglePause(true)` — we do the same via
+  /// [_pauseForRefocus]).
   Future<void> _toggleCoverTaskbar() async {
     try {
+      _pauseForRefocus();
       if (_coveringTaskbar) {
         await restoreWindowed();
       } else {
@@ -99,7 +130,7 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
       setState(() {
         _isReady = _encoder!.isReady;
         _statusMessage = _isReady
-            ? '就绪。选择一个文件开始编码。'
+            ? '就绪。选择一个文件开始传输。'
             : '未加载原生库。请先构建 libcimbar（.dll / .so）。';
       });
     } catch (e) {
@@ -107,46 +138,57 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
     }
   }
 
-  // --- Pick file → encode → display ---
+  // ─── Official send.js flow: importFile → encode_init → encode_bytes ──
 
-  Future<void> _pickFile() async {
+  /// Official one-step flow (`send.js importFile`): pick a file, init the
+  /// encode session, feed the file in slices, flush — then start playing
+  /// (`Report.setActive`). There is no separate "encode" button upstream.
+  Future<void> _pickAndEncode() async {
+    if (_encoder == null || _isReady == false || _isEncoding) return;
+
+    final CimbarInputFile input;
     try {
-      final input = await pickCimbarInputFile();
-      if (input == null) return; // user cancelled
-      setState(() {
-        _inputFile = input;
-        _statusMessage =
-            '已选择：${input.filename}（${input.bytes.length} 字节）。点击「编码并显示」。';
-      });
+      final picked = await pickCimbarInputFile();
+      if (picked == null) return; // user cancelled
+      input = picked;
     } catch (e) {
       setState(() => _statusMessage = '选择文件出错：$e');
+      return;
     }
-  }
 
-  Future<void> _startEncoding() async {
-    if (_inputFile == null || _encoder == null || _isEncoding) return;
-    _isEncoding = true; // synchronous guard against double-click
-
-    setState(() => _statusMessage = '正在将数据编码为 cimbar 帧…');
+    setState(() {
+      _inputFile = input;
+      _hasStream = false;
+      _playerPlaying = false;
+      _currentFrameIndex = 0;
+      _isEncoding = true;
+      _statusMessage = '正在将 ${input.filename}（${_formatBytes(input.length)}）编码为 cimbar 帧…';
+    });
 
     try {
-      final frames = await _encoder!.encodeData(
-        _inputFile!.bytes,
-        filename: _inputFile!.filename,
-      );
+      // Official `Send.encode_init(filename)` — embeds the name in the
+      // stream header and auto-increments the encode id (-1).
+      await _encoder!.initEncodeSession(input.filename);
 
-      if (frames.isEmpty) {
-        setState(() {
-          _statusMessage = '编码未生成任何帧。';
-          _isEncoding = false;
-        });
-        return;
+      // Official `Send.importFile`: read the file in slices and feed each
+      // one (`Send.encode_bytes`).
+      await for (final chunk in input.readChunks()) {
+        final status = await _encoder!.encodeChunk(chunk);
+        if (status < 0) {
+          throw StateError('cimbare_encode failed with code $status');
+        }
       }
 
+      // Official fallback flush: `cimbare_encode(nullptr, 0)`.
+      await _encoder!.finishEncode();
+
+      // Official `Report.setActive()`: the stream is live — start rendering.
       setState(() {
-        _frames = frames;
+        _streamKey++;
+        _hasStream = true;
+        _playerPlaying = true;
         _currentFrameIndex = 0;
-        _statusMessage = '已生成 ${frames.length} 帧 cimbar 条码，正在播放…';
+        _statusMessage = '正在播放：${input.filename}';
       });
 
       // Linux: force cover mode (WM fullscreen layer) when the barcode starts
@@ -157,21 +199,84 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
         if (mounted) setState(() => _coveringTaskbar = true);
       }
     } catch (e) {
-      setState(() => _statusMessage = '编码出错：$e');
+      setState(() {
+        _hasStream = false;
+        _playerPlaying = false;
+        _statusMessage = '编码出错：$e';
+      });
     }
 
     if (mounted) setState(() => _isEncoding = false);
   }
 
-  void _stopEncoding() {
-    setState(() {
-      _frames = [];
-      _currentFrameIndex = 0;
-      _statusMessage = '已停止。';
-    });
+  // ─── Official send.js pause cooldown ─────────────────────────────────
+
+  /// Official `Send.togglePause`: a 15-frame cooldown that freezes the
+  /// barcode so the camera can refocus, resuming by itself. Upstream fires
+  /// it on touchstart (pointer down here) and cancels it on touchend.
+  void _onBarcodePointerDown(bool down) {
+    if (!_hasStream) return;
+    if (down) {
+      _pauseForRefocus();
+    } else {
+      _resume();
+    }
   }
 
-  /// Chinese description of each barcode mode, shown in the mode menu.
+  void _pauseForRefocus() {
+    _pauseCooldown?.cancel();
+    if (_playerPlaying) setState(() => _playerPlaying = false);
+    _pauseCooldown = Timer(
+      Duration(milliseconds: _pauseCooldownFrames * (1000 ~/ _config.fps)),
+      _resume,
+    );
+  }
+
+  void _resume() {
+    _pauseCooldown?.cancel();
+    _pauseCooldown = null;
+    if (_hasStream && !_playerPlaying && mounted) {
+      setState(() => _playerPlaying = true);
+    }
+  }
+
+  // ─── Official main.js setMode ─────────────────────────────────────────
+
+  /// Official `Main.setMode` → `cimbare_configure(mode_val, -1)`: switching
+  /// mode keeps no compression override (-1 resets it to the Config
+  /// default) and throws out a stream whose chunk size no longer matches
+  /// (upstream clears the canvas). Picking a file again restarts the flow.
+  Future<void> _setMode(CimbarMode mode) async {
+    if (mode == _config.mode) return;
+    final newConfig = CimbarConfig(mode: mode);
+    try {
+      await _encoder?.configure(newConfig);
+      setState(() {
+        _config = newConfig;
+        _hasStream = false;
+        _playerPlaying = false;
+        _currentFrameIndex = 0;
+        _statusMessage = '模式已切换为 ${_modeLabel(mode)}，重新选择文件开始传输。';
+      });
+    } catch (e) {
+      setState(() => _statusMessage = '切换模式出错：$e');
+    }
+  }
+
+  /// Official `Main.setFPS` → `Send.setFPS`: `interval = floor(1000 / val)`.
+  /// The player re-arms its timer when the fps prop changes.
+  void _setFps(int fps) {
+    if (fps == _config.fps) return;
+    setState(() => _config = _config.copyWith(fps: fps));
+  }
+
+  // ─── UI helpers ────────────────────────────────────────────────────────
+
+  /// Official nav labels: B / Bm / Bu / 4C.
+  String _modeLabel(CimbarMode mode) =>
+      mode == CimbarMode.mode4C ? '4C' : mode.name.substring(4);
+
+  /// Chinese description of each barcode mode (mode menu tooltips).
   String _modeDescription(CimbarMode mode) => switch (mode) {
         CimbarMode.mode4C => '16x16 网格，兼容性最好',
         CimbarMode.modeB => '24x24 网格，彩色大容量（默认）',
@@ -179,7 +284,12 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
         CimbarMode.modeBu => '24x24 网格，B 模式变体',
       };
 
-  // --- UI ---
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes 字节';
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+
+  // ─── UI ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -187,28 +297,38 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
       color: Colors.black,
       child: Stack(
         children: [
-          // Right side: cimbar panel centered in the right area. The box is
-          // the 1024 barcode plus the shake gutter, so it is never stretched.
+          // Right side: the barcode canvas, centered, keeping its aspect
+          // ratio — the official `Main.scaleCanvas` behaviour.
           Positioned(
             left: 200,
             top: 0,
             right: 0,
             bottom: 0,
-            child: Container(
-              color: Colors.black,
-              child: Center(
-                child: _frames.isNotEmpty
-                    ? CimbarFramePlayer(
-                        key: ValueKey(_frames),
-                        frames: _frames,
-                        fps: _config.fps,
-                        onFrameChanged: (i) {
-                          if (mounted) {
-                            setState(() => _currentFrameIndex = i);
-                          }
-                        },
-                      )
-                    : _buildPlaceholder(),
+            child: Listener(
+              // Official touchstart/touchend pause cooldown.
+              onPointerDown: (e) => _onBarcodePointerDown(true),
+              onPointerUp: (e) => _onBarcodePointerDown(false),
+              onPointerCancel: (e) => _onBarcodePointerDown(false),
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: _hasStream
+                      ? FittedBox(
+                          fit: BoxFit.contain,
+                          child: CimbarFramePlayer(
+                            key: ValueKey(_streamKey),
+                            frameSupplier: () => _encoder!.nextFrame(),
+                            fps: _config.fps,
+                            playing: _playerPlaying,
+                            onFrameChanged: (i) {
+                              if (mounted) {
+                                setState(() => _currentFrameIndex = i);
+                              }
+                            },
+                          ),
+                        )
+                      : _buildPlaceholder(),
+                ),
               ),
             ),
           ),
@@ -267,44 +387,26 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          PopupMenuButton<CimbarMode>(
-                            tooltip: '选择条码模式',
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.settings, size: 18),
-                                const SizedBox(width: 6),
-                                Text('模式 ${_config.mode.name}'),
-                              ],
-                            ),
-                            onSelected: (mode) async {
-                              _config = _config.copyWith(mode: mode);
-                              await _encoder?.configure(_config);
-                            },
-                            itemBuilder: (_) => CimbarMode.values
-                                .map((m) => PopupMenuItem(
-                                      value: m,
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(m.name,
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.w600)),
-                                          Text(
-                                            _modeDescription(m),
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .onSurface
-                                                    .withValues(alpha: 0.7)),
-                                          ),
-                                        ],
-                                      ),
-                                    ))
-                                .toList(),
+                          // Official nav "current-file" line.
+                          Text(
+                            _inputFile?.filename ?? '未选择文件',
+                            style: Theme.of(context).textTheme.labelSmall,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                          const SizedBox(height: 8),
+                          FilledButton.icon(
+                            onPressed: _isReady && !_isEncoding
+                                ? _pickAndEncode
+                                : null,
+                            icon: const Icon(Icons.folder_open, size: 18),
+                            label: const Text('选择文件'),
+                          ),
+                          const SizedBox(height: 12),
+                          // Official modesel row: B / Bm / Bu / 4C flat buttons.
+                          _modeButtons(),
+                          const SizedBox(height: 12),
+                          // Official Framerate range: min 5 max 20 step 5.
+                          _fpsControl(),
                           const SizedBox(height: 12),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -331,50 +433,18 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
-                          FilledButton.icon(
-                            onPressed: _isReady && !_isEncoding
-                                ? _pickFile
-                                : null,
-                            icon: const Icon(Icons.folder_open, size: 18),
-                            label: const Text('选择文件'),
-                          ),
-                          const SizedBox(height: 8),
-                          FilledButton.icon(
-                            onPressed: _inputFile != null && !_isEncoding
-                                ? _startEncoding
-                                : null,
-                            icon: const Icon(Icons.qr_code, size: 18),
-                            label: const Text('编码并显示'),
-                          ),
-                          if (_frames.isNotEmpty) ...[
-                            const SizedBox(height: 8),
-                            OutlinedButton.icon(
-                              onPressed: _stopEncoding,
-                              icon: const Icon(Icons.stop, size: 18),
-                              label: const Text('停止'),
-                            ),
-                          ],
-                          const SizedBox(height: 20),
                           if (_inputFile != null) ...[
-                            _infoRow('文件名', _inputFile!.filename),
+                            const SizedBox(height: 16),
+                            _infoRow('大小', _formatBytes(_inputFile!.length)),
                             const SizedBox(height: 6),
-                            _infoRow('大小',
-                                '${(_inputFile!.bytes.length / 1024).toStringAsFixed(1)} KB'),
-                            const SizedBox(height: 6),
-                            _infoRow('模式', _config.mode.name),
-                            const SizedBox(height: 6),
-                            _fpsControl(),
-                            const SizedBox(height: 6),
-                            _infoRow('帧数', '${_frames.length}'),
+                            _infoRow('模式', _modeLabel(_config.mode)),
                           ],
-                          // Fixed gap instead of Spacer: inside a
-                          // SingleChildScrollView the height constraints are
-                          // unbounded, so a Spacer (flex child) is invalid.
                           const SizedBox(height: 20),
-                          if (_frames.isNotEmpty)
+                          if (_hasStream)
                             Text(
-                              '第 ${_currentFrameIndex + 1} / ${_frames.length} 帧',
+                              _playerPlaying
+                                  ? '第 ${_currentFrameIndex + 1} 帧'
+                                  : '已暂停（松开恢复）',
                               style: Theme.of(context).textTheme.bodySmall,
                               textAlign: TextAlign.center,
                             ),
@@ -391,23 +461,57 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
     );
   }
 
-  Widget _buildPlaceholder() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.upload_file_outlined,
-              size: 80, color: Theme.of(context).colorScheme.outline),
-          const SizedBox(height: 16),
-          Text(
-            '点击「选择文件」\n选择要传输的文件',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
-                ),
+  /// Official nav modesel row: four flat mode buttons.
+  Widget _modeButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        for (final mode in CimbarMode.values)
+          _ModeButton(
+            label: _modeLabel(mode),
+            description: _modeDescription(mode),
+            selected: mode == _config.mode,
+            onPressed: _isEncoding ? null : () => _setMode(mode),
           ),
-        ],
-      ),
+      ],
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    // Official drop-message copy: a "start" hint plus the photosensitivity
+    // warning that upstream shows before any barcode is on screen.
+    final outline = Theme.of(context).colorScheme.outline;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.upload_file_outlined, size: 80, color: outline),
+        const SizedBox(height: 16),
+        Text(
+          '⌜ 点击「选择文件」开始 ⌟',
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .bodyLarge
+              ?.copyWith(color: outline),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          '⚠️⚡ 光敏性警告！',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: outline,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '光敏性癫痫 + 闪烁光源 = 发作风险！\n注意安全！',
+          textAlign: TextAlign.center,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: outline),
+        ),
+      ],
     );
   }
 
@@ -431,49 +535,83 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
     );
   }
 
-  /// FPS control: shows current display rate, lets the user adjust it
-  /// via a slider. The player applies the new rate live.
+  /// Official Framerate control: `min=5 max=20 step=5 value=15`.
   Widget _fpsControl() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('显示帧率',
-                  style: Theme.of(context).textTheme.labelSmall),
-              Text(
-                '${_config.fps} /s',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ],
-          ),
-          Slider(
-            value: _config.fps.toDouble(),
-            min: _minFps.toDouble(),
-            max: _maxFps.toDouble(),
-            divisions: _maxFps - _minFps,
-            label: '${_config.fps} fps',
-            onChanged: (v) => setState(() {
-              _config = _config.copyWith(fps: v.round().clamp(_minFps, _maxFps));
-            }),
-          ),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('帧率', style: Theme.of(context).textTheme.labelSmall),
+            Text(
+              '${_config.fps} /s',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+          ],
+        ),
+        Slider(
+          value: _config.fps.toDouble(),
+          min: _minFps.toDouble(),
+          max: _maxFps.toDouble(),
+          divisions: (_maxFps - _minFps) ~/ _fpsStep,
+          label: '${_config.fps} fps',
+          onChanged: (v) => _setFps(v.round()),
+        ),
+      ],
     );
   }
 
   @override
   void dispose() {
+    _pauseCooldown?.cancel();
     if (!kIsWeb && (Platform.isWindows || Platform.isLinux)) {
       windowManager.removeListener(this);
     }
     _encoder?.dispose();
     super.dispose();
+  }
+}
+
+/// One flat mode button (official nav `modesel` links).
+class _ModeButton extends StatelessWidget {
+  final String label;
+  final String description;
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  const _ModeButton({
+    required this.label,
+    required this.description,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: description,
+      child: SizedBox(
+        width: 40,
+        height: 32,
+        child: FilledButton.tonal(
+          onPressed: onPressed,
+          style: FilledButton.styleFrom(
+            padding: EdgeInsets.zero,
+            backgroundColor: selected
+                ? scheme.primary.withValues(alpha: 0.25)
+                : scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            foregroundColor:
+                selected ? scheme.primary : scheme.onSurface.withValues(alpha: 0.7),
+            textStyle: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          child: Text(label),
+        ),
+      ),
+    );
   }
 }
 

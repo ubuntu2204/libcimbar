@@ -129,45 +129,38 @@ int cimbare_encode(const unsigned char* buffer, unsigned size)
     return 0;
 }
 
+// Mirrors upstream cimbar_js.cpp cimbare_next_frame() exactly (minus the
+// GLFW window bits): the fountain stream is infinite — after producing
+// blocks_required() * 8 symbol blocks the stream restarts, so playback can
+// loop forever just like cimbar_send / the web sender. Termination is the
+// caller's business (send.cpp and send.js both loop forever).
 int cimbare_next_frame(bool color_balance)
 {
     if (!_fes)
         return -1;
 
-    // Calculate how many frames we need: blocks_required * 2 for redundancy,
-    // minimum 8 frames for small files
-    unsigned blocksNeeded = _fes->blocks_required();
-    unsigned maxFrames = blocksNeeded * 2;
-    if (maxFrames < 8) maxFrames = 8;
-    if (maxFrames > 200) maxFrames = 200; // hard cap
-
-    // Stop after generating enough frames
-    if ((unsigned)_frameCount >= maxFrames) {
-        std::cerr << "[cimbar] next_frame: DONE, " << _frameCount
-                  << "/" << maxFrames << " frames (blocks=" << blocksNeeded << ")" << std::endl;
-        return 0;
-    }
-
-    if (_frameCount == 0) {
-        std::cerr << "[cimbar] next_frame: starting, blocks=" << blocksNeeded
-                  << ", maxFrames=" << maxFrames << std::endl;
+    // we generate 8x the amount of required symbol blocks.
+    // this number is somewhat arbitrary, but needs to not be
+    // *too* low (1-2), or we risk long runs of blocks the decoder
+    // has already seen. (upstream comment)
+    unsigned required = _fes->blocks_required() * 8;
+    if (_fes->block_count() > required)
+    {
+        _fes->restart();
+        // upstream resets the window shake here (shake(0)); the Flutter
+        // display layer owns the shake, so there is nothing to reset.
+        _frameCount = 0;
     }
 
     Encoder enc;
-    if (color_balance)
+    if (color_balance) // default is: disabled
         enc.set_color_mode(cimbar::Config::color_mode() + 0x100);
     enc.set_encode_id(_encodeId);
 
-    std::cerr << "[cimbar] next_frame: generating frame " << (_frameCount + 1) << "..." << std::endl;
     _next = enc.encode_next(*_fes, cimbar::vec_xy{});
-    if (!_next.has_value()) {
+    if (!_next.has_value())
         std::cerr << "[cimbar] next_frame: encode_next returned empty!" << std::endl;
-        return -1;
-    }
-    ++_frameCount;
-    std::cerr << "[cimbar] next_frame: frame " << _frameCount << " OK ("
-              << _next->cols << "x" << _next->rows << ")" << std::endl;
-    return _frameCount;
+    return ++_frameCount;
 }
 
 int cimbare_get_frame_buff(unsigned char** buff)

@@ -27,10 +27,16 @@
 /// ```dart
 /// import 'package:libcimbar/libcimbar.dart';
 ///
-/// // Desktop only — encode data into cimbar frames
+/// // Desktop only — encode a file and play it like the official sender
 /// final encoder = await CimbarPlatform.instance.createEncoder();
 /// await encoder.configure(CimbarConfig(mode: CimbarMode.modeB));
-/// final frames = await encoder.encodeData(fileBytes, filename: 'photo.png');
+/// final input = await pickCimbarInputFile();
+/// await encoder.initEncodeSession(input!.filename);
+/// await for (final chunk in input.readChunks()) {
+///   await encoder.encodeChunk(chunk);
+/// }
+/// await encoder.finishEncode();
+/// // → CimbarFramePlayer(frameSupplier: () => encoder.nextFrame(), fps: 15)
 ///
 /// // Web / Android / desktop — decode cimbar frames from camera
 /// final decoder = await CimbarPlatform.instance.createDecoder();

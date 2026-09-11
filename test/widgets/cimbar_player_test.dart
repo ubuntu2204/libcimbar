@@ -195,4 +195,84 @@ void main() {
       expect(find.byType(CustomPaint), findsWidgets);
     });
   });
+
+  group('CimbarFramePlayer frameSupplier (official sender mode)', () {
+    testWidgets('renders an empty box before the stream exists', (tester) async {
+      _useLargeTestSurface(tester);
+      Future<CimbarFrame?> supplier() async => null;
+      await tester.pumpWidget(MaterialApp(
+        home: Center(child: CimbarFramePlayer(frameSupplier: supplier)),
+      ));
+      await tester.pump();
+      expect(tester.getSize(find.byType(CimbarFramePlayer)),
+          const Size(CimbarShake.boxDim, CimbarShake.boxDim));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('pulls one frame per tick from the supplier', (tester) async {
+      _useLargeTestSurface(tester);
+      // An infinite fountain stream, like ICimbarEncoder.nextFrame.
+      var produced = 0;
+      Future<CimbarFrame?> supplier() async => _frame(produced++);
+      var lastReported = -1;
+      await tester.pumpWidget(MaterialApp(
+        home: Center(
+          child: CimbarFramePlayer(
+            frameSupplier: supplier,
+            fps: 15,
+            onFrameChanged: (i) => lastReported = i,
+          ),
+        ),
+      ));
+
+      // Tick 1: pulls frame 0.
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester
+          .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pump();
+      expect(lastReported, 0);
+
+      // Tick 2: pulls frame 1.
+      await tester.pump(const Duration(milliseconds: 80));
+      await tester
+          .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pump();
+      expect(lastReported, 1);
+    });
+
+    testWidgets('a null pull keeps the current frame (render() == 0)',
+        (tester) async {
+      _useLargeTestSurface(tester);
+      var next = 0;
+      Future<CimbarFrame?> supplier() async =>
+          next < 2 ? _frame(next++) : null; // stream dries up after 2 frames
+      var lastReported = -1;
+      await tester.pumpWidget(MaterialApp(
+        home: Center(
+          child: CimbarFramePlayer(
+            frameSupplier: supplier,
+            fps: 15,
+            onFrameChanged: (i) => lastReported = i,
+          ),
+        ),
+      ));
+
+      // Two ticks produce frames 0 and 1.
+      for (var i = 0; i < 2; i++) {
+        await tester.pump(const Duration(milliseconds: 80));
+        await tester.runAsync(() =>
+            Future<void>.delayed(const Duration(milliseconds: 200)));
+        await tester.pump();
+      }
+      expect(lastReported, 1);
+
+      // Further ticks produce nothing — the last frame stays on screen
+      // (official send.js: render() returning 0 keeps the current frame).
+      await tester.pump(const Duration(milliseconds: 500));
+      await tester
+          .runAsync(() => Future<void>.delayed(const Duration(milliseconds: 200)));
+      await tester.pump();
+      expect(lastReported, 1);
+    });
+  });
 }

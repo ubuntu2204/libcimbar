@@ -19,12 +19,16 @@ class FakeEncoder implements ICimbarEncoder {
   Future<void> configure(CimbarConfig config) async {}
 
   @override
-  Future<List<CimbarFrame>> encodeData(dynamic data,
-          {String filename = 'data.bin'}) async =>
-      [];
+  Future<void> initEncodeSession(String filename, {int encodeId = -1}) async {}
 
   @override
-  Future<List<CimbarFrame>> encodeFile(String filePath) async => [];
+  Future<int> encodeChunk(Uint8List chunk) async => 0;
+
+  @override
+  Future<void> finishEncode() async {}
+
+  @override
+  Future<CimbarFrame?> nextFrame({bool colorBalance = false}) async => null;
 
   @override
   Future<void> dispose() async {}

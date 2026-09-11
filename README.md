@@ -79,16 +79,22 @@ import 'package:libcimbar/libcimbar.dart';
 final encoder = await CimbarPlatform.instance.createEncoder();
 await encoder.configure(const CimbarConfig(mode: CimbarMode.modeB));
 
-// Encode any binary data into cimbar barcode frames
-final frames = await encoder.encodeData(
-  fileBytes,
-  filename: 'photo.png',
-);
+// One encode session per file; the filename goes into the stream header.
+await encoder.initEncodeSession('photo.png');
 
-// Display frames as an animation for the receiver to scan
-for (final frame in frames) {
-  displayFrame(frame); // frame.pixels contains raw RGB data
+// Feed the file in slices (official send.js importFile).
+await for (final chunk in inputFile.readChunks()) {
+  await encoder.encodeChunk(chunk);
 }
+await encoder.finishEncode();
+
+// Pull frames and play them at 15 fps for the receiver to scan; the
+// fountain stream loops forever (it restarts after 8x the required blocks,
+// exactly like upstream cimbar_js.cpp).
+CimbarFramePlayer(
+  frameSupplier: () => encoder.nextFrame(),
+  fps: 15, // frame.pixels contains raw RGB data
+);
 ```
 
 ### 4. Decode data
@@ -152,12 +158,16 @@ All functionality is exposed through abstract interfaces, enabling easy mocking 
 
 #### `ICimbarEncoder`
 
+Mirrors the official `cimbare_*` C API / `send.js` flow:
+
 ```dart
 abstract class ICimbarEncoder {
   bool get isReady;
   Future<void> configure(CimbarConfig config);
-  Future<List<CimbarFrame>> encodeData(Uint8List data, {String filename});
-  Future<List<CimbarFrame>> encodeFile(String filePath);
+  Future<void> initEncodeSession(String filename, {int encodeId = -1});
+  Future<int> encodeChunk(Uint8List chunk); // 1 more / 0 ready / <0 error
+  Future<void> finishEncode();              // official nullptr flush
+  Future<CimbarFrame?> nextFrame({bool colorBalance = false});
   Future<void> dispose();
 }
 ```
@@ -375,10 +385,15 @@ dependencies:
 ```dart
 import 'package:libcimbar/libcimbar.dart';
 
-// 编码
+// 编码（官方 send.js 流式流程）
 final encoder = await CimbarPlatform.instance.createEncoder();
 await encoder.configure(const CimbarConfig(mode: CimbarMode.modeB));
-final frames = await encoder.encodeData(data, filename: 'photo.png');
+await encoder.initEncodeSession('photo.png');
+await for (final chunk in inputFile.readChunks()) {
+  await encoder.encodeChunk(chunk);
+}
+await encoder.finishEncode();
+final frame = await encoder.nextFrame(); // 无限喷泉流，逐帧拉取
 
 // 解码
 final decoder = await CimbarPlatform.instance.createDecoder();

@@ -57,20 +57,33 @@ class CimbarShake {
 /// ([CimbarShake]), rendered nearest-neighbour at >= 1:1 pixel scale so the
 /// tile grid stays crisp and decodable.
 ///
-/// Frames are decoded lazily (one [ui.Image] at a time) so arbitrarily
-/// large encodings do not exhaust GPU memory; if a frame is still decoding
-/// when the next tick fires, the tick is skipped — playback simply holds
-/// the current frame until it is ready.
+/// Two frame sources are supported:
 ///
-/// Typical use (encoder app):
+/// 1. Pre-generated frames ([frames]) — decoded lazily (one [ui.Image] at a
+///    time) so arbitrarily large encodings do not exhaust GPU memory.
+/// 2. A live frame supplier ([frameSupplier]) — the official sender mode.
+///    Upstream `send.js nextFrame()` produces frames one at a time from the
+///    (infinite) fountain stream on every tick; this mode does the same, so
+///    memory holds a single frame no matter how large the file is.
+///
+/// If a tick produces no frame (supplier returns null — upstream
+/// `render() == 0`) or is still decoding when the next tick fires, playback
+/// simply holds the current frame.
+///
+/// Typical use (official sender mode):
 /// ```dart
-/// final frames = await encoder.encodeData(bytes, filename: 'file.bin');
-/// CimbarFramePlayer(frames: frames, fps: 15);
+/// await encoder.initEncodeSession('file.bin');
+/// // ... feed chunks via encodeChunk / finishEncode ...
+/// CimbarFramePlayer(
+///   frameSupplier: () => encoder.nextFrame(),
+///   fps: 15,
+/// );
 /// ```
 class CimbarFramePlayer extends StatefulWidget {
   const CimbarFramePlayer({
     super.key,
-    required this.frames,
+    this.frames = const [],
+    this.frameSupplier,
     this.fps = 15,
     this.playing = true,
     this.shake = true,
@@ -78,14 +91,24 @@ class CimbarFramePlayer extends StatefulWidget {
     this.onFrameChanged,
   });
 
-  /// Frames to play, as produced by [ICimbarEncoder.encodeData].
+  // NOTE: [frames] and [frameSupplier] are mutually exclusive (an assert
+  // cannot express this on a const constructor). When [frameSupplier] is
+  // set, [frames] is ignored — pass it empty.
+
+  /// Frames to play, as produced by an encoder. Ignored when
+  /// [frameSupplier] is set.
   final List<CimbarFrame> frames;
+
+  /// Live frame source (official sender mode). Called once per tick; a
+  /// `null` result keeps the current frame on screen.
+  final Future<CimbarFrame?> Function()? frameSupplier;
 
   /// Playback rate in frames per second. The official sender default is 15.
   final int fps;
 
   /// Whether the frame loop is running. Pausing keeps the current frame
-  /// (and the current shake step) on screen.
+  /// (and the current shake step) on screen — upstream `Send.togglePause`
+  /// skips both render and next_frame while paused.
   final bool playing;
 
   /// Whether to apply the upstream-style display nudge. Should stay `true`
@@ -122,14 +145,16 @@ class _CimbarFramePlayerState extends State<CimbarFramePlayer> {
   @override
   void initState() {
     super.initState();
-    _decodeAndShow(0, advanceShake: false);
+    if (widget.frameSupplier == null) _decodeAndShow(0, advanceShake: false);
     if (widget.playing) _startTimer();
   }
+
+  bool get _isSupplierMode => widget.frameSupplier != null;
 
   @override
   void didUpdateWidget(covariant CimbarFramePlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.frames, widget.frames)) {
+    if (!identical(oldWidget.frames, widget.frames) && !_isSupplierMode) {
       // New encode: restart from frame 0 with fresh state.
       if (widget.frames.isEmpty) {
         _decodeToken++;
@@ -162,19 +187,62 @@ class _CimbarFramePlayerState extends State<CimbarFramePlayer> {
       }
     } else if (widget.playing &&
         (oldWidget.fps != widget.fps ||
-            !identical(oldWidget.frames, widget.frames))) {
+            (!_isSupplierMode && !identical(oldWidget.frames, widget.frames)))) {
       _startTimer(); // re-arm with the new period
     }
   }
 
   void _startTimer() {
     _stopTimer();
-    if (widget.frames.isEmpty) return;
+    if (!_isSupplierMode && widget.frames.isEmpty) return;
     final fps = widget.fps <= 0 ? 1 : widget.fps;
+    // The official pacing: `interval = floor(1000 / fps)` (send.js setFPS)
+    // with a real sleep between frames (send.cpp wait_for_frame_time).
     _timer = Timer.periodic(Duration(milliseconds: 1000 ~/ fps), (_) {
-      if (!mounted || widget.frames.isEmpty) return;
-      final next = (_frameIndex + 1) % widget.frames.length;
-      _decodeAndShow(next);
+      _tick();
+    });
+  }
+
+  /// One playback tick — the Flutter equivalent of upstream send.js
+  /// `nextFrame()`: pull/advance to the next frame and show it.
+  Future<void> _tick() async {
+    if (!mounted) return;
+    final supplier = widget.frameSupplier;
+    if (supplier != null) {
+      if (widget.frames.isEmpty && !_isSupplierMode) return;
+      try {
+        final frame = await supplier();
+        if (frame == null) return; // official: keep showing the current frame
+        if (!mounted) return;
+        _showFrame(frame);
+      } catch (e) {
+        // Upstream lets the wasm exception propagate; here a native failure
+        // would kill the timer loop, so log and hold the current frame.
+        debugPrint('[CimbarFramePlayer] frame supplier failed: $e');
+      }
+      return;
+    }
+    if (widget.frames.isEmpty) return;
+    final next = (_frameIndex + 1) % widget.frames.length;
+    _decodeAndShow(next);
+  }
+
+  /// Decode [frame] and swap it in, advancing the shake step with it
+  /// (upstream `cimbare_render()`: show the frame, then `_window->shake()`).
+  void _showFrame(CimbarFrame frame) {
+    final token = ++_decodeToken;
+    _decodeFrame(frame, (image) {
+      if (_disposed || token != _decodeToken || !mounted) {
+        image.dispose();
+        return;
+      }
+      setState(() {
+        _frameIndex = frame.index;
+        _shakeStep = (_shakeStep + 1) % CimbarShake.offsets.length;
+        _image?.dispose();
+        _image = image;
+      });
+      widget.onFrameChanged?.call(frame.index);
     });
   }
 
@@ -247,7 +315,7 @@ class _CimbarFramePlayerState extends State<CimbarFramePlayer> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.frames.isEmpty) {
+    if (widget.frames.isEmpty && !_isSupplierMode) {
       return SizedBox(
         width: CimbarShake.boxDim,
         height: CimbarShake.boxDim,

@@ -18,26 +18,25 @@ class CimbarEncoderFfi implements ICimbarEncoder {
   @override
   bool get isReady => false;
 
-  @override
-  Future<void> configure(CimbarConfig config) async {
-    throw UnsupportedError(
-        'Encoding is only supported on desktop (Linux/Windows).');
-  }
+  UnsupportedError _unsupported() => UnsupportedError(
+      'Encoding is only supported on desktop (Linux/Windows).');
 
   @override
-  Future<List<CimbarFrame>> encodeData(
-    Uint8List data, {
-    String filename = 'data.bin',
-  }) async {
-    throw UnsupportedError(
-        'Encoding is only supported on desktop (Linux/Windows).');
-  }
+  Future<void> configure(CimbarConfig config) async => throw _unsupported();
 
   @override
-  Future<List<CimbarFrame>> encodeFile(String filePath) async {
-    throw UnsupportedError(
-        'Encoding is only supported on desktop (Linux/Windows).');
-  }
+  Future<void> initEncodeSession(String filename, {int encodeId = -1}) async =>
+      throw _unsupported();
+
+  @override
+  Future<int> encodeChunk(Uint8List chunk) async => throw _unsupported();
+
+  @override
+  Future<void> finishEncode() async => throw _unsupported();
+
+  @override
+  Future<CimbarFrame?> nextFrame({bool colorBalance = false}) async =>
+      throw _unsupported();
 
   @override
   Future<void> dispose() async {}

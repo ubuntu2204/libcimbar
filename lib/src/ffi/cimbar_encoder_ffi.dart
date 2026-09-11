@@ -3,7 +3,6 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import 'dart:ffi';
-import 'dart:io' show File, Platform;
 import 'package:ffi/ffi.dart';
 import 'package:flutter/foundation.dart';
 
@@ -14,12 +13,17 @@ import 'cimbar_bindings.dart';
 
 /// Windows/Linux/macOS cimbar encoder implementation using dart:ffi.
 ///
-/// Calls the native libcimbar C API (`cimbare_*` functions) directly.
-/// Requires `libcimbar.dll` / `libcimbar.so` / `libcimbar.dylib` to be
-/// compiled and placed in the appropriate library search path.
+/// A faithful port of the official sender flow (`web/send.js` /
+/// `src/exe/cimbar_send/send.cpp`): init_encode → encode chunks → next_frame
+/// forever. The fountain stream never ends — see [nextFrame].
 class CimbarEncoderFfi implements ICimbarEncoder {
   late final CimbarNative _native;
   bool _ready = false;
+
+  /// Reusable native staging buffer for [encodeChunk] (official send.js
+  /// keeps one `_compressBuff` for the same reason).
+  Pointer<Uint8>? _staging;
+  int _stagingSize = 0;
 
   CimbarEncoderFfi({String? libraryPath}) {
     _native = CimbarNative(libraryPath: libraryPath);
@@ -39,88 +43,84 @@ class CimbarEncoderFfi implements ICimbarEncoder {
   }
 
   @override
-  Future<List<CimbarFrame>> encodeData(
-    Uint8List data, {
-    String filename = 'data.bin',
-  }) async {
+  Future<void> initEncodeSession(String filename, {int encodeId = -1}) async {
+    _checkReady();
+    final result = _native.initEncode(filename, encodeId);
+    if (result < 0) {
+      throw StateError('cimbare_init_encode failed with code $result');
+    }
+  }
+
+  @override
+  Future<int> encodeChunk(Uint8List chunk) async {
+    _checkReady();
+    if (chunk.isEmpty) return _encode(null, 0);
+
+    final ptr = _stagingFor(chunk.length);
+    ptr.asTypedList(chunk.length).setAll(0, chunk);
+    return _encode(ptr, chunk.length);
+  }
+
+  @override
+  Future<void> finishEncode() async {
+    _checkReady();
+    // Official send.cpp: `cimbare_encode(nullptr, 0)` is the fallback flush;
+    // send.js: "this null call is functionally a flush()".
+    final result = _encode(null, 0);
+    if (result < 0) {
+      throw StateError('cimbare_encode flush failed: $result');
+    }
+  }
+
+  int _encode(Pointer<Uint8>? ptr, int size) {
+    // Official flush passes nullptr (`cimbare_encode(nullptr, 0)`).
+    return _native.encode(ptr ?? nullptr, size);
+  }
+
+  Pointer<Uint8> _stagingFor(int length) {
+    final existing = _staging;
+    if (existing != null && _stagingSize >= length) return existing;
+    if (existing != null) calloc.free(existing);
+    _staging = calloc<Uint8>(length);
+    _stagingSize = length;
+    return _staging!;
+  }
+
+  @override
+  Future<CimbarFrame?> nextFrame({bool colorBalance = false}) async {
     _checkReady();
 
-    // Step 1: Initialize encoding session
-    final initResult = _native.initEncode(filename, -1);
-    if (initResult < 0) {
-      throw StateError('cimbare_init_encode failed with code $initResult');
-    }
-
-    final chunkSize = _native.encodeBufsize;
-    final frames = <CimbarFrame>[];
-
-    // Step 2: Feed data in chunks
-    final nativeBuffer = calloc<Uint8>(chunkSize);
-    try {
-      int offset = 0;
-      while (offset < data.length) {
-        final remaining = data.length - offset;
-        final copyLen = remaining < chunkSize ? remaining : chunkSize;
-
-        // Copy chunk to native buffer
-        final src =
-            data.buffer.asUint8List(data.offsetInBytes + offset, copyLen);
-        nativeBuffer.asTypedList(chunkSize).setRange(0, copyLen, src);
-
-        final result = _native.encode(nativeBuffer, copyLen);
-        if (result < 0) {
-          throw StateError('cimbare_encode failed at offset $offset: $result');
-        }
-        offset += copyLen;
-      }
-
-      // Flush remaining data
-      final flushResult = _native.encode(nativeBuffer, 0);
-      if (flushResult < 0) {
-        throw StateError('cimbare_encode flush failed: $flushResult');
-      }
-    } finally {
-      calloc.free(nativeBuffer);
-    }
-
-    // Step 3: Extract all generated frames
-    //
-    // Frames that cannot pass the decoder's own anchor scan are dropped, the
-    // same thing upstream's EncoderPlus::encode_fountain() does. A small
-    // share of generated frames contain patterns that falsely match as
-    // corner anchors — the decoder then deskews against bogus points and the
-    // frame is worthless. Measured ~1.5% of frames.
-    int frameIndex = 0;
+    // Port of the official frame production loop:
+    //   - EncoderPlus::encode_fountain(): skip frames that fail the decoder's
+    //     own anchor scan ("some % of generated frames ... will produce random
+    //     patterns that falsely match as corner anchors"), at most 4 in a row
+    //     before emitting anyway — "we gotta make forward progress. And it's
+    //     probably a bug?"
+    //   - send.js nextFrame(): a null frame just means "keep showing the
+    //     current one" (render() returns 0, the loop carries on).
+    // The attempt cap is the one thing upstream does not have; it only ever
+    // triggers if the native side is misbehaving, and prevents an infinite
+    // Dart loop in that case.
     int consecutiveBad = 0;
-    int skipped = 0;
     int attempts = 0;
-    debugPrint('[cimbar-ffi] Collecting frames...');
     while (true) {
-      // Bound total work, not just accepted frames: a skipped frame does not
-      // advance frameIndex, so an attempt counter is what actually guarantees
-      // this loop terminates.
       if (++attempts > 1000) {
-        debugPrint('[cimbar-ffi] attempt limit reached, stopping collection');
-        break;
+        debugPrint('[cimbar-ffi] nextFrame: attempt limit reached');
+        return null;
       }
-      final frameCount = _native.nextFrame();
-      debugPrint('[cimbar-ffi] nextFrame returned: $frameCount');
-      if (frameCount <= 0) break;
+
+      final frameCount = _native.nextFrame(colorBalance: colorBalance);
+      if (frameCount <= 0) return null;
 
       final scanCheck = _native.willItScan();
       if (scanCheck == 0) {
-        // Upstream tolerates at most 4 in a row before deciding something is
-        // wrong and letting frames through anyway; more than that almost
-        // certainly means the check itself is broken, not the frames.
-        if (++consecutiveBad < 5) {
-          ++skipped;
-          continue;
-        }
-        debugPrint('[cimbar-ffi] $consecutiveBad unscannable frames in a row '
-            '- emitting anyway');
+        if (++consecutiveBad < 5) continue;
+        debugPrint('[cimbar-ffi] generated $consecutiveBad bad frames in a '
+            'row. This really shouldn\'t happen, maybe report a bug. :(');
       }
       consecutiveBad = 0;
 
+      // Snapshot the frame: the native buffer is reused for the next call.
       final result = _native.getFrameBuffer();
       final size = result.size;
       final ptr = result.ptr;
@@ -130,43 +130,23 @@ class CimbarEncoderFfi implements ICimbarEncoder {
       final width = _isqrt(imageSize);
       final height = imageSize ~/ width;
 
-      // asTypedList is a VIEW onto the encoder's frame buffer, which the
-      // next cimbare_next_frame() overwrites. CimbarFrame takes its own
-      // snapshot, so one copy total happens (inside the constructor).
-      final pixels = ptr.asTypedList(size);
-
-      frames.add(CimbarFrame(
-        index: frameIndex++,
-        pixels: pixels,
+      return CimbarFrame(
+        index: frameCount - 1,
+        pixels: ptr.asTypedList(size),
         width: width,
         height: height,
-        totalFrames: frameCount > 0 ? frameCount : null,
-      ));
-
-      if (frameIndex % 10 == 0) {
-        debugPrint('[cimbar-ffi] Collected $frameIndex frames...');
-      }
-
-      // Safety: don't loop forever
-      if (frameIndex > 500) break;
+      );
     }
-    debugPrint('[cimbar-ffi] Done: ${frames.length} frames collected'
-        '${skipped > 0 ? ' ($skipped dropped as unscannable)' : ''}');
-
-    return frames;
-  }
-
-  @override
-  Future<List<CimbarFrame>> encodeFile(String filePath) async {
-    final file = File(filePath);
-    final bytes = await file.readAsBytes();
-    final filename = filePath.split(Platform.pathSeparator).last;
-    return encodeData(bytes, filename: filename);
   }
 
   @override
   Future<void> dispose() async {
     _ready = false;
+    if (_staging != null) {
+      calloc.free(_staging!);
+      _staging = null;
+    }
+    _stagingSize = 0;
   }
 
   void _checkReady() {

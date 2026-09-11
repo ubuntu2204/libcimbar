@@ -14,7 +14,8 @@ import 'package:libcimbar/src/models/decode_result.dart';
 class MockEncoder implements ICimbarEncoder {
   bool configured = false;
   bool disposed = false;
-  final List<Uint8List> encodedData = [];
+  final List<Uint8List> encodedChunks = [];
+  List<String> sessions = [];
 
   @override
   bool get isReady => true;
@@ -25,25 +26,28 @@ class MockEncoder implements ICimbarEncoder {
   }
 
   @override
-  Future<List<CimbarFrame>> encodeData(
-    Uint8List data, {
-    String filename = 'data.bin',
-  }) async {
-    encodedData.add(data);
-    return [
-      CimbarFrame(
-        index: 0,
-        pixels: Uint8List(1024 * 1024 * 3),
-        width: 1024,
-        height: 1024,
-        totalFrames: 1,
-      ),
-    ];
+  Future<void> initEncodeSession(String filename, {int encodeId = -1}) async {
+    sessions.add(filename);
   }
 
   @override
-  Future<List<CimbarFrame>> encodeFile(String filePath) async {
-    return encodeData(Uint8List(0), filename: filePath);
+  Future<int> encodeChunk(Uint8List chunk) async {
+    encodedChunks.add(chunk);
+    return 0;
+  }
+
+  @override
+  Future<void> finishEncode() async {}
+
+  @override
+  Future<CimbarFrame?> nextFrame({bool colorBalance = false}) async {
+    if (sessions.isEmpty) return null;
+    return CimbarFrame(
+      index: 0,
+      pixels: Uint8List(1024 * 1024 * 3),
+      width: 1024,
+      height: 1024,
+    );
   }
 
   @override
@@ -198,29 +202,39 @@ void main() {
       expect(encoder.configured, isTrue);
     });
 
-    test('encodeData returns a list of frames', () async {
-      final data = Uint8List.fromList([1, 2, 3, 4, 5]);
-      final frames = await encoder.encodeData(data, filename: 'test.bin');
+    test('initEncodeSession records the filename', () async {
+      await encoder.initEncodeSession('test.bin');
+      await encoder.initEncodeSession('other.bin', encodeId: 42);
 
-      expect(frames, isNotEmpty);
-      expect(frames.first, isA<CimbarFrame>());
+      expect(encoder.sessions, ['test.bin', 'other.bin']);
     });
 
-    test('encodeData with default filename', () async {
-      final data = Uint8List.fromList([1, 2, 3]);
-      final frames = await encoder.encodeData(data);
+    test('encodeChunk collects the fed chunks', () async {
+      final a = Uint8List.fromList([1, 2, 3, 4, 5]);
+      final b = Uint8List.fromList([6, 7, 8]);
 
-      expect(frames, isNotEmpty);
+      expect(await encoder.encodeChunk(a), 0);
+      expect(await encoder.encodeChunk(b), 0);
+      expect(encoder.encodedChunks, hasLength(2));
     });
 
-    test('encodeData with empty data', () async {
-      final frames = await encoder.encodeData(Uint8List(0));
-      expect(frames, isNotEmpty);
+    test('finishEncode completes the session', () async {
+      await encoder.initEncodeSession('test.bin');
+      await encoder.encodeChunk(Uint8List.fromList([1]));
+      await encoder.finishEncode();
+      // No exception means success.
     });
 
-    test('encodeFile delegates to encodeData', () async {
-      final frames = await encoder.encodeFile('/path/to/file.avif');
-      expect(frames, isNotEmpty);
+    test('nextFrame returns a frame while a session is open', () async {
+      await encoder.initEncodeSession('test.bin');
+      final frame = await encoder.nextFrame();
+
+      expect(frame, isA<CimbarFrame>());
+    });
+
+    test('nextFrame returns null without a session', () async {
+      final frame = await encoder.nextFrame();
+      expect(frame, isNull);
     });
 
     test('dispose can be called', () async {
@@ -230,16 +244,16 @@ void main() {
 
     test('full encode workflow', () async {
       await encoder.configure(const CimbarConfig(mode: CimbarMode.modeB));
-      final frames = await encoder.encodeData(
-        Uint8List.fromList(List.generate(100, (i) => i)),
-        filename: 'screenshot.avif',
-      );
-      expect(frames.length, greaterThan(0));
+      await encoder.initEncodeSession('screenshot.avif');
+      await encoder.encodeChunk(Uint8List.fromList(List.generate(100, (i) => i)));
+      await encoder.finishEncode();
+      final frame = await encoder.nextFrame();
+      expect(frame, isNotNull);
       await encoder.dispose();
 
       expect(encoder.configured, isTrue);
       expect(encoder.disposed, isTrue);
-      expect(encoder.encodedData.length, 1);
+      expect(encoder.encodedChunks, hasLength(1));
     });
   });
 
