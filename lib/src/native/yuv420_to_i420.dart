@@ -141,10 +141,10 @@ I420Frame? yuv420ToI420(
 /// Copy a region of [plane] into [dst], honouring row padding and
 /// interleaved chroma.
 ///
-/// Sampling every `pixelStride`-th byte is what separates U from V. That is
-/// exactly what the plugin does itself: `camera_android_camerax`'s
-/// `ImageProxyUtils.planesToNV21` documents the source as "YUV_420_888 (with
-/// VU planes in NV21 layout)" and reads
+/// Sampling every `pixelStride`-th byte is what separates U from V. The
+/// camera HAL delivers "YUV_420_888 (with VU planes in NV21 layout)" —
+/// the layout `camera_android_camerax`'s `ImageProxyUtils.planesToNV21`
+/// also documented — reading
 ///   planes[1] -> uBuffer, sampled by uPixelStride  => U
 ///   planes[2] -> vBuffer, sampled by vPixelStride  => V
 /// while interleaving them the other way round (V first) to build NV21.

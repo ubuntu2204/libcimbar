@@ -26,8 +26,9 @@
                  (the author's own unmerged "orientation-station" branch
                  tried to remove it) — Flutter has no such constraint:
                  configChanges keeps the Activity alive across rotations,
-                 CameraX re-targets the analysis frames to the new display
-                 rotation, and the full-frame scan + deskew homography are
+                 the cfc Camera1 capture re-targets its frames to the new
+                 display rotation (Dart restarts the capture), and the
+                 full-frame scan + deskew homography are
                  orientation-agnostic. -->
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user

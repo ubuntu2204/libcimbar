@@ -10,7 +10,9 @@ typedef CameraFrameCallback = void Function(CameraFrame frame);
 /// Abstract interface for camera-based barcode capture.
 ///
 /// Platform implementations:
-/// - Android / iOS: the `camera` plugin (CameraX)
+/// - Android: `CfcCameraCapture` — the official cfc viewfinder ported to
+///   native Camera1 (android.hardware.Camera), no `camera` plugin involved
+/// - iOS / other native: the `camera` plugin fallback
 /// - Web: getUserMedia via dart:js_interop
 abstract class ICameraCapture {
   /// Whether camera capture is supported on this platform.

@@ -47,6 +47,15 @@ class DecodeResult {
   /// means every following frame is scanned with this mode.
   final int? detectedMode;
 
+  /// Per-stream fountain progress, one 0..1 value per in-flight stream —
+  /// the exact list the official receivers render: cfc's
+  /// `drawProgress(get_progress())` and recv.js's `render_progress(report)`
+  /// both draw ONE bar per entry, updated every frame.
+  ///
+  /// Empty when the sink holds no in-flight streams (nothing drawn — the
+  /// official behaviour too: cfc returns early on an empty list).
+  final List<double> streamProgress;
+
   const DecodeResult({
     this.fileId,
     this.filename = '',
@@ -59,15 +68,22 @@ class DecodeResult {
     this.frameBytesDecoded = 0,
     this.frameCapacity = 0,
     this.detectedMode,
+    this.streamProgress = const [],
   });
 
   /// Create a result indicating an error occurred.
+  ///
+  /// [streamProgress] carries the sink's last known per-stream state: cfc
+  /// draws `get_progress()` every frame regardless of whether THIS frame
+  /// decoded, so the bars never blink off on a bad frame.
   factory DecodeResult.error(String message, {int frameBytesDecoded = 0,
-      int frameCapacity = 0}) => DecodeResult(
+      int frameCapacity = 0, List<double> streamProgress = const []}) =>
+      DecodeResult(
         error: message,
         progress: 0.0,
         frameBytesDecoded: frameBytesDecoded,
         frameCapacity: frameCapacity,
+        streamProgress: streamProgress,
       );
 
   /// Create a progress-only result (decode in progress).
@@ -78,6 +94,7 @@ class DecodeResult {
     int frameBytesDecoded = 0,
     int frameCapacity = 0,
     int? detectedMode,
+    List<double> streamProgress = const [],
   }) =>
       DecodeResult(
         progress: progress,
@@ -86,6 +103,7 @@ class DecodeResult {
         frameBytesDecoded: frameBytesDecoded,
         frameCapacity: frameCapacity,
         detectedMode: detectedMode,
+        streamProgress: streamProgress,
       );
 
   /// Create a completed result with the recovered file data.

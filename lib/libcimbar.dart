@@ -20,7 +20,7 @@
 /// |------------------|---------------|---------|------|
 /// | Encoder          | FFI           | --      | --   |
 /// | Decoder          | FFI           | FFI     | WASM |
-/// | Camera Capture   | --            | plugin  | getUserMedia |
+/// | Camera Capture   | --            | native Camera1 (cfc port) | getUserMedia |
 ///
 /// ## Quick Start
 ///

@@ -26,7 +26,9 @@ flutter run -d PGJM10
 
 ## 功能
 
-- 通过摄像头扫描 cimbar 条码（Web 走 VideoFrame 原生 YUV 直通，Android 走 CameraX）
+- 通过摄像头扫描 cimbar 条码（Web 走 VideoFrame 原生 YUV 直通；Android 走原生
+  Camera1 API，完整移植官方 cfc 取景：`bestCameraFrameSize` 选帧、NV21 双缓冲、
+  SurfaceTexture 预览纹理）
 - 实时喷泉解码，达到阈值后自动重组文件
 - 解码完成后按条码里携带的原始文件名自动保存
 - 支持保存摄像头帧（含 NV12 / YUV420 灰度）用于调试

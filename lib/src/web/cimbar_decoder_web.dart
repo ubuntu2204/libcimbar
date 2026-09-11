@@ -28,6 +28,12 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   double _progress = 0.0;
   bool _isComplete = false;
 
+  /// Last known per-stream progress from the fountain sink report — the
+  /// list recv.js's render_progress / cfc's drawProgress render every
+  /// frame. Kept across frames that don't refresh the report so the bars
+  /// never blink off.
+  List<double> _streamProgress = const [];
+
   /// WASM heap pointer for the decode buffer.
   int _decodeBufPtr = 0;
   int _decodeBufSize = 0;
@@ -184,6 +190,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     cimbardConfigureDecode(bounce.toJS);
     cimbardConfigureDecode(_modeVal.toJS);
     _progress = 0.0;
+    _streamProgress = const [];
     debugPrint('[Decoder] fountain streams reset (mode bounce '
         '$_modeVal->$bounce->$_modeVal)');
   }
@@ -228,16 +235,19 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         if (bytesDecoded == -100 || bytesDecoded == -101) {
           // pool trouble (timeout / wasm not ready / trap), not an image
           // problem — treat the frame as skipped, not failed.
-          return DecodeResult.inProgress(progress: _progress);
+          return DecodeResult.inProgress(progress: _progress,
+              streamProgress: _streamProgress);
         }
         return DecodeResult.error(
-            'scan_extract_decode failed: $bytesDecoded — $report');
+            'scan_extract_decode failed: $bytesDecoded — $report',
+            streamProgress: _streamProgress);
       }
       if (bytesDecoded == 0) {
         lastScanBytes = 0;
         _diag('scan_extract_decode => 0 bytes (anchors found, no payload) — '
             '$report');
-        return DecodeResult.inProgress(progress: _progress);
+        return DecodeResult.inProgress(progress: _progress,
+            streamProgress: _streamProgress);
       }
       if (_autoMode) {
         // First frame with payload locks the mode — recv.js setMode():
@@ -302,14 +312,16 @@ class CimbarDecoderFfi implements ICimbarDecoder {
             '(${width}x$height, fmt=${format.value}, ${imageData.length}B) — '
             '$report');
         return DecodeResult.error(
-            'scan_extract_decode failed: $bytesDecoded — $report');
+            'scan_extract_decode failed: $bytesDecoded — $report',
+            streamProgress: _streamProgress);
       }
       if (bytesDecoded == 0) {
         lastScanBytes = 0;
         // Barcode located but no payload recovered from this frame yet.
         _diag('scan_extract_decode => 0 bytes (anchors found, no payload) — '
             '${_readReport()}');
-        return DecodeResult.inProgress(progress: _progress);
+        return DecodeResult.inProgress(progress: _progress,
+            streamProgress: _streamProgress);
       }
       _diag('scan_extract_decode => $bytesDecoded bytes — ${_readReport()}',
           force: true);
@@ -356,6 +368,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     final streams = parseFountainProgress(lastFountainProgress);
     if (streams.isNotEmpty) {
       _progress = maxFountainProgress(streams);
+      _streamProgress = streams;
     }
     debugPrint('[Decoder] fountain_decode => $fileId '
         '(runtimeType=${fileId.runtimeType})');
@@ -365,6 +378,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         'fountain_decode error: $fileId',
         frameBytesDecoded: bytesDecoded,
         frameCapacity: _decodeBufSize,
+        streamProgress: _streamProgress,
       );
     }
     if (fileId == 0) {
@@ -373,6 +387,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
         frameBytesDecoded: bytesDecoded,
         frameCapacity: _decodeBufSize,
         detectedMode: detectedMode,
+        streamProgress: _streamProgress,
       );
     }
 

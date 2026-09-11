@@ -22,6 +22,12 @@ class CimbarDecoderFfi implements ICimbarDecoder {
   bool _isComplete = false;
   int _framesProcessed = 0;
 
+  /// Last known per-stream progress from the fountain sink report
+  /// (`[ p1,p2,... ]`) — the list cfc's drawProgress renders every frame.
+  /// Kept across frames that don't refresh the report (scan misses), so
+  /// the bars stay on screen instead of blinking off.
+  List<double> _streamProgress = const [];
+
   /// Mode value applied by the last [configure] — kept so [resetStreams]
   /// can bounce it (see there).
   int _modeVal = 68;
@@ -111,6 +117,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     _native.configureDecode(bounce);
     _native.configureDecode(_modeVal);
     _progress = 0.0;
+    _streamProgress = const [];
   }
 
   @override
@@ -154,11 +161,15 @@ class CimbarDecoderFfi implements ICimbarDecoder {
       );
 
       if (bytesDecoded < 0) {
-        return DecodeResult.error('scan_extract_decode failed: $bytesDecoded');
+        return DecodeResult.error(
+          'scan_extract_decode failed: $bytesDecoded',
+          streamProgress: _streamProgress,
+        );
       }
 
       if (bytesDecoded == 0) {
-        return DecodeResult.inProgress(progress: _progress);
+        return DecodeResult.inProgress(progress: _progress,
+            streamProgress: _streamProgress);
       }
 
       if (_autoMode && bytesDecoded > 0) {
@@ -189,6 +200,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
           'fountain_decode error: $fileId',
           frameBytesDecoded: bytesDecoded,
           frameCapacity: _decodeBufferSize,
+          streamProgress: _streamProgress,
         );
       }
 
@@ -202,6 +214,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
           frameBytesDecoded: bytesDecoded,
           frameCapacity: _decodeBufferSize,
           detectedMode: detectedMode,
+          streamProgress: _streamProgress,
         );
       }
 
@@ -231,6 +244,7 @@ class CimbarDecoderFfi implements ICimbarDecoder {
     final streams = parseFountainProgress(_native.getReport());
     if (streams.isNotEmpty) {
       _progress = maxFountainProgress(streams);
+      _streamProgress = streams;
     }
   }
 

@@ -25,7 +25,7 @@ Encode files into animated color barcode sequences on one screen, and decode the
 |------------|---------|---------|--------|
 | Windows    | ✅ FFI  | ✅ FFI  | —      |
 | Linux      | ✅ FFI  | ✅ FFI  | —      |
-| Android    | —       | ✅ FFI (`libcimbar_jni.so`) | ✅ CameraX |
+| Android    | —       | ✅ FFI (`libcimbar_jni.so`) | ✅ Camera1 (native, cfc port) |
 | Web (WASM) | —       | ✅ JS interop | ✅ getUserMedia |
 
 Windows builds are produced by cross-compiling on Ubuntu with
@@ -139,7 +139,7 @@ for (final cameraFrame in cameraStream) {
 │  ┌────────▼──────────┐   ┌──────────────▼───────────────┐  │
 │  │   Desktop / FFI    │   │   Android / Web              │  │
 │  │   dart:ffi         │   │   FFI / JS interop           │  │
-│  │   libcimbar.so|dll │   │   CameraX / getUserMedia     │  │
+│  │   libcimbar.so|dll │   │   Camera1 (cfc) / getUserMedia │  │
 │  └────────┬──────────┘   └──────────────┬───────────────┘  │
 │           │                              │                  │
 │  ┌────────▼──────────────────────────────▼───────────────┐  │

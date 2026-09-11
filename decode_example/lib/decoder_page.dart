@@ -3,7 +3,8 @@ import 'dart:io' show Platform;
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
+import 'package:flutter/foundation.dart'
+    show debugPrint, kIsWeb, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'
     show SystemChrome, SystemUiMode;
@@ -70,6 +71,12 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
   bool _isCameraActive = false;
   String _statusMessage = '正在初始化解码器…';
   double _progress = 0.0;
+
+  /// Per-stream fountain progress (`[p1, p2, ...]`) — the exact list the
+  /// official receivers draw every frame (cfc drawProgress / recv.js
+  /// render_progress). Kept across frames that don't refresh it, so the
+  /// bars stay up until the sink itself changes.
+  List<double> _streamProgress = const [];
 
   CimbarConfig _config = const CimbarConfig(
     mode: CimbarMode.modeB,
@@ -287,6 +294,8 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
       _statusMessage = '摄像头已开启，请对准 cimbar 条码…';
       _detectedMode = null;
       _framesProcessed = 0;
+      _progress = 0.0;
+      _streamProgress = const [];
       _callCount = 0;
       _decodedFrames = 0;
       _perfectFrames = 0;
@@ -458,6 +467,13 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
       }
 
       _progress = result.progress;
+      // cfc draws get_progress() on EVERY frame (drawProgress is called
+      // unconditionally before drawGuidance), so the bars are a constant
+      // overlay — a bad frame keeps the last sink state instead of
+      // blinking the bars off.
+      if (result.streamProgress.isNotEmpty) {
+        _streamProgress = result.streamProgress;
+      }
       final detected = result.detectedMode;
       if (detected != null) _detectedMode = detected;
 
@@ -752,7 +768,12 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     );
   }
 
-  /// Floating status strip over the viewfinder (message + progress).
+  /// Floating status strip over the viewfinder (message + progress readout).
+  ///
+  /// The progress BARS live in the picture itself (cfc drawProgress /
+  /// recv.js render_progress — see [_buildScanningOverlay]); this strip
+  /// keeps the numeric readout permanently visible, like cfc's debug
+  /// status line.
   Widget _buildScanningStatusBar() {
     return Positioned(
       top: 0,
@@ -761,46 +782,32 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
       child: Container(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
         color: Colors.black.withValues(alpha: 0.55),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  _isReady ? Icons.check_circle : Icons.error,
-                  size: 16,
-                  color: _isReady ? Colors.greenAccent : Colors.redAccent,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _statusMessage,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                ),
-              ],
+            Icon(
+              _isReady ? Icons.check_circle : Icons.error,
+              size: 16,
+              color: _isReady ? Colors.greenAccent : Colors.redAccent,
             ),
-            if (_progress > 0 && _progress < 1.0) ...[
-              const SizedBox(height: 6),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(3),
-                child: LinearProgressIndicator(
-                  value: _progress,
-                  minHeight: 6,
-                  color: _guideColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${(_progress * 100).toStringAsFixed(1)}% — $_healthLine',
-                maxLines: 1,
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _statusMessage,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                style: const TextStyle(color: Colors.white, fontSize: 13),
               ),
-            ],
+            ),
+            const SizedBox(width: 8),
+            // Permanent progress readout — 0.0% included, so the transfer
+            // state is never a mystery (cfc logs "#: perfect/decoded/scanned"
+            // the same way, every frame).
+            Text(
+              '${(_progress * 100).toStringAsFixed(1)}%\n$_healthLine',
+              textAlign: TextAlign.right,
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+            ),
           ],
         ),
       ),
@@ -1032,6 +1039,7 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
         }
         final vidLeft = (size.width - vidW) / 2;
         final vidTop = (size.height - vidH) / 2;
+        final videoRect = Rect.fromLTWH(vidLeft, vidTop, vidW, vidH);
 
         // Largest modeAspect rect inscribed in the video rect, centred
         // (recv.js crosshair rule / cfc's central square).
@@ -1047,7 +1055,7 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
 
         return Stack(
           children: [
-            if (kIsWeb)
+            if (kIsWeb) ...[
               // recv.html crosshairs: two L-corners on the window's
               // top-right / bottom-left diagonal, white/yellow/green.
               CustomPaint(
@@ -1056,8 +1064,25 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
                   frameRect: window,
                   color: _guideColor,
                 ),
-              )
-            else ...[
+              ),
+              // recv.js render_progress: per-stream horizontal bars pinned
+              // to the bottom of the screen (fixed bottom:0 left:0 right:0),
+              // redrawn from the sink report on every decoded frame.
+              CustomPaint(
+                size: size,
+                painter: _RecvProgressBarsPainter(streams: _streamProgress),
+              ),
+            ] else ...[
+              // cfc drawProgress: one vertical bar per in-flight fountain
+              // stream at the bottom-left of the frame, redrawn every frame
+              // (jni.cpp calls it unconditionally before drawGuidance).
+              CustomPaint(
+                size: size,
+                painter: _CfcProgressBarsPainter(
+                  vidRect: videoRect,
+                  streams: _streamProgress,
+                ),
+              ),
               // cfc drawGuidance: four brackets at the window corners,
               // black outline under the status color.
               CustomPaint(
@@ -1263,4 +1288,124 @@ class _CornerBracketsPainter extends CustomPainter {
   @override
   bool shouldRepaint(_CornerBracketsPainter old) =>
       old.frameRect != frameRect || old.color != color;
+}
+
+/// Per-stream fountain progress bars, ported from cfc's `drawProgress`
+/// (jni.cpp:95): one VERTICAL bar per in-flight stream at the bottom-left
+/// of the frame — black outline under a white fill, redrawn EVERY frame
+/// (jni.cpp calls drawProgress unconditionally before drawGuidance, so the
+/// bars are a constant overlay while streams are in flight; an empty list
+/// draws nothing, exactly like upstream's early return).
+///
+/// Geometry (minsz = frame short side):
+///   fillWidth    = minsz >> 7
+///   outlineWidth = fillWidth + (minsz >> 8) + 1
+///   barLength    = (minsz >> 1) + (minsz >> 2)   (3/4 of the short side)
+///   barOffsetW   = (minsz - barLength) >> 3      (left inset)
+///   barOffsetL   = (minsz - barLength) >> 1      (bottom inset)
+class _CfcProgressBarsPainter extends CustomPainter {
+  /// The displayed video rect — cfc draws on the full frame Mat, ours is
+  /// letterboxed into the view, so the bars anchor to the same rect the
+  /// camera content actually occupies.
+  final Rect vidRect;
+  final List<double> streams;
+
+  _CfcProgressBarsPainter({required this.vidRect, required this.streams});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (streams.isEmpty) return; // upstream: if (progress.empty()) return;
+
+    final minsz = math.min(vidRect.width, vidRect.height);
+    final fillWidth = minsz / 128;
+    final outlineWidth = fillWidth + minsz / 256 + 1;
+    final barLength = minsz / 2 + minsz / 4;
+    final barOffsetW = (minsz - barLength) / 8;
+    final barOffsetL = (minsz - barLength) / 2;
+    final outlineOffset = (outlineWidth - fillWidth) / 2;
+
+    final outlinePaint = Paint()
+      ..color = Colors.black
+      ..strokeWidth = outlineWidth
+      ..strokeCap = StrokeCap.butt;
+    final fillPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = fillWidth
+      ..strokeCap = StrokeCap.butt;
+
+    double px = vidRect.left + barOffsetW;
+    final py = vidRect.bottom - barOffsetL;
+    for (final p in streams) {
+      final progress = p.clamp(0.0, 1.0);
+      final fillLength = barLength * progress;
+      canvas.drawLine(
+        Offset(px - outlineOffset, py),
+        Offset(px - outlineOffset, py - barLength),
+        outlinePaint,
+      );
+      canvas.drawLine(
+        Offset(px, py),
+        Offset(px, py - fillLength),
+        fillPaint,
+      );
+      px += outlineWidth + outlineWidth;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_CfcProgressBarsPainter old) =>
+      old.vidRect != vidRect || !listEquals(old.streams, streams);
+}
+
+/// Per-stream fountain progress bars, ported from the official WEB receiver
+/// (recv.js `render_progress` + recv.html `#progress_bars`): horizontal
+/// bars pinned to the BOTTOM of the screen (position: fixed; bottom: 0;
+/// left: 0; right: 0), one per in-flight stream, white fill inside a navy
+/// inset border, width = progress. A zero-width bar still shows its border
+/// line — the bars are permanently visible from the first frame on.
+class _RecvProgressBarsPainter extends CustomPainter {
+  final List<double> streams;
+
+  _RecvProgressBarsPainter({required this.streams});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (streams.isEmpty) return;
+
+    final vh = size.height / 100;
+    final barH = 1.2 * vh; // .progress { height: 1.2vh }
+    final borderTop = 0.2 * vh; // border-top: 0.2vh inset navy
+    final borderBottom = 0.4 * vh; // border-bottom: 0.4vh inset navy
+    final borderRight = 0.3 * vh; // border-right: 0.3vh inset navy
+    final margin = 1.0 * vh; // margin-bottom: 1vh
+    final totalH = barH + borderTop + borderBottom;
+
+    final navyPaint = Paint()..color = const Color(0xFF000080);
+    final whitePaint = Paint()..color = Colors.white;
+    final radius = Radius.circular(0.5 * vh); // border-radius: 0 0.5vh 0.5vh 0
+
+    // First stream = first div = topmost; the group sits at screen bottom.
+    double bottom = size.height - margin;
+    for (final p in streams.reversed) {
+      final top = bottom - totalH;
+      final w = size.width * p.clamp(0.0, 1.0);
+
+      final outer = RRect.fromRectAndCorners(
+        Rect.fromLTWH(0, top, w + borderRight, totalH),
+        topRight: radius,
+        bottomRight: radius,
+      );
+      canvas.drawRRect(outer, navyPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(0, top + borderTop, w, barH),
+        whitePaint,
+      );
+
+      bottom -= totalH + margin;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RecvProgressBarsPainter old) =>
+      !listEquals(old.streams, streams);
 }
