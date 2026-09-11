@@ -10,9 +10,7 @@ import 'interfaces/cimbar_encoder_interface.dart';
 import 'interfaces/cimbar_decoder_interface.dart';
 import 'interfaces/screen_capture_interface.dart';
 import 'interfaces/camera_capture_interface.dart';
-import 'interfaces/image_compressor_interface.dart';
 
-import 'impl/avif_compressor.dart';
 import 'impl/windows_screen_capture.dart'
     if (dart.library.js_interop) 'web/screen_capture_stub.dart';
 import 'native/cfc_camera_capture.dart'
@@ -45,8 +43,8 @@ import 'ffi/cimbar_decoder_ffi.dart'
 /// | Decoder        | FFI           | FFI     | WASM           |
 /// | Camera Capture | --            | cfc     | getUserMedia   |
 ///
-/// `createScreenCapture()` and `createImageCompressor()` still exist, but the
-/// example apps no longer use them (no Alt+A screenshot / AVIF workflow).
+/// `createScreenCapture()` still exists, but the example apps no longer
+/// use it (no Alt+A screenshot workflow).
 ///
 /// Usage:
 /// ```dart
@@ -130,16 +128,6 @@ class CimbarPlatform {
     throw UnsupportedError(
       'Camera capture is only supported on Web, Android and iOS.',
     );
-  }
-
-  /// Create an AVIF image compressor (Windows only).
-  Future<IImageCompressor> createImageCompressor() async {
-    if (kIsWeb) {
-      throw UnsupportedError(
-        'Image compression is only supported on Windows.',
-      );
-    }
-    return AvifCompressor();
   }
 }
 

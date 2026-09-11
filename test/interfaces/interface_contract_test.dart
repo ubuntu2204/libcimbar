@@ -5,7 +5,6 @@ import 'package:libcimbar/src/interfaces/cimbar_encoder_interface.dart';
 import 'package:libcimbar/src/interfaces/cimbar_decoder_interface.dart';
 import 'package:libcimbar/src/interfaces/screen_capture_interface.dart';
 import 'package:libcimbar/src/interfaces/camera_capture_interface.dart';
-import 'package:libcimbar/src/interfaces/image_compressor_interface.dart';
 import 'package:libcimbar/src/models/cimbar_config.dart';
 import 'package:libcimbar/src/models/cimbar_frame.dart';
 import 'package:libcimbar/src/models/decode_result.dart';
@@ -173,44 +172,6 @@ class MockCameraCapture implements ICameraCapture {
       timestampUs: DateTime.now().microsecondsSinceEpoch,
     ));
   }
-}
-
-class MockImageCompressor implements IImageCompressor {
-  @override
-  bool get isAvailable => true;
-
-  @override
-  Future<Uint8List> compressRgba(
-    Uint8List pixels, {
-    required int width,
-    required int height,
-    CompressionQuality quality = CompressionQuality.balanced,
-  }) async {
-    // Return a minimal "compressed" result
-    return Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]);
-  }
-
-  @override
-  Future<Uint8List> compressRgb(
-    Uint8List pixels, {
-    required int width,
-    required int height,
-    CompressionQuality quality = CompressionQuality.balanced,
-  }) async {
-    return Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]);
-  }
-
-  @override
-  Future<DecompressedImage> decompress(Uint8List data) async {
-    return DecompressedImage(
-      pixels: Uint8List(4 * 4 * 4),
-      width: 4,
-      height: 4,
-    );
-  }
-
-  @override
-  Future<void> dispose() async {}
 }
 
 // ─── Tests ───────────────────────────────────────────────────────
@@ -481,77 +442,4 @@ void main() {
     });
   });
 
-  group('IImageCompressor interface contract', () {
-    late MockImageCompressor compressor;
-
-    setUp(() {
-      compressor = MockImageCompressor();
-    });
-
-    test('isAvailable returns true for mock', () {
-      expect(compressor.isAvailable, isTrue);
-    });
-
-    test('compressRgba returns compressed data', () async {
-      final pixels = Uint8List(4 * 4 * 4); // 4x4 RGBA
-      final result = await compressor.compressRgba(
-        pixels,
-        width: 4,
-        height: 4,
-      );
-
-      expect(result, isNotEmpty);
-    });
-
-    test('compressRgb returns compressed data', () async {
-      final pixels = Uint8List(4 * 4 * 3); // 4x4 RGB
-      final result = await compressor.compressRgb(
-        pixels,
-        width: 4,
-        height: 4,
-      );
-
-      expect(result, isNotEmpty);
-    });
-
-    test('compressRgba with quality presets', () async {
-      final pixels = Uint8List(4 * 4 * 4);
-
-      for (final quality in CompressionQuality.values) {
-        final result = await compressor.compressRgba(
-          pixels,
-          width: 4,
-          height: 4,
-          quality: quality,
-        );
-        expect(result, isNotEmpty);
-      }
-    });
-
-    test('decompress returns DecompressedImage', () async {
-      final compressed = Uint8List.fromList([0x89, 0x50, 0x4E, 0x47]);
-      final result = await compressor.decompress(compressed);
-
-      expect(result.pixels, isNotEmpty);
-      expect(result.width, greaterThan(0));
-      expect(result.height, greaterThan(0));
-    });
-
-    test('DecompressedImage has correct properties', () {
-      final img = DecompressedImage(
-        pixels: Uint8List(0),
-        width: 100,
-        height: 200,
-      );
-
-      expect(img.width, 100);
-      expect(img.height, 200);
-      expect(img.pixels.length, 0);
-    });
-
-    test('dispose can be called', () async {
-      await compressor.dispose();
-      // No exception means success
-    });
-  });
 }

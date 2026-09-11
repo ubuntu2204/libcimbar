@@ -8,8 +8,6 @@ import 'package:libcimbar/src/interfaces/cimbar_encoder_interface.dart';
 import 'package:libcimbar/src/interfaces/cimbar_decoder_interface.dart';
 import 'package:libcimbar/src/interfaces/screen_capture_interface.dart';
 import 'package:libcimbar/src/interfaces/camera_capture_interface.dart';
-import 'package:libcimbar/src/interfaces/image_compressor_interface.dart';
-import 'package:libcimbar/src/impl/avif_compressor.dart';
 
 // ─── Fake implementations for testing platform registration ──────
 
@@ -141,12 +139,6 @@ void main() {
       final camera = FakeCameraCapture();
       expect(camera, isA<ICameraCapture>());
       expect(camera.isSupported, isTrue);
-    });
-
-    test('AvifCompressor implements IImageCompressor', () {
-      final compressor = AvifCompressor();
-      expect(compressor, isA<IImageCompressor>());
-      expect(compressor.isAvailable, isTrue);
     });
   });
 

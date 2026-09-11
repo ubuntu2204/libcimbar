@@ -52,7 +52,6 @@ export 'src/interfaces/cimbar_encoder_interface.dart';
 export 'src/interfaces/cimbar_decoder_interface.dart';
 export 'src/interfaces/screen_capture_interface.dart';
 export 'src/interfaces/camera_capture_interface.dart';
-export 'src/interfaces/image_compressor_interface.dart';
 
 // Platform interface (auto-selects implementation)
 export 'src/cimbar_platform.dart';
@@ -66,6 +65,3 @@ export 'src/models/capture_mode.dart' show WebCaptureMode;
 export 'src/widgets/cimbar_player.dart'; // CimbarFramePlayer, CimbarShake
 export 'src/utils/cimbar_file_saver.dart'; // saveRecoveredFile
 export 'src/utils/cimbar_file_loader.dart'; // pickCimbarInputFile
-
-// Implementations (for direct use or testing)
-export 'src/impl/avif_compressor.dart';
