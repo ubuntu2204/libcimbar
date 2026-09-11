@@ -806,6 +806,26 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
     return null;
   }
 
+  /// The Flutter texture id of the CfcCameraCapture preview (Android),
+  /// or null when another capture backend is active.
+  int? get _cfcTextureId {
+    try {
+      final id = (_camera as dynamic).textureId as int?;
+      return (id != null && id >= 0) ? id : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Rotation the cfc capture reported for the current display.
+  int get _cfcRotation {
+    try {
+      return ((_camera as dynamic).rotation as int?) ?? 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// [fullBleed] renders the preview edge-to-edge (scanning layout);
   /// otherwise it is clipped into the idle layout's preview card.
   Widget _buildCameraPreview({bool fullBleed = false}) {
@@ -818,6 +838,39 @@ class _DecoderPageState extends State<DecoderPage> with WidgetsBindingObserver {
           // Camera video stream
           HtmlElementView(viewType: vType),
           // Scanning frame overlay
+          _buildScanningOverlay(),
+        ],
+      );
+      if (fullBleed) return stack;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: stack,
+      );
+    }
+
+    // CfcCameraCapture (Android): preview via a Flutter texture fed by the
+    // camera's SurfaceTexture. The texture content is the sensor-direction
+    // 4:3 frame; RotatedBox orients it for the current display, exactly
+    // like cfc's frameRotation. If the preview texture is not available
+    // (no permission / camera error) the "scanning blind" card below shows.
+    final cfcId = _cfcTextureId;
+    if (_isCameraActive && cfcId != null) {
+      final portrait =
+          MediaQuery.of(context).size.height >= MediaQuery.of(context).size.width;
+      final displayAspect = portrait ? 1 / _captureAspect : _captureAspect;
+      final stack = Stack(
+        fit: StackFit.expand,
+        children: [
+          const ColoredBox(color: Colors.black),
+          Center(
+            child: AspectRatio(
+              aspectRatio: displayAspect,
+              child: RotatedBox(
+                quarterTurns: (_cfcRotation ~/ 90) % 4,
+                child: Texture(textureId: cfcId),
+              ),
+            ),
+          ),
           _buildScanningOverlay(),
         ],
       );

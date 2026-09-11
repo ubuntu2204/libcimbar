@@ -9,6 +9,7 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 
 import '../interfaces/camera_capture_interface.dart';
+import 'cfc_camera_capture.dart';
 import 'yuv420_to_i420.dart';
 
 /// Camera capture for Android (and iOS), backed by the `camera` plugin.
@@ -214,4 +215,42 @@ class AndroidCameraCapture implements ICameraCapture {
 /// conditional import decides what this resolves to — the `camera`-plugin
 /// implementation on native, the getUserMedia one on web — and both sides
 /// export it under this alias so every target compiles.
-typedef PlatformCameraCapture = AndroidCameraCapture;
+typedef PlatformCameraCapture = AdaptiveCameraCapture;
+
+/// Android uses the OFFICIAL-style capture (`CfcCameraCapture` — Camera1 +
+/// cfc's `bestCameraFrameSize` + NV21 + Flutter-texture preview, which
+/// keeps the sensor's native 4:3 field of view); other native platforms
+/// keep the `camera` plugin implementation.
+class AdaptiveCameraCapture implements ICameraCapture {
+  final ICameraCapture _impl;
+
+  AdaptiveCameraCapture()
+      : _impl = Platform.isAndroid ? CfcCameraCapture() : AndroidCameraCapture();
+
+  @override
+  bool get isSupported => _impl.isSupported;
+
+  @override
+  bool get isStreaming => _impl.isStreaming;
+
+  @override
+  Future<void> start({
+    int preferredWidth = 1920,
+    int preferredHeight = 1080,
+    int frameIntervalMs = 200,
+  }) =>
+      _impl.start(
+        preferredWidth: preferredWidth,
+        preferredHeight: preferredHeight,
+        frameIntervalMs: frameIntervalMs,
+      );
+
+  @override
+  void onFrame(CameraFrameCallback callback) => _impl.onFrame(callback);
+
+  @override
+  Future<void> stop() => _impl.stop();
+
+  @override
+  Future<void> dispose() => _impl.dispose();
+}
