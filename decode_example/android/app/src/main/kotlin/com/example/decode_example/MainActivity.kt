@@ -11,10 +11,19 @@ class MainActivity : FlutterActivity() {
         // OFFICIAL-style camera capture (cfc): Camera1 + bestCameraFrameSize
         // + NV21 frames + Flutter-texture preview. See CfcCameraHandler.kt.
         cfcCamera = CfcCameraHandler(
-            applicationContext,
+            this,
             flutterEngine.dartExecutor.binaryMessenger,
             flutterEngine.renderer,
         ).also { it.configure() }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray,
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        cfcCamera?.onPermissionsResult(requestCode, grantResults)
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {

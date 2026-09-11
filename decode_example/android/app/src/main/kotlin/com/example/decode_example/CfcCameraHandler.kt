@@ -1,14 +1,18 @@
 package com.example.decode_example
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.ImageFormat
 import android.hardware.Camera
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import android.view.WindowManager
+import androidx.core.content.ContextCompat
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -30,17 +34,20 @@ import io.flutter.view.TextureRegistry
  *    TextureRegistry), the equivalent of cfc drawing its camera Mat into
  *    its own view — Dart letterboxes/rotates it with its own widgets.
  *
- * Frames are throttled to the official 15 fps cadence and shipped to Dart
- * over the frames EventChannel as raw NV21 byte arrays (sensor direction —
- * Dart rotates for display and decodes orientation-independently).
+ * Frames are throttled to [FRAME_INTERVAL_MS] (official apps decode every
+ * camera frame; the Dart decoder needs a bounded rate) and shipped to Dart
+ * over the frames EventChannel as raw NV21 byte arrays.
  *
  * NOTE: `setDisplayOrientation` is deliberately NOT called. For
  * SurfaceTextures it only encodes a transform matrix that the Flutter
  * engine does not apply; instead Dart rotates the texture with RotatedBox
  * based on the `rotation` value returned from open().
+ *
+ * NOTE: this handler BYPASSES the camera plugin, so it must request the
+ * CAMERA runtime permission itself (the plugin used to do it).
  */
 class CfcCameraHandler(
-    private val context: Context,
+    private val activity: android.app.Activity,
     private val messenger: BinaryMessenger,
     private val textureRegistry: TextureRegistry,
 ) {
@@ -48,8 +55,12 @@ class CfcCameraHandler(
         const val CHANNEL = "libcimbar/cfc_camera"
         const val FRAME_CHANNEL = "libcimbar/cfc_camera/frames"
 
+        private const val TAG = "CfcCamera"
+
         /// Official cadence (recv.js frameRate ideal:15 / cfc every frame).
         private const val FRAME_INTERVAL_MS = 66L
+
+        private const val PERMISSION_REQUEST_CODE = 9001
     }
 
     private var camera: Camera? = null
@@ -59,6 +70,7 @@ class CfcCameraHandler(
     private var frameHeight = 0
     private var frameRotation = 0
     private var lastFrameAt = 0L
+    private var pendingOpenResult: MethodChannel.Result? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
     fun configure() {
@@ -81,9 +93,49 @@ class CfcCameraHandler(
             })
     }
 
+    /// Called by the Activity when a permission request completes.
+    fun onPermissionsResult(requestCode: Int, grantResults: IntArray) {
+        if (requestCode != PERMISSION_REQUEST_CODE) return
+        val result = pendingOpenResult
+        pendingOpenResult = null
+        if (result == null) return
+        val granted = grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            Log.i(TAG, "CAMERA permission granted — opening camera")
+            doOpen(result)
+        } else {
+            Log.e(TAG, "CAMERA permission denied")
+            result.error("permission", "CAMERA 权限被拒绝", null)
+        }
+    }
+
+    private fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun open(result: MethodChannel.Result) {
+        if (camera != null) {
+            Log.i(TAG, "open: already open")
+            result.success(currentState())
+            return
+        }
+        if (!hasCameraPermission()) {
+            // This handler bypasses the camera plugin, so IT must request
+            // the runtime permission (the plugin used to do it).
+            Log.i(TAG, "open: requesting CAMERA permission")
+            pendingOpenResult = result
+            activity.requestPermissions(
+                arrayOf(Manifest.permission.CAMERA), PERMISSION_REQUEST_CODE)
+            return
+        }
+        Log.i(TAG, "open: permission already granted")
+        doOpen(result)
+    }
+
     /// cfc's initializeCamera core path, on Camera1 (android.hardware.Camera).
     @SuppressLint("DiscouragedPrivateApi")
-    private fun open(result: MethodChannel.Result) {
+    private fun doOpen(result: MethodChannel.Result) {
         if (camera != null) {
             result.success(currentState())
             return
@@ -107,7 +159,7 @@ class CfcCameraHandler(
             Camera.getCameraInfo(cameraId, info)
             // OpenCV CameraBridgeViewBase.getFrameRotation: sensor
             // orientation vs screen rotation.
-            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            val wm = activity.getSystemService(Context.WINDOW_SERVICE) as WindowManager
             val screenRotation = when (wm.defaultDisplay.rotation) {
                 Surface.ROTATION_90 -> 90
                 Surface.ROTATION_180 -> 180
@@ -119,19 +171,22 @@ class CfcCameraHandler(
             } else {
                 (info.orientation - screenRotation + 360) % 360
             }
+            Log.i(TAG, "open: camera $cameraId, frameRotation=$frameRotation")
 
             val params = cam.parameters
             // cfc bestCameraFrameSize: short side 960..1080, smallest width.
             // Surface bounds = the display in its CURRENT orientation, like
             // cfc's view bounds.
-            val dm = context.resources.displayMetrics
+            val dm = activity.resources.displayMetrics
             val frameSize = bestCameraFrameSize(
                 params.supportedPreviewSizes, dm.widthPixels, dm.heightPixels,
             ) ?: run {
                 cam.release()
+                Log.e(TAG, "open: no suitable preview size")
                 result.error("no-size", "No suitable preview size", null)
                 return
             }
+            Log.i(TAG, "open: preview ${frameSize.width}x${frameSize.height}")
 
             params.previewFormat = ImageFormat.NV21
             params.setPreviewSize(frameSize.width, frameSize.height)
@@ -149,6 +204,7 @@ class CfcCameraHandler(
             val entry = textureRegistry.createSurfaceTexture()
             cam.setPreviewTexture(entry.surfaceTexture())
             cam.startPreview()
+            Log.i(TAG, "open: preview started, textureId=${entry.id()}")
 
             // NV21 frames, double-buffered (cfc: mBuffer + addCallbackBuffer).
             val bufSize = frameWidth * frameHeight *
@@ -165,11 +221,13 @@ class CfcCameraHandler(
         } catch (e: Exception) {
             camera?.release()
             camera = null
+            Log.e(TAG, "open failed", e)
             result.error("camera-error", e.message, null)
         }
     }
 
     private fun close(result: MethodChannel.Result) {
+        Log.i(TAG, "close")
         camera?.let { cam ->
             cam.setPreviewCallbackWithBuffer(null)
             cam.stopPreview()
