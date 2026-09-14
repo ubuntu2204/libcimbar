@@ -188,6 +188,7 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
         _hasStream = true;
         _playerPlaying = true;
         _currentFrameIndex = 0;
+        _nullFrameStreak = 0;
         _statusMessage = '正在播放：${input.filename}';
       });
 
@@ -270,6 +271,35 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
     setState(() => _config = _config.copyWith(fps: fps));
   }
 
+  /// Frame supplier wrapper with a stall detector.
+  ///
+  /// The official fountain stream is infinite (`cimbar_js.cpp`: the stream
+  /// restarts after 8x the required symbol blocks), so `nextFrame()` should
+  /// NEVER come up empty for long. A stream that keeps drying up means the
+  /// loaded native library predates the infinite-stream semantics (it caps
+  /// frames and returns 0) — say so instead of freezing silently.
+  int _nullFrameStreak = 0;
+
+  Future<CimbarFrame?> _supplyFrame() async {
+    final frame = await _encoder!.nextFrame();
+    if (frame != null) {
+      _nullFrameStreak = 0;
+      return frame;
+    }
+    if (++_nullFrameStreak == 30) {
+      // ~2s at 15 fps: not a transient hiccup, the stream is really over.
+      if (mounted) {
+        setState(() {
+          _playerPlaying = false;
+          _statusMessage = '编码流已停止产出帧（${_inputFile?.filename ?? ''}）。'
+              '加载的原生库可能是旧版（缺少官方无限喷泉语义），'
+              '请重新编译 libcimbar.dll / .so 后重试。';
+        });
+      }
+    }
+    return null;
+  }
+
   // ─── UI helpers ────────────────────────────────────────────────────────
 
   /// Official nav labels: B / Bm / Bu / 4C.
@@ -317,7 +347,7 @@ class _EncoderPageState extends State<EncoderPage> with WindowListener {
                           fit: BoxFit.contain,
                           child: CimbarFramePlayer(
                             key: ValueKey(_streamKey),
-                            frameSupplier: () => _encoder!.nextFrame(),
+                            frameSupplier: _supplyFrame,
                             fps: _config.fps,
                             playing: _playerPlaying,
                             onFrameChanged: (i) {
