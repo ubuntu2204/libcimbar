@@ -5,7 +5,8 @@
 //   Android → android/src/main/jniLibs/<abi>/libcimbar_jni.so (Gradle merges
 //             it into the APK, no NDK/CMake needed)
 //   Windows → windows/libcimbar.dll (copied next to the .exe by CMake)
-//   Web     → assets/wasm/*.wasm (Flutter asset; not a code asset at all)
+//   Web     → the app's web/assets/wasm/* (static files next to index.html;
+//             not a code asset, and deliberately not a bundled Flutter asset)
 //
 // Linux has no usable prebuilt (glibc/distro differences), so this hook
 // compiles the vendored C++ core from `third_party/libcimbar` with CMake.
@@ -112,15 +113,17 @@ void main(List<String> args) async {
 Uri? _findLibrary(Uri buildDir) {
   final dir = Directory.fromUri(buildDir);
   if (!dir.existsSync()) return null;
-  final matches = dir
-      .listSync(recursive: true)
-      .whereType<File>()
-      .where((f) => f.uri.pathSegments.last == _linuxLibraryName)
-      .toList()
-    // Prefer the shallowest match (build root over nested intermediates).
-    ..sort((a, b) => a.uri.pathSegments.length.compareTo(
-          b.uri.pathSegments.length,
-        ));
+  final matches =
+      dir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.uri.pathSegments.last == _linuxLibraryName)
+          .toList()
+        // Prefer the shallowest match (build root over nested intermediates).
+        ..sort(
+          (a, b) =>
+              a.uri.pathSegments.length.compareTo(b.uri.pathSegments.length),
+        );
   return matches.isEmpty ? null : matches.first.uri;
 }
 

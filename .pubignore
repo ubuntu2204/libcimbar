@@ -73,8 +73,9 @@ android/.externalNativeBuild/
 # ====================
 # WASM artifacts (built separately via native/build_wasm.sh)
 # ====================
-# The copy in `assets/wasm/` IS published (Flutter asset, loaded by the web
-# decoder); the per-app copies are duplicates and stay out.
+# The copy in `assets/wasm/` IS published (reference copies apps can place in
+# their own `web/assets/wasm/`; it is not a bundled Flutter asset anymore); the
+# per-app copies are duplicates and stay out.
 *.wasm
 !assets/wasm/*.wasm
 example/web/assets/wasm/

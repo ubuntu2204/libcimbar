@@ -18,6 +18,13 @@
 
 ### Fixed
 
+- **桌面/移动构建不再打包 WASM 资源**：移除了插件 `pubspec.yaml` 里的
+  `assets: - assets/wasm/`。WASM 只被 Web 端当作**静态文件**加载（应用自己的
+  `web/assets/wasm/`，由 `index.html` 的 `<script>` 与 worker 的 `importScripts()`
+  引用），没有任何代码走 Flutter 资源包；这条声明只会让 Windows/Linux/Android 的
+  `flutter_assets/packages/libcimbar/assets/wasm/` 多出约 4 MB 用不到的
+  `.js`/`.wasm`。**注意**：旧的构建产物不会被自动清理，需手动删掉该目录或重新构建。
+
 - **中文（非 ASCII）文件名乱码**：
   - 编码端 `cimbare_init_encode` 的 `fnsize` 改为 UTF-8 **字节数**（此前传的是 Dart
     的 UTF-16 码元数，导致中文名被从中间截断成非法 UTF-8）

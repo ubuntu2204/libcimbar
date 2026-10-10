@@ -287,6 +287,14 @@ bash build_wasm.sh /path/to/libcimbar
 # decode_example/web/assets/wasm/cimbar_js.wasm
 ```
 
+The WASM glue is **not** a bundled Flutter asset: the web decoder loads it as a
+plain static file (`index.html` injects `<script
+src="assets/wasm/libcimbar.js">`, and `recv-worker.js` is spawned by URL and
+`importScripts()`es the glue next to itself). So each web app must keep its own
+copy under **`<app>/web/assets/wasm/`** — `flutter build web` copies `web/`
+verbatim to the build root. Declaring it in the plugin's `pubspec.yaml` instead
+would only make every desktop/Android bundle carry ~4 MB of unused wasm.
+
 ## Example Apps
 
 The project provides two separate example applications:

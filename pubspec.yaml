@@ -62,5 +62,12 @@ flutter:
         pluginClass: LibcimbarWeb
         fileName: src/web/libcimbar_web.dart
 
-  assets:
-    - assets/wasm/
+  # No `assets:` on purpose.
+  #
+  # The Emscripten glue (libcimbar.js / cimbar_js.wasm) and the decode worker
+  # are fetched by the WEB decoder as plain static files from the app's own
+  # `web/assets/wasm/` directory: index.html injects
+  # `<script src="assets/wasm/libcimbar.js">` and recv-worker.js is spawned by
+  # URL. Nothing reads them through the Flutter asset bundle, so declaring them
+  # here only made every Linux/Windows/Android bundle carry ~4 MB of wasm/js.
+  # The reference copies still ship inside the package under `assets/wasm/`.

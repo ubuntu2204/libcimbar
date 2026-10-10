@@ -99,8 +99,11 @@ android/.externalNativeBuild/
 # Web / WASM assets
 # ====================
 # Built separately via native/build_wasm.sh — but the copies under
-# `assets/wasm/` are the ones we PUBLISH (the web decoder loads them), so they
-# are tracked. Per-app copies (example/web, decode_example/web) stay ignored.
+# `assets/wasm/` are the ones we PUBLISH (reference copies apps can drop into
+# their own `web/assets/wasm/`), so they are tracked. They are NOT declared as
+# Flutter assets: the web decoder loads the glue/worker from the app's `web/`
+# directory, and bundling them would weigh down every desktop/Android build.
+# Per-app copies (example/web, decode_example/web) stay ignored.
 assets/wasm/*.wasm
 assets/wasm/*.js
 !assets/wasm/.gitkeep
